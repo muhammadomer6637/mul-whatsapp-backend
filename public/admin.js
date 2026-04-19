@@ -307,19 +307,38 @@ async function sendMessage() {
     return;
   }
 
-  if (!msg) return;
+  if (!msg) {
+    return;
+  }
 
-  await fetch(`${BASE}/api/send`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      phone: selectedPhone,
-      message: msg
-    })
-  });
+  try {
+    const res = await fetch(`${BASE}/api/send`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        phone: selectedPhone,
+        message: msg
+      })
+    });
 
-  input.value = "";
-  await openChat(selectedPhone, false);
+    const data = await res.json();
+    console.log("SEND RESPONSE:", data);
+
+    if (!res.ok || !data.success) {
+      alert(data.error || "Message send failed");
+      return;
+    }
+
+    input.value = "";
+
+    await loadChats();
+    await openChat(selectedPhone, false);
+  } catch (error) {
+    console.error("Frontend send error:", error);
+    alert("Message send failed. Check browser console and Railway logs.");
+  }
 }
 
 async function switchToBot() {
