@@ -1,27 +1,21 @@
 const { Pool } = require("pg");
 
-const connectionString = process.env.DATABASE_URL;
-
-console.log("DATABASE_URL exists:", !!connectionString);
-
 const pool = new Pool({
-  connectionString,
-  ssl: { rejectUnauthorized: false }
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes("railway")
+    ? { rejectUnauthorized: false }
+    : false
 });
 
 async function testConnection() {
   try {
     const client = await pool.connect();
-    const result = await client.query("SELECT NOW()");
-    console.log("✅ Database connected successfully");
-    console.log("DB time:", result.rows[0].now);
+    console.log("Database connected successfully");
     client.release();
   } catch (error) {
-    console.error("❌ Database connection error:", error.message);
+    console.error("Database connection error:", error.message);
   }
 }
 
-module.exports = {
-  pool,
-  testConnection,
-};
+module.exports = pool;
+module.exports.testConnection = testConnection;
