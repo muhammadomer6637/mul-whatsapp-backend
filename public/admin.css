@@ -11,7 +11,6 @@
   --success: #18c37e;
   --warning: #f3b544;
   --danger: #ff5b6e;
-  --chip: rgba(255,255,255,0.06);
   --shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
   --radius: 22px;
 }
@@ -28,11 +27,14 @@ body {
     radial-gradient(circle at top left, rgba(74, 163, 255, 0.12), transparent 20%),
     linear-gradient(135deg, #071224 0%, #08172c 40%, #0a1b35 100%);
   color: var(--text);
+  height: 100vh;
+  overflow: hidden;
 }
 
 .app-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -44,6 +46,7 @@ body {
   flex-direction: column;
   justify-content: space-between;
   box-shadow: var(--shadow);
+  flex-shrink: 0;
 }
 
 .brand {
@@ -135,7 +138,9 @@ body {
 .main-content {
   flex: 1;
   padding: 28px;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .topbar {
@@ -143,6 +148,7 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 24px;
+  flex-shrink: 0;
 }
 
 .topbar h1 {
@@ -184,6 +190,26 @@ body {
   opacity: 0.96;
 }
 
+.section {
+  flex: 1;
+  min-height: 0;
+}
+
+.section.hidden {
+  display: none;
+}
+
+#dashboard {
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+#agent {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .toolbar,
 .agent-toolbar {
   display: flex;
@@ -192,6 +218,7 @@ body {
   gap: 18px;
   margin-bottom: 22px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .range-group,
@@ -216,10 +243,6 @@ body {
   background: linear-gradient(135deg, rgba(47,125,246,0.22), rgba(77,163,255,0.12));
   border-color: rgba(77, 163, 255, 0.4);
   color: white;
-}
-
-.section.hidden {
-  display: none;
 }
 
 .stats-grid {
@@ -419,7 +442,8 @@ body {
   display: grid;
   grid-template-columns: 360px 1fr;
   gap: 18px;
-  min-height: 72vh;
+  min-height: 0;
+  height: 100%;
 }
 
 .chat-sidebar,
@@ -435,6 +459,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .chat-sidebar-header {
@@ -443,6 +468,7 @@ body {
   align-items: center;
   padding: 20px 20px 14px;
   border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
 }
 
 .chat-sidebar-header h3 {
@@ -465,6 +491,7 @@ body {
   padding: 10px;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 
 .chat-item {
@@ -529,6 +556,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 
 .chat-header {
@@ -538,6 +566,7 @@ body {
   justify-content: space-between;
   gap: 16px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .chat-header h3 {
@@ -551,6 +580,7 @@ body {
 
 .messages {
   flex: 1;
+  min-height: 0;
   padding: 20px;
   overflow-y: auto;
   background:
@@ -606,6 +636,7 @@ body {
   grid-template-columns: 1fr auto auto;
   gap: 12px;
   background: rgba(255,255,255,0.02);
+  flex-shrink: 0;
 }
 
 .composer input {
@@ -685,16 +716,19 @@ body {
   margin-bottom: 14px;
 }
 
-.premium-scroll::-webkit-scrollbar {
+.premium-scroll::-webkit-scrollbar,
+#dashboard::-webkit-scrollbar {
   width: 9px;
 }
 
-.premium-scroll::-webkit-scrollbar-thumb {
+.premium-scroll::-webkit-scrollbar-thumb,
+#dashboard::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,0.10);
   border-radius: 999px;
 }
 
-.premium-scroll::-webkit-scrollbar-track {
+.premium-scroll::-webkit-scrollbar-track,
+#dashboard::-webkit-scrollbar-track {
   background: transparent;
 }
 
@@ -712,6 +746,13 @@ body {
 @media (max-width: 780px) {
   .app-shell {
     flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  body {
+    height: auto;
+    overflow: auto;
   }
 
   .sidebar {
@@ -722,6 +763,7 @@ body {
 
   .main-content {
     padding: 18px;
+    overflow: visible;
   }
 
   .topbar {
@@ -736,5 +778,9 @@ body {
 
   .message-bubble {
     max-width: 90%;
+  }
+
+  .agent-layout {
+    height: auto;
   }
 }
