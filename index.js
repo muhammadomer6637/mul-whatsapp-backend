@@ -1108,6 +1108,8 @@ app.post("/api/send", async (req, res) => {
   try {
     const { phone, message } = req.body;
 
+    console.log("API SEND REQUEST:", { phone, message });
+
     if (!phone || !message) {
       return res.status(400).json({
         success: false,
@@ -1123,10 +1125,14 @@ app.post("/api/send", async (req, res) => {
       message: "Agent message sent successfully"
     });
   } catch (error) {
-    console.error("POST /api/send error:", error.message);
+    console.error(
+      "POST /api/send full error:",
+      error.response?.data || error.message || error
+    );
+
     return res.status(500).json({
       success: false,
-      error: "Failed to send agent message"
+      error: error.response?.data?.error?.message || "Failed to send agent message"
     });
   }
 });
