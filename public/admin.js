@@ -75,6 +75,7 @@ async function openChat(phone) {
   `).join("");
 
   document.getElementById("messages").innerHTML = html;
+  loadChats();
 }
 
 async function sendMessage() {
