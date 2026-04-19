@@ -1,7 +1,7 @@
 const express = require("express");
 const axios = require("axios");
 const path = require("path");
-const { Pool } = require("pg");
+const pool = require("./db/db");
 const { testConnection } = require("./db/db");
 const initDb = require("./db/initDb");
 
@@ -18,14 +18,6 @@ const PHONE_NUMBER_ID = "1065169533344109";
 const BASE_URL =
   process.env.BASE_URL ||
   "https://mul-whatsapp-backend-production.up.railway.app";
-
-// PostgreSQL pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes("railway")
-    ? { rejectUnauthorized: false }
-    : false
-});
 
 // Temporary in-memory user state
 const userStates = {};
@@ -170,7 +162,10 @@ async function createUserIfNotExists(phone, name = null) {
   }
 }
 
-async function updateUserDetails(phone, { name = null, program = null, mode = null }) {
+async function updateUserDetails(
+  phone,
+  { name = null, program = null, mode = null }
+) {
   try {
     await pool.query(
       `
@@ -345,7 +340,11 @@ function getProgramResponse(code) {
 
 function getMoreProgramResponse(code) {
   const mapping = {
-    "1a-more": { title: "Associate Degree Programs (ADP - 2 Years)", key: "adp", index: 1 },
+    "1a-more": {
+      title: "Associate Degree Programs (ADP - 2 Years)",
+      key: "adp",
+      index: 1
+    },
     "1b-more": { title: "BS Programs (4 Years)", key: "bs", index: 1 },
     "1c-more": { title: "M.Phil./MS Programs", key: "mphil", index: 1 },
     "1d-more": { title: "Ph.D. Programs", key: "phd", index: 1 }
@@ -378,7 +377,7 @@ Reply 0 for Main Menu`;
 // =========================
 // WHATSAPP SEND HELPERS
 // =========================
-async function sendTextMessage(to, message) {
+async function sendTextMessage(to, message, chatStatus = "active") {
   try {
     await axios.post(
       `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
@@ -403,13 +402,19 @@ async function sendTextMessage(to, message) {
       text: message
     });
 
-    await upsertChat(to, message, "active");
+    await upsertChat(to, message, chatStatus);
   } catch (error) {
     console.error("Send text error:", error.response?.data || error.message);
   }
 }
 
-async function sendDocumentMessage(to, documentUrl, filename, caption = "") {
+async function sendDocumentMessage(
+  to,
+  documentUrl,
+  filename,
+  caption = "",
+  chatStatus = "active"
+) {
   try {
     await axios.post(
       `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
@@ -441,7 +446,7 @@ async function sendDocumentMessage(to, documentUrl, filename, caption = "") {
       mime_type: "application/pdf"
     });
 
-    await upsertChat(to, caption || filename, "active");
+    await upsertChat(to, caption || filename, chatStatus);
   } catch (error) {
     console.error("Send document error:", error.response?.data || error.message);
   }
@@ -509,7 +514,14 @@ app.post("/webhook", async (req, res) => {
       incomingText = `[${type}]`;
     }
 
-    console.log("Incoming message from:", from, "| type:", type, "| text:", incomingText);
+    console.log(
+      "Incoming message from:",
+      from,
+      "| type:",
+      type,
+      "| text:",
+      incomingText
+    );
 
     // Always ensure user exists in DB
     await createUserIfNotExists(from, contactName);
@@ -630,7 +642,8 @@ Your request has been forwarded to our support team.
 
 Please wait, our admission representative will message you shortly.
 
-Reply 0 for Main Menu`
+Reply 0 for Main Menu`,
+        "agent_waiting"
       );
 
       return res.sendStatus(200);
@@ -638,7 +651,14 @@ Reply 0 for Main Menu`
 
     // Main greetings
     if (
-      ["hi", "hello", "assalamualaikum", "assalamu alaikum", "menu", "start"].includes(lowerText)
+      [
+        "hi",
+        "hello",
+        "assalamualaikum",
+        "assalamu alaikum",
+        "menu",
+        "start"
+      ].includes(lowerText)
     ) {
       userStates[from].currentMenu = "main";
       userStates[from].previousMenu = "main";
@@ -914,7 +934,10 @@ Reply 0 for Main Menu`
 
     return res.sendStatus(200);
   } catch (error) {
-    console.error("Webhook error:", error.response?.data || error.message || error);
+    console.error(
+      "Webhook error:",
+      error.response?.data || error.message || error
+    );
     return res.sendStatus(500);
   }
 });
