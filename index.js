@@ -1,6 +1,7 @@
 const express = require("express");
 const axios = require("axios");
 const path = require("path");
+const { Pool } = require("pg");
 const { testConnection } = require("./db/db");
 const initDb = require("./db/initDb");
 
@@ -14,7 +15,17 @@ app.use("/files", express.static(path.join(__dirname, "public")));
 const VERIFY_TOKEN = "mul_token_123";
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const PHONE_NUMBER_ID = "1065169533344109";
-const BASE_URL = process.env.BASE_URL || "https://mul-whatsapp-backend-production.up.railway.app";
+const BASE_URL =
+  process.env.BASE_URL ||
+  "https://mul-whatsapp-backend-production.up.railway.app";
+
+// PostgreSQL pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes("railway")
+    ? { rejectUnauthorized: false }
+    : false
+});
 
 // Temporary in-memory user state
 const userStates = {};
@@ -142,6 +153,98 @@ const PROGRAMS = {
 };
 
 // =========================
+// DATABASE HELPERS
+// =========================
+async function createUserIfNotExists(phone, name = null) {
+  try {
+    await pool.query(
+      `
+      INSERT INTO users (phone, name, mode)
+      VALUES ($1, $2, 'bot')
+      ON CONFLICT (phone) DO NOTHING
+      `,
+      [phone, name]
+    );
+  } catch (err) {
+    console.error("createUserIfNotExists error:", err.message);
+  }
+}
+
+async function updateUserDetails(phone, { name = null, program = null, mode = null }) {
+  try {
+    await pool.query(
+      `
+      UPDATE users
+      SET
+        name = COALESCE($2, name),
+        program = COALESCE($3, program),
+        mode = COALESCE($4, mode)
+      WHERE phone = $1
+      `,
+      [phone, name, program, mode]
+    );
+  } catch (err) {
+    console.error("updateUserDetails error:", err.message);
+  }
+}
+
+async function getUserByPhone(phone) {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM users WHERE phone = $1 LIMIT 1`,
+      [phone]
+    );
+    return result.rows[0] || null;
+  } catch (err) {
+    console.error("getUserByPhone error:", err.message);
+    return null;
+  }
+}
+
+async function saveMessage({
+  phone,
+  sender,
+  type = "text",
+  text = null,
+  media_id = null,
+  media_url = null,
+  file_name = null,
+  mime_type = null
+}) {
+  try {
+    await pool.query(
+      `
+      INSERT INTO messages
+      (phone, sender, type, text, media_id, media_url, file_name, mime_type, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+      `,
+      [phone, sender, type, text, media_id, media_url, file_name, mime_type]
+    );
+  } catch (err) {
+    console.error("saveMessage error:", err.message);
+  }
+}
+
+async function upsertChat(phone, lastMessage, status = "active") {
+  try {
+    await pool.query(
+      `
+      INSERT INTO chats (phone, status, last_message, updated_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (phone)
+      DO UPDATE SET
+        status = EXCLUDED.status,
+        last_message = EXCLUDED.last_message,
+        updated_at = NOW()
+      `,
+      [phone, status, lastMessage]
+    );
+  } catch (err) {
+    console.error("upsertChat error:", err.message);
+  }
+}
+
+// =========================
 // MESSAGE HELPERS
 // =========================
 function splitIntoChunks(items, size = 12) {
@@ -211,7 +314,7 @@ Reply 0 for Main Menu`;
 }
 
 function formatProgramChunk(title, items, currentIndex, totalChunks, baseCode) {
-  const list = items.map((item, i) => `• ${item}`).join("\n");
+  const list = items.map((item) => `• ${item}`).join("\n");
   let msg = `🎓 ${title}\n\n${list}`;
 
   if (currentIndex < totalChunks - 1) {
@@ -256,7 +359,13 @@ function getMoreProgramResponse(code) {
     return `No more programs in this category.\n\nReply 1 for Programs Menu\nReply 0 for Main Menu`;
   }
 
-  return formatProgramChunk(item.title + " (More)", chunks[item.index], item.index, chunks.length, code.replace("-more", ""));
+  return formatProgramChunk(
+    item.title + " (More)",
+    chunks[item.index],
+    item.index,
+    chunks.length,
+    code.replace("-more", "")
+  );
 }
 
 function applyNowMessage() {
@@ -286,6 +395,15 @@ async function sendTextMessage(to, message) {
         }
       }
     );
+
+    await saveMessage({
+      phone: to,
+      sender: "bot",
+      type: "text",
+      text: message
+    });
+
+    await upsertChat(to, message, "active");
   } catch (error) {
     console.error("Send text error:", error.response?.data || error.message);
   }
@@ -312,6 +430,18 @@ async function sendDocumentMessage(to, documentUrl, filename, caption = "") {
         }
       }
     );
+
+    await saveMessage({
+      phone: to,
+      sender: "bot",
+      type: "document",
+      text: caption || filename,
+      media_url: documentUrl,
+      file_name: filename,
+      mime_type: "application/pdf"
+    });
+
+    await upsertChat(to, caption || filename, "active");
   } catch (error) {
     console.error("Send document error:", error.response?.data || error.message);
   }
@@ -338,29 +468,93 @@ app.get("/webhook", (req, res) => {
 app.post("/webhook", async (req, res) => {
   try {
     const msg = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+    const contact = req.body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0];
 
     if (!msg) {
       return res.sendStatus(200);
     }
 
     const from = msg.from;
+    const contactName = contact?.profile?.name || null;
     const text = msg.text?.body?.trim();
+    const lowerText = text?.toLowerCase();
+    const type = msg.type || "text";
 
-    if (!text) {
-      return res.sendStatus(200);
+    let incomingText = "";
+    let media_id = null;
+    let media_url = null;
+    let file_name = null;
+    let mime_type = null;
+
+    if (type === "text") {
+      incomingText = text || "";
+    } else if (type === "image") {
+      incomingText = "[Image]";
+      media_id = msg.image?.id || null;
+      mime_type = msg.image?.mime_type || null;
+    } else if (type === "document") {
+      incomingText = msg.document?.filename || "[Document]";
+      media_id = msg.document?.id || null;
+      file_name = msg.document?.filename || null;
+      mime_type = msg.document?.mime_type || null;
+    } else if (type === "video") {
+      incomingText = "[Video]";
+      media_id = msg.video?.id || null;
+      mime_type = msg.video?.mime_type || null;
+    } else if (type === "audio") {
+      incomingText = "[Audio]";
+      media_id = msg.audio?.id || null;
+      mime_type = msg.audio?.mime_type || null;
+    } else {
+      incomingText = `[${type}]`;
     }
 
-    const lowerText = text.toLowerCase();
+    console.log("Incoming message from:", from, "| type:", type, "| text:", incomingText);
 
-    console.log("Incoming message from:", from, "| text:", lowerText);
+    // Always ensure user exists in DB
+    await createUserIfNotExists(from, contactName);
+    await updateUserDetails(from, { name: contactName });
 
-    // Init state
+    // Save incoming message
+    await saveMessage({
+      phone: from,
+      sender: "user",
+      type,
+      text: incomingText,
+      media_id,
+      media_url,
+      file_name,
+      mime_type
+    });
+
+    // Initialize chat row
+    await upsertChat(from, incomingText, "active");
+
+    // Init local state if not exists
     if (!userStates[from]) {
       userStates[from] = {
         previousMenu: "main",
         currentMenu: "main",
         awaitingLead: false
       };
+    }
+
+    // If already in agent mode, bot must stay silent
+    const currentUser = await getUserByPhone(from);
+    const currentMode = currentUser?.mode || "bot";
+
+    if (currentMode === "agent") {
+      console.log(`Bot stopped for ${from} because user is in agent mode.`);
+      return res.sendStatus(200);
+    }
+
+    // Ignore empty non-text messages for bot flow
+    if (!text && type !== "text") {
+      return res.sendStatus(200);
+    }
+
+    if (!text) {
+      return res.sendStatus(200);
     }
 
     // Global commands
@@ -408,27 +602,33 @@ app.post("/webhook", async (req, res) => {
     if (userStates[from].awaitingLead && text.includes(",")) {
       const [name, ...rest] = text.split(",");
       const program = rest.join(",").trim();
+      const cleanName = name.trim();
 
       console.log("Lead captured:", {
         phone: from,
-        name: name.trim(),
+        name: cleanName,
         program
       });
 
       userStates[from].awaitingLead = false;
       userStates[from].previousMenu = "anything";
-      userStates[from].currentMenu = "lead_done";
+      userStates[from].currentMenu = "agent_waiting";
+
+      await updateUserDetails(from, {
+        name: cleanName,
+        program,
+        mode: "agent"
+      });
+
+      await upsertChat(from, `Lead: ${cleanName} - ${program}`, "agent_waiting");
 
       await sendTextMessage(
         from,
         `✅ Thank you!
 
-Your request has been received successfully.
+Your request has been forwarded to our support team.
 
-Name: ${name.trim()}
-Program: ${program}
-
-Our admissions team will contact you shortly.
+Please wait, our admission representative will message you shortly.
 
 Reply 0 for Main Menu`
       );
@@ -605,6 +805,9 @@ Reply 0 for Main Menu`
     }
 
     if (lowerText === "5a") {
+      userStates[from].previousMenu = "anything";
+      userStates[from].currentMenu = "5a";
+
       await sendTextMessage(
         from,
         `🎓 Students Affairs Office
@@ -621,6 +824,9 @@ Reply 0 for Main Menu`
     }
 
     if (lowerText === "5b") {
+      userStates[from].previousMenu = "anything";
+      userStates[from].currentMenu = "5b";
+
       await sendTextMessage(
         from,
         `📝 Examination
@@ -637,6 +843,9 @@ Reply 0 for Main Menu`
     }
 
     if (lowerText === "5c") {
+      userStates[from].previousMenu = "anything";
+      userStates[from].currentMenu = "5c";
+
       await sendTextMessage(
         from,
         `💳 Account Office
@@ -653,6 +862,9 @@ Reply 0 for Main Menu`
     }
 
     if (lowerText === "5d") {
+      userStates[from].previousMenu = "anything";
+      userStates[from].currentMenu = "5d";
+
       await sendTextMessage(
         from,
         `🎓 Admissions
