@@ -599,15 +599,6 @@ if (currentMode === "agent") {
   return res.sendStatus(200);
 }
 
-    // If already in agent mode, bot must stay silent
-    const currentUser = await getUserByPhone(from);
-    const currentMode = currentUser?.mode || "bot";
-
-    if (currentMode === "agent") {
-      console.log(`Bot stopped for ${from} because user is in agent mode.`);
-      return res.sendStatus(200);
-    }
-
     // Ignore empty non-text messages for bot flow
     if (!text && type !== "text") {
       return res.sendStatus(200);
