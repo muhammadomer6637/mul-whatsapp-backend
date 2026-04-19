@@ -452,6 +452,41 @@ async function sendDocumentMessage(
   }
 }
 
+async function sendAgentTextMessage(to, message, chatStatus = "agent_active") {
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: { body: message }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    await saveMessage({
+      phone: to,
+      sender: "agent",
+      type: "text",
+      text: message
+    });
+
+    await upsertChat(to, message, chatStatus);
+  } catch (error) {
+    console.error(
+      "Send agent text error:",
+      error.response?.data || error.message
+    );
+    throw error;
+  }
+}
+
 // =========================
 // ROUTES
 // =========================
@@ -527,29 +562,42 @@ app.post("/webhook", async (req, res) => {
     await createUserIfNotExists(from, contactName);
     await updateUserDetails(from, { name: contactName });
 
-    // Save incoming message
-    await saveMessage({
-      phone: from,
-      sender: "user",
-      type,
-      text: incomingText,
-      media_id,
-      media_url,
-      file_name,
-      mime_type
-    });
+ // Init local state if not exists
+if (!userStates[from]) {
+  userStates[from] = {
+    previousMenu: "main",
+    currentMenu: "main",
+    awaitingLead: false
+  };
+}
 
-    // Initialize chat row
-    await upsertChat(from, incomingText, "active");
+// Check current mode before updating chat status
+const currentUser = await getUserByPhone(from);
+const currentMode = currentUser?.mode || "bot";
 
-    // Init local state if not exists
-    if (!userStates[from]) {
-      userStates[from] = {
-        previousMenu: "main",
-        currentMenu: "main",
-        awaitingLead: false
-      };
-    }
+// Save incoming message
+await saveMessage({
+  phone: from,
+  sender: "user",
+  type,
+  text: incomingText,
+  media_id,
+  media_url,
+  file_name,
+  mime_type
+});
+
+// Preserve chat status if user is already in agent mode
+const incomingChatStatus =
+  currentMode === "agent" ? "agent_waiting" : "active";
+
+await upsertChat(from, incomingText, incomingChatStatus);
+
+// If already in agent mode, bot must stay silent
+if (currentMode === "agent") {
+  console.log(`Bot stopped for ${from} because user is in agent mode.`);
+  return res.sendStatus(200);
+}
 
     // If already in agent mode, bot must stay silent
     const currentUser = await getUserByPhone(from);
@@ -939,6 +987,160 @@ Reply 0 for Main Menu`
       error.response?.data || error.message || error
     );
     return res.sendStatus(500);
+  }
+});
+
+// =========================
+// AGENT PANEL APIs
+// =========================
+
+// Get all chats for agent panel
+app.get("/api/chats", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        c.phone,
+        c.status,
+        c.last_message,
+        c.updated_at,
+        u.name,
+        u.program,
+        u.mode
+      FROM chats c
+      LEFT JOIN users u ON u.phone = c.phone
+      ORDER BY
+        CASE
+          WHEN c.status = 'agent_waiting' THEN 0
+          WHEN c.status = 'agent_active' THEN 1
+          ELSE 2
+        END,
+        c.updated_at DESC
+    `);
+
+    return res.json({
+      success: true,
+      chats: result.rows
+    });
+  } catch (error) {
+    console.error("GET /api/chats error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch chats"
+    });
+  }
+});
+
+// Get all messages for one phone number
+app.get("/api/messages/:phone", async (req, res) => {
+  try {
+    const { phone } = req.params;
+
+    const result = await pool.query(
+      `
+      SELECT id, phone, sender, type, text, media_id, media_url, file_name, mime_type, created_at
+      FROM messages
+      WHERE phone = $1
+      ORDER BY created_at ASC
+      `,
+      [phone]
+    );
+
+    return res.json({
+      success: true,
+      messages: result.rows
+    });
+  } catch (error) {
+    console.error("GET /api/messages/:phone error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch messages"
+    });
+  }
+});
+
+// Send message from agent to WhatsApp user
+app.post("/api/send", async (req, res) => {
+  try {
+    const { phone, message } = req.body;
+
+    if (!phone || !message) {
+      return res.status(400).json({
+        success: false,
+        error: "phone and message are required"
+      });
+    }
+
+    await updateUserDetails(phone, { mode: "agent" });
+    await sendAgentTextMessage(phone, message, "agent_active");
+
+    return res.json({
+      success: true,
+      message: "Agent message sent successfully"
+    });
+  } catch (error) {
+    console.error("POST /api/send error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to send agent message"
+    });
+  }
+});
+
+// Switch chat mode between bot and agent
+app.post("/api/switch-mode", async (req, res) => {
+  try {
+    const { phone, mode } = req.body;
+
+    if (!phone || !mode) {
+      return res.status(400).json({
+        success: false,
+        error: "phone and mode are required"
+      });
+    }
+
+    if (!["bot", "agent"].includes(mode)) {
+      return res.status(400).json({
+        success: false,
+        error: "mode must be bot or agent"
+      });
+    }
+
+    await updateUserDetails(phone, { mode });
+
+    let chatStatus = "active";
+    let lastMessage = "Chat switched to bot mode";
+
+    if (mode === "agent") {
+      chatStatus = "agent_active";
+      lastMessage = "Chat switched to agent mode";
+    }
+
+    await upsertChat(phone, lastMessage, chatStatus);
+
+    if (!userStates[phone]) {
+      userStates[phone] = {
+        previousMenu: "main",
+        currentMenu: "main",
+        awaitingLead: false
+      };
+    }
+
+    if (mode === "bot") {
+      userStates[phone].awaitingLead = false;
+      userStates[phone].currentMenu = "main";
+      userStates[phone].previousMenu = "main";
+    }
+
+    return res.json({
+      success: true,
+      message: `Mode switched to ${mode}`
+    });
+  } catch (error) {
+    console.error("POST /api/switch-mode error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to switch mode"
+    });
   }
 });
 
