@@ -21,6 +21,9 @@ module.exports = async function initDb() {
         phone VARCHAR(30) UNIQUE NOT NULL,
         status VARCHAR(30) DEFAULT 'active',
         last_message TEXT,
+        unread_count INTEGER DEFAULT 0,
+        last_incoming_at TIMESTAMP,
+        last_outgoing_at TIMESTAMP,
         updated_at TIMESTAMP DEFAULT NOW()
       );
     `);
@@ -39,6 +42,22 @@ module.exports = async function initDb() {
         mime_type TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       );
+    `);
+
+    // Safe ALTERs for existing DB
+    await pool.query(`
+      ALTER TABLE chats
+      ADD COLUMN IF NOT EXISTS unread_count INTEGER DEFAULT 0;
+    `);
+
+    await pool.query(`
+      ALTER TABLE chats
+      ADD COLUMN IF NOT EXISTS last_incoming_at TIMESTAMP;
+    `);
+
+    await pool.query(`
+      ALTER TABLE chats
+      ADD COLUMN IF NOT EXISTS last_outgoing_at TIMESTAMP;
     `);
 
     console.log("Tables created / verified successfully");
