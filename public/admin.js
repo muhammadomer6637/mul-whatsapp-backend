@@ -99,7 +99,6 @@ async function loadDashboard(range = "24h") {
       </div>
     `;
 
-    // Queue snapshot
     document.getElementById("queueSnapshot").innerHTML = `
       <div class="mini-stat">
         <h4>Agent Waiting</h4>
@@ -119,7 +118,6 @@ async function loadDashboard(range = "24h") {
       </div>
     `;
 
-    // Top Programs
     const topProgramsWrap = document.getElementById("topProgramsList");
     if (!data.topPrograms.length) {
       topProgramsWrap.innerHTML = `<p style="color: var(--muted);">No program inquiry data available.</p>`;
@@ -142,7 +140,6 @@ async function loadDashboard(range = "24h") {
       }).join("");
     }
 
-    // Recent leads
     const leadsBody = document.querySelector("#leadsTable tbody");
     leadsBody.innerHTML = data.recentLeads.map(lead => `
       <tr>
@@ -206,13 +203,33 @@ function renderChatList() {
     );
   }
 
+  filtered.sort((a, b) => {
+    const aUnread = Number(a.unread_count || 0);
+    const bUnread = Number(b.unread_count || 0);
+    if (bUnread !== aUnread) return bUnread - aUnread;
+
+    const statusPriority = {
+      agent_waiting: 3,
+      agent_active: 2,
+      active: 1
+    };
+
+    const aStatus = statusPriority[a.status] || 0;
+    const bStatus = statusPriority[b.status] || 0;
+    if (bStatus !== aStatus) return bStatus - aStatus;
+
+    const aTime = new Date(a.updated_at || 0).getTime();
+    const bTime = new Date(b.updated_at || 0).getTime();
+    return bTime - aTime;
+  });
+
   document.getElementById("chatCountBadge").textContent = filtered.length;
 
   const html = filtered.map(chat => `
     <div class="chat-item ${selectedPhone === chat.phone ? "active-chat" : ""}" onclick="openChat('${chat.phone}')">
       <div class="chat-topline">
         <div class="chat-name">${escapeHtml(chat.name || chat.phone)}</div>
-        ${chat.unread_count > 0 ? `<span class="unread-badge">${chat.unread_count}</span>` : ""}
+        ${Number(chat.unread_count || 0) > 0 ? `<span class="unread-badge">${chat.unread_count}</span>` : ""}
       </div>
       <div class="chat-program">${escapeHtml(chat.program || "No program selected")}</div>
       <div class="chat-preview">${escapeHtml(chat.last_message || "No messages yet")}</div>
@@ -344,12 +361,7 @@ function formatDateTime(value, short = false) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-
-  if (short) {
-    return date.toLocaleString();
-  }
-
-  return date.toLocaleString();
+  return short ? date.toLocaleString() : date.toLocaleString();
 }
 
 function escapeHtml(str) {
@@ -376,7 +388,6 @@ document.addEventListener("DOMContentLoaded", () => {
   loadDashboard();
   loadChats();
 
-  // Soft auto-refresh
   setInterval(() => {
     if (currentSection === "dashboard") {
       loadDashboard(currentRange);
