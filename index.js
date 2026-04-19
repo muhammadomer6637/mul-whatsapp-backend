@@ -1,6 +1,8 @@
 const express = require("express");
 const axios = require("axios");
 const path = require("path");
+const { testConnection } = require("./db/db");
+const initDb = require("./db/initDb");
 
 const app = express();
 app.use(express.json());
@@ -705,6 +707,8 @@ Reply 0 for Main Menu`
   }
 });
 
-app.listen(3000, () => {
+app.listen(3000, async () => {
   console.log("Server running on port 3000");
+  await testConnection();
+  await initDb();
 });
