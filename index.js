@@ -239,6 +239,76 @@ async function upsertChat(phone, lastMessage, status = "active") {
   }
 }
 
+async function incrementUnreadAndSetIncoming(phone, lastMessage, status = "active") {
+  try {
+    await pool.query(
+      `
+      INSERT INTO chats (
+        phone,
+        status,
+        last_message,
+        unread_count,
+        last_incoming_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, 1, NOW(), NOW())
+      ON CONFLICT (phone)
+      DO UPDATE SET
+        status = EXCLUDED.status,
+        last_message = EXCLUDED.last_message,
+        unread_count = chats.unread_count + 1,
+        last_incoming_at = NOW(),
+        updated_at = NOW()
+      `,
+      [phone, status, lastMessage]
+    );
+  } catch (err) {
+    console.error("incrementUnreadAndSetIncoming error:", err.message);
+  }
+}
+
+async function setOutgoingMeta(phone, lastMessage, status = "active") {
+  try {
+    await pool.query(
+      `
+      INSERT INTO chats (
+        phone,
+        status,
+        last_message,
+        unread_count,
+        last_outgoing_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, 0, NOW(), NOW())
+      ON CONFLICT (phone)
+      DO UPDATE SET
+        status = EXCLUDED.status,
+        last_message = EXCLUDED.last_message,
+        last_outgoing_at = NOW(),
+        updated_at = NOW()
+      `,
+      [phone, status, lastMessage]
+    );
+  } catch (err) {
+    console.error("setOutgoingMeta error:", err.message);
+  }
+}
+
+async function resetUnreadCount(phone) {
+  try {
+    await pool.query(
+      `
+      UPDATE chats
+      SET unread_count = 0, updated_at = NOW()
+      WHERE phone = $1
+      `,
+      [phone]
+    );
+  } catch (err) {
+    console.error("resetUnreadCount error:", err.message);
+  }
+}
+
 // =========================
 // MESSAGE HELPERS
 // =========================
@@ -402,7 +472,7 @@ async function sendTextMessage(to, message, chatStatus = "active") {
       text: message
     });
 
-    await upsertChat(to, message, chatStatus);
+    await setOutgoingMeta(to, message, chatStatus);
   } catch (error) {
     console.error("Send text error:", error.response?.data || error.message);
   }
@@ -446,7 +516,7 @@ async function sendDocumentMessage(
       mime_type: "application/pdf"
     });
 
-    await upsertChat(to, caption || filename, chatStatus);
+    await setOutgoingMeta(to, caption || filename, chatStatus);
   } catch (error) {
     console.error("Send document error:", error.response?.data || error.message);
   }
@@ -477,7 +547,7 @@ async function sendAgentTextMessage(to, message, chatStatus = "agent_active") {
       text: message
     });
 
-    await upsertChat(to, message, chatStatus);
+    await setOutgoingMeta(to, message, chatStatus);
   } catch (error) {
     console.error(
       "Send agent text error:",
@@ -558,48 +628,41 @@ app.post("/webhook", async (req, res) => {
       incomingText
     );
 
-    // Always ensure user exists in DB
     await createUserIfNotExists(from, contactName);
     await updateUserDetails(from, { name: contactName });
 
- // Init local state if not exists
-if (!userStates[from]) {
-  userStates[from] = {
-    previousMenu: "main",
-    currentMenu: "main",
-    awaitingLead: false
-  };
-}
+    if (!userStates[from]) {
+      userStates[from] = {
+        previousMenu: "main",
+        currentMenu: "main",
+        awaitingLead: false
+      };
+    }
 
-// Check current mode before updating chat status
-const currentUser = await getUserByPhone(from);
-const currentMode = currentUser?.mode || "bot";
+    const currentUser = await getUserByPhone(from);
+    const currentMode = currentUser?.mode || "bot";
 
-// Save incoming message
-await saveMessage({
-  phone: from,
-  sender: "user",
-  type,
-  text: incomingText,
-  media_id,
-  media_url,
-  file_name,
-  mime_type
-});
+    await saveMessage({
+      phone: from,
+      sender: "user",
+      type,
+      text: incomingText,
+      media_id,
+      media_url,
+      file_name,
+      mime_type
+    });
 
-// Preserve chat status if user is already in agent mode
-const incomingChatStatus =
-  currentMode === "agent" ? "agent_waiting" : "active";
+    const incomingChatStatus =
+      currentMode === "agent" ? "agent_waiting" : "active";
 
-await upsertChat(from, incomingText, incomingChatStatus);
+    await incrementUnreadAndSetIncoming(from, incomingText, incomingChatStatus);
 
-// If already in agent mode, bot must stay silent
-if (currentMode === "agent") {
-  console.log(`Bot stopped for ${from} because user is in agent mode.`);
-  return res.sendStatus(200);
-}
+    if (currentMode === "agent") {
+      console.log(`Bot stopped for ${from} because user is in agent mode.`);
+      return res.sendStatus(200);
+    }
 
-    // Ignore empty non-text messages for bot flow
     if (!text && type !== "text") {
       return res.sendStatus(200);
     }
@@ -608,7 +671,6 @@ if (currentMode === "agent") {
       return res.sendStatus(200);
     }
 
-    // Global commands
     if (lowerText === "0") {
       userStates[from] = {
         previousMenu: "main",
@@ -649,7 +711,6 @@ if (currentMode === "agent") {
       return res.sendStatus(200);
     }
 
-    // Lead capture after 5e
     if (userStates[from].awaitingLead && text.includes(",")) {
       const [name, ...rest] = text.split(",");
       const program = rest.join(",").trim();
@@ -688,7 +749,6 @@ Reply 0 for Main Menu`,
       return res.sendStatus(200);
     }
 
-    // Main greetings
     if (
       [
         "hi",
@@ -707,7 +767,6 @@ Reply 0 for Main Menu`,
       return res.sendStatus(200);
     }
 
-    // Option 1 - Programs
     if (lowerText === "1") {
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "programs";
@@ -731,7 +790,6 @@ Reply 0 for Main Menu`,
       return res.sendStatus(200);
     }
 
-    // Option 2 - Fee Structure PDF
     if (lowerText === "2") {
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "fee";
@@ -758,7 +816,6 @@ Reply APPLY to apply online`
       return res.sendStatus(200);
     }
 
-    // Option 3 - Scholarship
     if (lowerText === "3") {
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "scholarship";
@@ -776,7 +833,6 @@ Reply 0 for Main Menu`
       return res.sendStatus(200);
     }
 
-    // Option 4 - How to Apply
     if (lowerText === "4") {
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "apply";
@@ -855,7 +911,6 @@ Reply 0 for Main Menu`
       return res.sendStatus(200);
     }
 
-    // Option 5 - Anything Else
     if (lowerText === "5") {
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "anything";
@@ -958,7 +1013,6 @@ Ali, BS Computer Science`
       return res.sendStatus(200);
     }
 
-    // Fallback
     await sendTextMessage(
       from,
       `Sorry, I did not understand your message.
@@ -984,8 +1038,6 @@ Reply 0 for Main Menu`
 // =========================
 // AGENT PANEL APIs
 // =========================
-
-// Get all chats for agent panel
 app.get("/api/chats", async (req, res) => {
   try {
     const result = await pool.query(`
@@ -993,6 +1045,9 @@ app.get("/api/chats", async (req, res) => {
         c.phone,
         c.status,
         c.last_message,
+        c.unread_count,
+        c.last_incoming_at,
+        c.last_outgoing_at,
         c.updated_at,
         u.name,
         u.program,
@@ -1021,7 +1076,6 @@ app.get("/api/chats", async (req, res) => {
   }
 });
 
-// Get all messages for one phone number
 app.get("/api/messages/:phone", async (req, res) => {
   try {
     const { phone } = req.params;
@@ -1049,7 +1103,6 @@ app.get("/api/messages/:phone", async (req, res) => {
   }
 });
 
-// Send message from agent to WhatsApp user
 app.post("/api/send", async (req, res) => {
   try {
     const { phone, message } = req.body;
@@ -1077,7 +1130,6 @@ app.post("/api/send", async (req, res) => {
   }
 });
 
-// Switch chat mode between bot and agent
 app.post("/api/switch-mode", async (req, res) => {
   try {
     const { phone, mode } = req.body;
@@ -1131,6 +1183,145 @@ app.post("/api/switch-mode", async (req, res) => {
     return res.status(500).json({
       success: false,
       error: "Failed to switch mode"
+    });
+  }
+});
+
+app.post("/api/mark-read", async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        error: "phone is required"
+      });
+    }
+
+    await resetUnreadCount(phone);
+
+    return res.json({
+      success: true,
+      message: "Unread count reset successfully"
+    });
+  } catch (error) {
+    console.error("POST /api/mark-read error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to reset unread count"
+    });
+  }
+});
+
+app.get("/api/dashboard", async (req, res) => {
+  try {
+    const range = req.query.range || "24h";
+    const start = req.query.start;
+    const end = req.query.end;
+
+    let intervalSql = "INTERVAL '24 hours'";
+    if (range === "7d") intervalSql = "INTERVAL '7 days'";
+    if (range === "30d") intervalSql = "INTERVAL '30 days'";
+
+    let whereCreated = `created_at >= NOW() - ${intervalSql}`;
+
+    if (range === "custom" && start && end) {
+      whereCreated = `created_at BETWEEN '${start}'::timestamp AND '${end}'::timestamp`;
+    }
+
+    const conversationsStarted = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM users
+      WHERE ${whereCreated}
+    `);
+
+    const unreadConversations = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM chats
+      WHERE unread_count > 0
+    `);
+
+    const totalUnreadMessages = await pool.query(`
+      SELECT COALESCE(SUM(unread_count), 0)::int AS count
+      FROM chats
+    `);
+
+    const agentWaiting = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM chats
+      WHERE status = 'agent_waiting'
+    `);
+
+    const agentActive = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM chats
+      WHERE status = 'agent_active'
+    `);
+
+    const activeWithBot = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM users u
+      JOIN chats c ON c.phone = u.phone
+      WHERE u.mode = 'bot'
+      AND c.last_incoming_at >= NOW() - INTERVAL '10 minutes'
+    `);
+
+    const activeWithAgent = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM users u
+      JOIN chats c ON c.phone = u.phone
+      WHERE u.mode = 'agent'
+      AND c.last_incoming_at >= NOW() - INTERVAL '10 minutes'
+    `);
+
+    const topPrograms = await pool.query(`
+      SELECT
+        program,
+        COUNT(*)::int AS inquiries
+      FROM users
+      WHERE program IS NOT NULL
+        AND TRIM(program) <> ''
+        AND ${whereCreated}
+      GROUP BY program
+      ORDER BY inquiries DESC, program ASC
+      LIMIT 10
+    `);
+
+    const recentLeads = await pool.query(`
+      SELECT
+        u.name,
+        u.program,
+        u.phone,
+        c.status,
+        c.updated_at
+      FROM users u
+      LEFT JOIN chats c ON c.phone = u.phone
+      WHERE u.program IS NOT NULL
+        AND TRIM(u.program) <> ''
+      ORDER BY c.updated_at DESC NULLS LAST
+      LIMIT 10
+    `);
+
+    return res.json({
+      success: true,
+      filters: { range, start: start || null, end: end || null },
+      stats: {
+        conversationsStarted: conversationsStarted.rows[0].count,
+        unreadConversations: unreadConversations.rows[0].count,
+        totalUnreadMessages: totalUnreadMessages.rows[0].count,
+        agentWaiting: agentWaiting.rows[0].count,
+        agentActive: agentActive.rows[0].count,
+        activeWithBot: activeWithBot.rows[0].count,
+        activeWithAgent: activeWithAgent.rows[0].count
+      },
+      topPrograms: topPrograms.rows,
+      recentLeads: recentLeads.rows
+    });
+  } catch (error) {
+    console.error("GET /api/dashboard error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch dashboard data"
     });
   }
 });
