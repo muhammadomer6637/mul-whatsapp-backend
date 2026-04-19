@@ -8,6 +8,7 @@ const initDb = require("./db/initDb");
 const app = express();
 app.use(express.json());
 
+app.use(express.static(path.join(__dirname, "public")));
 // Static files for PDF
 app.use("/files", express.static(path.join(__dirname, "public")));
 
