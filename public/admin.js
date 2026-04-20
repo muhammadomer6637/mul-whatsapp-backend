@@ -122,9 +122,10 @@ async function loadDashboard(range = "24h") {
     if (!data.topPrograms.length) {
       topProgramsWrap.innerHTML = `<p style="color: var(--muted);">No program inquiry data available.</p>`;
     } else {
-      const maxCount = Math.max(...data.topPrograms.map(p => p.inquiries), 1);
+      const normalized = normalizeProgramsForDisplay(data.topPrograms);
+      const maxCount = Math.max(...normalized.map(p => p.inquiries), 1);
 
-      topProgramsWrap.innerHTML = data.topPrograms.map(program => {
+      topProgramsWrap.innerHTML = normalized.map(program => {
         const width = (program.inquiries / maxCount) * 100;
         return `
           <div class="program-row">
@@ -144,7 +145,7 @@ async function loadDashboard(range = "24h") {
     leadsBody.innerHTML = data.recentLeads.map(lead => `
       <tr>
         <td>${escapeHtml(lead.name || "-")}</td>
-        <td>${escapeHtml(lead.program || "-")}</td>
+        <td>${escapeHtml(prettyProgramName(lead.program || "-"))}</td>
         <td>${escapeHtml(lead.phone || "-")}</td>
         <td>
           <span class="status-chip status-${lead.status}">
@@ -231,7 +232,7 @@ function renderChatList() {
         <div class="chat-name">${escapeHtml(chat.name || chat.phone)}</div>
         ${Number(chat.unread_count || 0) > 0 ? `<span class="unread-badge">${chat.unread_count}</span>` : ""}
       </div>
-      <div class="chat-program">${escapeHtml(chat.program || "No program selected")}</div>
+      <div class="chat-program">${escapeHtml(prettyProgramName(chat.program || "No program selected"))}</div>
       <div class="chat-preview">${escapeHtml(chat.last_message || "No messages yet")}</div>
     </div>
   `).join("");
@@ -255,7 +256,7 @@ async function openChat(phone, markRead = true) {
   chatHeader.innerHTML = `
     <div>
       <h3>${escapeHtml(selectedChat?.name || phone)}</h3>
-      <p>${escapeHtml(selectedChat?.program || "No program selected")} · ${escapeHtml(selectedChat?.phone || phone)}</p>
+      <p>${escapeHtml(prettyProgramName(selectedChat?.program || "No program selected"))} · ${escapeHtml(selectedChat?.phone || phone)}</p>
     </div>
     <div>
       <span class="status-chip status-${selectedChat?.status || "active"}">
@@ -332,7 +333,6 @@ async function sendMessage() {
     }
 
     input.value = "";
-
     await loadChats();
     await openChat(selectedPhone, false);
   } catch (error) {
@@ -383,6 +383,56 @@ function formatDateTime(value, short = false) {
   return short ? date.toLocaleString() : date.toLocaleString();
 }
 
+function normalizeProgramKey(name) {
+  if (!name) return "";
+  const raw = String(name).trim().toLowerCase().replace(/\s+/g, " ");
+
+  const map = {
+    "bscs": "BS Computer Science",
+    "bs cs": "BS Computer Science",
+    "bs computer science": "BS Computer Science",
+    "bsse": "BS Software Engineering",
+    "bs se": "BS Software Engineering",
+    "bs software engineering": "BS Software Engineering",
+    "bba": "BBA",
+    "dpt": "Doctor of Physiotherapy",
+    "llb": "Bachelor of Laws (LLB)",
+    "m.phil education": "M.Phil Education",
+    "mphil education": "M.Phil Education",
+    "m.phil sociology": "M.Phil Sociology",
+    "mphil sociology": "M.Phil Sociology"
+  };
+
+  return map[raw] || titleCase(raw);
+}
+
+function prettyProgramName(name) {
+  return normalizeProgramKey(name);
+}
+
+function normalizeProgramsForDisplay(programs) {
+  const merged = {};
+
+  programs.forEach(item => {
+    const key = normalizeProgramKey(item.program);
+    if (!merged[key]) {
+      merged[key] = 0;
+    }
+    merged[key] += Number(item.inquiries || 0);
+  });
+
+  return Object.entries(merged)
+    .map(([program, inquiries]) => ({ program, inquiries }))
+    .sort((a, b) => b.inquiries - a.inquiries || a.program.localeCompare(b.program));
+}
+
+function titleCase(str) {
+  return String(str)
+    .split(" ")
+    .map(word => word ? word.charAt(0).toUpperCase() + word.slice(1) : "")
+    .join(" ");
+}
+
 function escapeHtml(str) {
   if (str === null || str === undefined) return "";
   return String(str)
@@ -393,7 +443,6 @@ function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
-// Enter to send
 document.addEventListener("DOMContentLoaded", () => {
   const input = document.getElementById("messageInput");
   if (input) {
