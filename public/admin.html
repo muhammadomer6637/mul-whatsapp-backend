@@ -3,31 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MUL Admin Panel</title>
+  <title>MUL Admissions Admin Panel</title>
   <link rel="stylesheet" href="admin.css" />
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
-      <div class="brand">
-        <div class="brand-logo">M</div>
-        <div class="brand-text">
-          <h2>MUL Admin</h2>
-          <p>WhatsApp Control Center</p>
+      <div>
+        <div class="brand">
+          <img src="/mul-logo-white.png" alt="MUL Logo" class="brand-logo-img" />
+          <div class="brand-subtitle">Admissions Command Center</div>
         </div>
+
+        <nav class="nav-menu">
+          <button class="nav-btn active" data-section="dashboard" onclick="showSection('dashboard', this)">
+            <span class="nav-icon">▣</span>
+            <span>Dashboard</span>
+          </button>
+
+          <button class="nav-btn" data-section="agent" onclick="showSection('agent', this)">
+            <span class="nav-icon">◉</span>
+            <span>Agent Panel</span>
+          </button>
+        </nav>
       </div>
-
-      <nav class="nav-menu">
-        <button class="nav-btn active" data-section="dashboard" onclick="showSection('dashboard', this)">
-          <span class="nav-icon">▣</span>
-          <span>Dashboard</span>
-        </button>
-
-        <button class="nav-btn" data-section="agent" onclick="showSection('agent', this)">
-          <span class="nav-icon">◉</span>
-          <span>Agent Panel</span>
-        </button>
-      </nav>
 
       <div class="sidebar-footer">
         <div class="status-dot"></div>
@@ -41,12 +40,13 @@
           <h1 id="pageTitle">Dashboard</h1>
           <p id="pageSubtitle">Admissions insights, unread activity, and lead intelligence</p>
         </div>
+
         <div class="topbar-actions">
           <button class="refresh-btn" onclick="refreshCurrentSection()">Refresh</button>
         </div>
       </header>
 
-      <!-- Dashboard -->
+      <!-- DASHBOARD -->
       <section id="dashboard" class="section">
         <div class="toolbar">
           <div class="range-group">
@@ -63,7 +63,7 @@
             <div class="panel-header">
               <div>
                 <h3>Top Programs by Inquiries</h3>
-                <p>Most frequently requested programs in selected range</p>
+                <p>Most requested programs in the selected period</p>
               </div>
             </div>
             <div id="topProgramsList" class="program-bars"></div>
@@ -73,7 +73,7 @@
             <div class="panel-header">
               <div>
                 <h3>Queue Snapshot</h3>
-                <p>Live operational status</p>
+                <p>Operational overview</p>
               </div>
             </div>
             <div class="mini-stats" id="queueSnapshot"></div>
@@ -84,7 +84,7 @@
           <div class="panel-header">
             <div>
               <h3>Recent Leads</h3>
-              <p>Latest captured prospects from WhatsApp</p>
+              <p>Latest inquiries captured from WhatsApp</p>
             </div>
           </div>
           <div class="table-wrap">
@@ -104,7 +104,7 @@
         </div>
       </section>
 
-      <!-- Agent Panel -->
+      <!-- AGENT PANEL -->
       <section id="agent" class="section hidden">
         <div class="agent-toolbar">
           <div class="search-wrap">
@@ -117,14 +117,13 @@
           </div>
 
           <div class="agent-toolbar-actions">
-            <button class="ghost-btn active-filter" id="filterAll" onclick="setChatFilter('all', this)">All</button>
-            <button class="ghost-btn" id="filterWaiting" onclick="setChatFilter('agent_waiting', this)">Waiting</button>
-            <button class="ghost-btn" id="filterActive" onclick="setChatFilter('agent_active', this)">Active</button>
+            <button class="ghost-btn active-filter" onclick="setChatFilter('all', this)">All</button>
+            <button class="ghost-btn" onclick="setChatFilter('agent_waiting', this)">Waiting</button>
+            <button class="ghost-btn" onclick="setChatFilter('agent_active', this)">Active</button>
           </div>
         </div>
 
         <div class="agent-layout">
-          <!-- Chat Sidebar -->
           <div class="chat-sidebar">
             <div class="chat-sidebar-header">
               <h3>Conversations</h3>
@@ -133,12 +132,11 @@
             <div id="chatList" class="chat-list premium-scroll"></div>
           </div>
 
-          <!-- Chat Window -->
           <div class="chat-panel">
             <div id="chatHeader" class="chat-header empty-state-header">
               <div>
                 <h3>Select a conversation</h3>
-                <p>Open any chat from the left panel to start responding</p>
+                <p>Open any inquiry from the left panel to view and respond</p>
               </div>
             </div>
 
@@ -146,7 +144,7 @@
               <div class="empty-chat-state">
                 <div class="empty-chat-icon">💬</div>
                 <h3>No conversation selected</h3>
-                <p>Choose a lead from the chat list to view messages and reply.</p>
+                <p>Choose a lead from the list to start responding.</p>
               </div>
             </div>
 
