@@ -9,7 +9,6 @@ const app = express();
 app.use(express.json());
 
 app.use(express.static(path.join(__dirname, "public")));
-// Static files for PDF
 app.use("/files", express.static(path.join(__dirname, "public")));
 
 // CONFIG
@@ -324,59 +323,42 @@ function splitIntoChunks(items, size = 12) {
 function welcomeMessage() {
   return `Assalamu Alaikum 👋
 
-Welcome to Minhaj University Lahore — a leading institution committed to academic excellence, innovation, research, and student success. We offer a wide range of degree programs to help students build strong professional futures.
+Welcome to Minhaj University Lahore.
 
 Please choose an option:
 
 1. Programs
 2. Fee Structure
-3. Scholarship
-4. How to Apply for Admission
-5. Anything Else
-
-Reply 0 at any time for Main Menu.`;
+3. Scholarships
+4. How to Apply
+5. Other Support
+6. Talk to Agent`;
 }
 
 function programsMenu() {
   return `📚 Programs Categories
 
-Please choose:
-
-1a. Associate Degree Programs (ADP - 2 Years)
-1b. BS Programs (4 Years)
+1a. Associate Degree Programs (ADP)
+1b. BS Programs
 1c. M.Phil./MS Programs
-1d. Ph.D. Programs
-
-Reply 9 for Previous Menu
-Reply 0 for Main Menu`;
+1d. Ph.D. Programs`;
 }
 
 function howToApplyMenu() {
-  return `📝 How to Apply for Admission
-
-Please choose:
+  return `📝 How to Apply
 
 4a. On Campus
 4b. Online
-4c. Documents Requirements
-
-Reply 9 for Previous Menu
-Reply 0 for Main Menu`;
+4c. Documents Requirements`;
 }
 
-function anythingElseMenu() {
-  return `📞 Anything Else
+function otherSupportMenu() {
+  return `📞 Other Support
 
-Please choose:
-
-5a. Related to Students Affairs Office
-5b. Related to Examination
-5c. Related to Account Office
-5d. Admissions
-5e. Talk to Agent
-
-Reply 9 for Previous Menu
-Reply 0 for Main Menu`;
+5a. Students Affairs Office
+5b. Examination
+5c. Accounts Office
+5d. Admissions`;
 }
 
 function formatProgramChunk(title, items, currentIndex, totalChunks, baseCode) {
@@ -387,17 +369,15 @@ function formatProgramChunk(title, items, currentIndex, totalChunks, baseCode) {
     msg += `\n\nReply ${baseCode}-more for more programs`;
   }
 
-  msg += `\nReply 1 for Programs Menu`;
   msg += `\nReply APPLY to apply online`;
-  msg += `\nReply 0 for Main Menu`;
 
   return msg;
 }
 
 function getProgramResponse(code) {
   const mapping = {
-    "1a": { title: "Associate Degree Programs (ADP - 2 Years)", key: "adp" },
-    "1b": { title: "BS Programs (4 Years)", key: "bs" },
+    "1a": { title: "Associate Degree Programs (ADP)", key: "adp" },
+    "1b": { title: "BS Programs", key: "bs" },
     "1c": { title: "M.Phil./MS Programs", key: "mphil" },
     "1d": { title: "Ph.D. Programs", key: "phd" }
   };
@@ -412,11 +392,11 @@ function getProgramResponse(code) {
 function getMoreProgramResponse(code) {
   const mapping = {
     "1a-more": {
-      title: "Associate Degree Programs (ADP - 2 Years)",
+      title: "Associate Degree Programs (ADP)",
       key: "adp",
       index: 1
     },
-    "1b-more": { title: "BS Programs (4 Years)", key: "bs", index: 1 },
+    "1b-more": { title: "BS Programs", key: "bs", index: 1 },
     "1c-more": { title: "M.Phil./MS Programs", key: "mphil", index: 1 },
     "1d-more": { title: "Ph.D. Programs", key: "phd", index: 1 }
   };
@@ -426,7 +406,7 @@ function getMoreProgramResponse(code) {
 
   const chunks = splitIntoChunks(PROGRAMS[item.key], 12);
   if (!chunks[item.index]) {
-    return `No more programs in this category.\n\nReply 1 for Programs Menu\nReply 0 for Main Menu`;
+    return `No more programs in this category.`;
   }
 
   return formatProgramChunk(
@@ -440,9 +420,7 @@ function getMoreProgramResponse(code) {
 
 function applyNowMessage() {
   return `📝 Apply Now Online:
-https://admission.mul.edu.pk/
-
-Reply 0 for Main Menu`;
+https://admission.mul.edu.pk/`;
 }
 
 // =========================
@@ -558,6 +536,51 @@ async function sendAgentTextMessage(to, message, chatStatus = "agent_active") {
   }
 }
 
+async function sendReplyButtons(to, bodyText, buttons, chatStatus = "active") {
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: {
+            text: bodyText
+          },
+          action: {
+            buttons: buttons.map((btn) => ({
+              type: "reply",
+              reply: {
+                id: btn.id,
+                title: btn.title
+              }
+            }))
+          }
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    await saveMessage({
+      phone: to,
+      sender: "bot",
+      type: "interactive",
+      text: bodyText
+    });
+
+    await setOutgoingMeta(to, bodyText, chatStatus);
+  } catch (error) {
+    console.error("Send reply buttons error:", error.response?.data || error.message);
+  }
+}
+
 // =========================
 // ROUTES
 // =========================
@@ -587,9 +610,13 @@ app.post("/webhook", async (req, res) => {
 
     const from = msg.from;
     const contactName = contact?.profile?.name || null;
-    const text = msg.text?.body?.trim();
-    const lowerText = text?.toLowerCase();
     const type = msg.type || "text";
+
+    let text = msg.text?.body?.trim() || "";
+    if (type === "interactive" && msg.interactive?.type === "button_reply") {
+      text = msg.interactive.button_reply.id || "";
+    }
+    const lowerText = text?.toLowerCase();
 
     let incomingText = "";
     let media_id = null;
@@ -599,6 +626,8 @@ app.post("/webhook", async (req, res) => {
 
     if (type === "text") {
       incomingText = text || "";
+    } else if (type === "interactive" && msg.interactive?.type === "button_reply") {
+      incomingText = msg.interactive.button_reply?.title || text || "[Button Reply]";
     } else if (type === "image") {
       incomingText = "[Image]";
       media_id = msg.image?.id || null;
@@ -636,7 +665,8 @@ app.post("/webhook", async (req, res) => {
       userStates[from] = {
         previousMenu: "main",
         currentMenu: "main",
-        awaitingLead: false
+        awaitingLead: false,
+        hasInteracted: false
       };
     }
 
@@ -664,7 +694,7 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(200);
     }
 
-    if (!text && type !== "text") {
+    if (!text && type !== "text" && type !== "interactive") {
       return res.sendStatus(200);
     }
 
@@ -672,11 +702,70 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(200);
     }
 
+    // AUTO MENU FOR FIRST MESSAGE
+    if (!userStates[from].hasInteracted) {
+      userStates[from].hasInteracted = true;
+
+      if (!["1", "2", "3", "4", "5", "6", "apply"].includes(lowerText)) {
+        await sendTextMessage(from, welcomeMessage());
+        return res.sendStatus(200);
+      }
+    }
+
+    if (lowerText === "main_menu") {
+      userStates[from] = {
+        previousMenu: "main",
+        currentMenu: "main",
+        awaitingLead: false,
+        hasInteracted: true
+      };
+      await sendTextMessage(from, welcomeMessage());
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "back") {
+      const prev = userStates[from].previousMenu || "main";
+
+      if (prev === "main") {
+        userStates[from].currentMenu = "main";
+        await sendTextMessage(from, welcomeMessage());
+      } else if (prev === "programs") {
+        userStates[from].currentMenu = "programs";
+        userStates[from].previousMenu = "main";
+        await sendReplyButtons(
+          from,
+          programsMenu(),
+          [{ id: "main_menu", title: "Main Menu" }]
+        );
+      } else if (prev === "apply") {
+        userStates[from].currentMenu = "apply";
+        userStates[from].previousMenu = "main";
+        await sendReplyButtons(
+          from,
+          howToApplyMenu(),
+          [{ id: "main_menu", title: "Main Menu" }]
+        );
+      } else if (prev === "other_support") {
+        userStates[from].currentMenu = "other_support";
+        userStates[from].previousMenu = "main";
+        await sendReplyButtons(
+          from,
+          otherSupportMenu(),
+          [{ id: "main_menu", title: "Main Menu" }]
+        );
+      } else {
+        await sendTextMessage(from, welcomeMessage());
+      }
+
+      return res.sendStatus(200);
+    }
+
     if (lowerText === "0") {
       userStates[from] = {
         previousMenu: "main",
         currentMenu: "main",
-        awaitingLead: false
+        awaitingLead: false,
+        hasInteracted: true
       };
       await sendTextMessage(from, welcomeMessage());
       return res.sendStatus(200);
@@ -691,15 +780,27 @@ app.post("/webhook", async (req, res) => {
       } else if (prev === "programs") {
         userStates[from].currentMenu = "programs";
         userStates[from].previousMenu = "main";
-        await sendTextMessage(from, programsMenu());
+        await sendReplyButtons(
+          from,
+          programsMenu(),
+          [{ id: "main_menu", title: "Main Menu" }]
+        );
       } else if (prev === "apply") {
         userStates[from].currentMenu = "apply";
         userStates[from].previousMenu = "main";
-        await sendTextMessage(from, howToApplyMenu());
-      } else if (prev === "anything") {
-        userStates[from].currentMenu = "anything";
+        await sendReplyButtons(
+          from,
+          howToApplyMenu(),
+          [{ id: "main_menu", title: "Main Menu" }]
+        );
+      } else if (prev === "other_support") {
+        userStates[from].currentMenu = "other_support";
         userStates[from].previousMenu = "main";
-        await sendTextMessage(from, anythingElseMenu());
+        await sendReplyButtons(
+          from,
+          otherSupportMenu(),
+          [{ id: "main_menu", title: "Main Menu" }]
+        );
       } else {
         await sendTextMessage(from, welcomeMessage());
       }
@@ -724,8 +825,9 @@ app.post("/webhook", async (req, res) => {
       });
 
       userStates[from].awaitingLead = false;
-      userStates[from].previousMenu = "anything";
+      userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "agent_waiting";
+      userStates[from].hasInteracted = true;
 
       await updateUserDetails(from, {
         name: cleanName,
@@ -741,9 +843,7 @@ app.post("/webhook", async (req, res) => {
 
 Your request has been forwarded to our support team.
 
-Please wait, our admission representative will message you shortly.
-
-Reply 0 for Main Menu`,
+Please wait, our admission representative will message you shortly.`,
         "agent_waiting"
       );
 
@@ -763,6 +863,7 @@ Reply 0 for Main Menu`,
       userStates[from].currentMenu = "main";
       userStates[from].previousMenu = "main";
       userStates[from].awaitingLead = false;
+      userStates[from].hasInteracted = true;
 
       await sendTextMessage(from, welcomeMessage());
       return res.sendStatus(200);
@@ -771,7 +872,14 @@ Reply 0 for Main Menu`,
     if (lowerText === "1") {
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "programs";
-      await sendTextMessage(from, programsMenu());
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        programsMenu(),
+        [{ id: "main_menu", title: "Main Menu" }]
+      );
+
       return res.sendStatus(200);
     }
 
@@ -779,7 +887,17 @@ Reply 0 for Main Menu`,
       const response = getProgramResponse(lowerText);
       userStates[from].previousMenu = "programs";
       userStates[from].currentMenu = lowerText;
-      await sendTextMessage(from, response);
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        response,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
+      );
+
       return res.sendStatus(200);
     }
 
@@ -787,24 +905,33 @@ Reply 0 for Main Menu`,
       const response = getMoreProgramResponse(lowerText);
       userStates[from].previousMenu = "programs";
       userStates[from].currentMenu = lowerText;
-      await sendTextMessage(from, response);
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        response,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
+      );
+
       return res.sendStatus(200);
     }
 
     if (lowerText === "2") {
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "fee";
+      userStates[from].hasInteracted = true;
 
       const pdfUrl = `${BASE_URL}/files/Fee%20Structure%20Spring%202026.pdf`;
 
-      await sendTextMessage(
+      await sendReplyButtons(
         from,
         `💰 Fee Structure – Spring 2026
 
-Please find attached the complete fee structure.
-
-Reply 0 for Main Menu
-Reply APPLY to apply online`
+Please find attached the complete fee structure.`,
+        [{ id: "main_menu", title: "Main Menu" }]
       );
 
       await sendDocumentMessage(
@@ -820,15 +947,15 @@ Reply APPLY to apply online`
     if (lowerText === "3") {
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "scholarship";
+      userStates[from].hasInteracted = true;
 
-      await sendTextMessage(
+      await sendReplyButtons(
         from,
         `🎓 Scholarships
 
-For Scholarships details please visit our website:
-https://www.mul.edu.pk/en/scholarships-and-fee-concession
-
-Reply 0 for Main Menu`
+For scholarship details please visit:
+https://www.mul.edu.pk/en/scholarships-and-fee-concession`,
+        [{ id: "main_menu", title: "Main Menu" }]
       );
 
       return res.sendStatus(200);
@@ -837,24 +964,33 @@ Reply 0 for Main Menu`
     if (lowerText === "4") {
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "apply";
-      await sendTextMessage(from, howToApplyMenu());
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        howToApplyMenu(),
+        [{ id: "main_menu", title: "Main Menu" }]
+      );
+
       return res.sendStatus(200);
     }
 
     if (lowerText === "4a") {
       userStates[from].previousMenu = "apply";
       userStates[from].currentMenu = "4a";
+      userStates[from].hasInteracted = true;
 
-      await sendTextMessage(
+      await sendReplyButtons(
         from,
         `🏫 On Campus Admission
 
 Please visit University admissions office with required documents.
 Buy Prospectus, fill Prospectus and attach documents.
-Get Admission Fee challan and pay in Account Office or affiliated banks.
-
-Reply 9 for Previous Menu
-Reply 0 for Main Menu`
+Get Admission Fee challan and pay in Account Office or affiliated banks.`,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
       );
 
       return res.sendStatus(200);
@@ -863,8 +999,9 @@ Reply 0 for Main Menu`
     if (lowerText === "4b") {
       userStates[from].previousMenu = "apply";
       userStates[from].currentMenu = "4b";
+      userStates[from].hasInteracted = true;
 
-      await sendTextMessage(
+      await sendReplyButtons(
         from,
         `🌐 Online Admission
 
@@ -880,10 +1017,11 @@ Once status changes from Pending to Paid, upload your documents and agree to ter
 
 Your application will be submitted successfully.
 You will receive admission fee challan once your admission application is accepted.
-It may take 24 to 48 hours for processing.
-
-Reply 9 for Previous Menu
-Reply 0 for Main Menu`
+It may take 24 to 48 hours for processing.`,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
       );
 
       return res.sendStatus(200);
@@ -892,8 +1030,9 @@ Reply 0 for Main Menu`
     if (lowerText === "4c") {
       userStates[from].previousMenu = "apply";
       userStates[from].currentMenu = "4c";
+      userStates[from].hasInteracted = true;
 
-      await sendTextMessage(
+      await sendReplyButtons(
         from,
         `📄 Documents Requirements
 
@@ -903,10 +1042,11 @@ Reply 0 for Main Menu`
 • Domicile
 • 5 Photographs
 
-All documents should be attested.
-
-Reply 9 for Previous Menu
-Reply 0 for Main Menu`
+All documents should be attested.`,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
       );
 
       return res.sendStatus(200);
@@ -914,96 +1054,112 @@ Reply 0 for Main Menu`
 
     if (lowerText === "5") {
       userStates[from].previousMenu = "main";
-      userStates[from].currentMenu = "anything";
-      await sendTextMessage(from, anythingElseMenu());
+      userStates[from].currentMenu = "other_support";
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        otherSupportMenu(),
+        [{ id: "main_menu", title: "Main Menu" }]
+      );
+
       return res.sendStatus(200);
     }
 
     if (lowerText === "5a") {
-      userStates[from].previousMenu = "anything";
+      userStates[from].previousMenu = "other_support";
       userStates[from].currentMenu = "5a";
+      userStates[from].hasInteracted = true;
 
-      await sendTextMessage(
+      await sendReplyButtons(
         from,
         `🎓 Students Affairs Office
 
 Contact Details:
 042-35145621-6
 Extension: 346 & 446
-Email: support.dsa@mul.edu.pk
-
-Reply 9 for Previous Menu
-Reply 0 for Main Menu`
+Email: support.dsa@mul.edu.pk`,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
       );
       return res.sendStatus(200);
     }
 
     if (lowerText === "5b") {
-      userStates[from].previousMenu = "anything";
+      userStates[from].previousMenu = "other_support";
       userStates[from].currentMenu = "5b";
+      userStates[from].hasInteracted = true;
 
-      await sendTextMessage(
+      await sendReplyButtons(
         from,
         `📝 Examination
 
 Contact Details:
 042-35145621-6
 Extension: 317 & 307
-Email: support.exams@mul.edu.pk
-
-Reply 9 for Previous Menu
-Reply 0 for Main Menu`
+Email: support.exams@mul.edu.pk`,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
       );
       return res.sendStatus(200);
     }
 
     if (lowerText === "5c") {
-      userStates[from].previousMenu = "anything";
+      userStates[from].previousMenu = "other_support";
       userStates[from].currentMenu = "5c";
+      userStates[from].hasInteracted = true;
 
-      await sendTextMessage(
+      await sendReplyButtons(
         from,
-        `💳 Account Office
+        `💳 Accounts Office
 
 Contact Details:
 042-35145621-6
 Extension: 310 & 388
-Email: support.accounts@mul.edu.pk
-
-Reply 9 for Previous Menu
-Reply 0 for Main Menu`
+Email: support.accounts@mul.edu.pk`,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
       );
       return res.sendStatus(200);
     }
 
     if (lowerText === "5d") {
-      userStates[from].previousMenu = "anything";
+      userStates[from].previousMenu = "other_support";
       userStates[from].currentMenu = "5d";
+      userStates[from].hasInteracted = true;
 
-      await sendTextMessage(
+      await sendReplyButtons(
         from,
         `🎓 Admissions
 
 Contact Details:
 03111222685
-Email: admissions@mul.edu.pk
-
-Reply 9 for Previous Menu
-Reply 0 for Main Menu`
+Email: admissions@mul.edu.pk`,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
       );
       return res.sendStatus(200);
     }
 
-    if (lowerText === "5e") {
+    if (lowerText === "6") {
       userStates[from].awaitingLead = true;
-      userStates[from].previousMenu = "anything";
+      userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "agent";
+      userStates[from].hasInteracted = true;
 
       await sendTextMessage(
         from,
         `👤 Talk to Agent
 
-Please send your details in this format:
+Please send your details:
 
 Name, Program
 
@@ -1018,12 +1174,13 @@ Ali, BS Computer Science`
       from,
       `Sorry, I did not understand your message.
 
-Please use one of these options:
-1, 2, 3, 4, 5
-or submenu options like:
-1a, 1b, 4a, 5e
-
-Reply 0 for Main Menu`
+Please choose:
+1 Programs
+2 Fee Structure
+3 Scholarships
+4 How to Apply
+5 Other Support
+6 Talk to Agent`
     );
 
     return res.sendStatus(200);
@@ -1171,7 +1328,8 @@ app.post("/api/switch-mode", async (req, res) => {
       userStates[phone] = {
         previousMenu: "main",
         currentMenu: "main",
-        awaitingLead: false
+        awaitingLead: false,
+        hasInteracted: true
       };
     }
 
