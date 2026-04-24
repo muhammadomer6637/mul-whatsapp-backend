@@ -1,6 +1,8 @@
 const express = require("express");
 const axios = require("axios");
 const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
 const pool = require("./db/db");
 const { testConnection } = require("./db/db");
 const initDb = require("./db/initDb");
@@ -10,6 +12,11 @@ app.use(express.json());
 
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/files", express.static(path.join(__dirname, "public")));
+const uploadsDir = path.join(__dirname, "public", "uploads");
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 // CONFIG
 const VERIFY_TOKEN = "mul_token_123";
