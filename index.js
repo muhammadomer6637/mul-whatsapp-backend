@@ -691,7 +691,7 @@ app.post("/webhook", async (req, res) => {
   mime_type = msg.image?.mime_type || null;
 
   media_url = await downloadWhatsAppMedia(media_id, mime_type);
-}
+
     } else if (type === "document") {
   incomingText = msg.document?.filename || "[Document]";
   media_id = msg.document?.id || null;
@@ -699,21 +699,21 @@ app.post("/webhook", async (req, res) => {
   mime_type = msg.document?.mime_type || null;
 
   media_url = await downloadWhatsAppMedia(media_id, mime_type);
-}
+
    } else if (type === "video") {
   incomingText = "[Video]";
   media_id = msg.video?.id || null;
   mime_type = msg.video?.mime_type || null;
 
   media_url = await downloadWhatsAppMedia(media_id, mime_type);
-}
+
     } else if (type === "audio") {
   incomingText = "[Audio]";
   media_id = msg.audio?.id || null;
   mime_type = msg.audio?.mime_type || null;
 
   media_url = await downloadWhatsAppMedia(media_id, mime_type);
-}
+
     } else {
       incomingText = `[${type}]`;
     }
