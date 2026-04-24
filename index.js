@@ -1493,6 +1493,24 @@ app.get("/api/dashboard", async (req, res) => {
 
 app.listen(3000, async () => {
   console.log("Server running on port 3000");
+
   await testConnection();
   await initDb();
+
+  // 🔥 MEDIA COLUMNS AUTO ADD (RUN ONCE)
+  try {
+    await pool.query(`
+      ALTER TABLE messages
+      ADD COLUMN IF NOT EXISTS message_type VARCHAR(30) DEFAULT 'text',
+      ADD COLUMN IF NOT EXISTS media_id TEXT,
+      ADD COLUMN IF NOT EXISTS media_url TEXT,
+      ADD COLUMN IF NOT EXISTS mime_type TEXT,
+      ADD COLUMN IF NOT EXISTS file_name TEXT,
+      ADD COLUMN IF NOT EXISTS caption TEXT;
+    `);
+
+    console.log("✅ Media columns ensured in DB");
+  } catch (err) {
+    console.error("❌ Media columns error:", err.message);
+  }
 });
