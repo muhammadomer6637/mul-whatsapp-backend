@@ -35,18 +35,15 @@
     </aside>
 
     <main class="main-content">
-      <header class="topbar">
+      <header class="topbar" id="topbar">
         <div>
           <h1 id="pageTitle">Dashboard</h1>
           <p id="pageSubtitle">Admissions insights, unread activity, and lead intelligence</p>
         </div>
 
-        <div class="topbar-actions">
-          <button class="refresh-btn" onclick="refreshCurrentSection()">Refresh</button>
-        </div>
+        <button class="refresh-btn" onclick="refreshCurrentSection()">Refresh</button>
       </header>
 
-      <!-- DASHBOARD -->
       <section id="dashboard" class="section">
         <div class="toolbar">
           <div class="range-group">
@@ -87,6 +84,7 @@
               <p>Latest inquiries captured from WhatsApp</p>
             </div>
           </div>
+
           <div class="table-wrap">
             <table class="styled-table" id="leadsTable">
               <thead>
@@ -104,39 +102,41 @@
         </div>
       </section>
 
-      <!-- AGENT PANEL -->
       <section id="agent" class="section hidden">
-        <div class="agent-toolbar">
-          <div class="search-wrap">
-            <input
-              type="text"
-              id="chatSearch"
-              placeholder="Search by name, phone, or program..."
-              oninput="filterChats()"
-            />
-          </div>
-
-          <div class="agent-toolbar-actions">
-            <button class="ghost-btn active-filter" onclick="setChatFilter('all', this)">All</button>
-            <button class="ghost-btn" onclick="setChatFilter('agent_waiting', this)">Waiting</button>
-            <button class="ghost-btn" onclick="setChatFilter('agent_active', this)">Active</button>
-          </div>
-        </div>
-
-        <div class="agent-layout">
-          <div class="chat-sidebar">
-            <div class="chat-sidebar-header">
-              <h3>Conversations</h3>
+        <div class="whatsapp-shell">
+          <div class="wa-chat-list">
+            <div class="wa-list-top">
+              <div>
+                <h2>Chats</h2>
+                <p>Live WhatsApp inquiries</p>
+              </div>
               <span id="chatCountBadge" class="pill-badge">0</span>
             </div>
+
+            <div class="wa-search">
+              <input
+                type="text"
+                id="chatSearch"
+                placeholder="Search name, phone, or program..."
+                oninput="filterChats()"
+              />
+            </div>
+
+            <div class="wa-filter-tabs">
+              <button class="ghost-btn active-filter" onclick="setChatFilter('all', this)">All</button>
+              <button class="ghost-btn" onclick="setChatFilter('agent_waiting', this)">Waiting</button>
+              <button class="ghost-btn" onclick="setChatFilter('agent_active', this)">Active</button>
+            </div>
+
             <div id="chatList" class="chat-list premium-scroll"></div>
           </div>
 
-          <div class="chat-panel">
-            <div id="chatHeader" class="chat-header empty-state-header">
+          <div class="wa-chat-window">
+            <div id="chatHeader" class="wa-chat-header">
+              <div class="wa-avatar">M</div>
               <div>
                 <h3>Select a conversation</h3>
-                <p>Open any inquiry from the left panel to view and respond</p>
+                <p>Choose a lead from the left panel</p>
               </div>
             </div>
 
@@ -144,14 +144,14 @@
               <div class="empty-chat-state">
                 <div class="empty-chat-icon">💬</div>
                 <h3>No conversation selected</h3>
-                <p>Choose a lead from the list to start responding.</p>
+                <p>Open any inquiry to view messages and reply.</p>
               </div>
             </div>
 
             <div class="composer">
-              <input type="text" id="messageInput" placeholder="Type your reply..." />
+              <input type="text" id="messageInput" placeholder="Type a message..." />
               <button class="primary-btn" onclick="sendMessage()">Send</button>
-              <button class="danger-btn" onclick="switchToBot()">Switch to Bot</button>
+              <button class="danger-btn" onclick="switchToBot()">Bot</button>
             </div>
           </div>
         </div>
