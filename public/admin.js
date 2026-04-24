@@ -231,20 +231,57 @@ async function openChat(phone, markRead = true) {
   const res = await fetch(`${BASE}/api/messages/${phone}`);
   const data = await res.json();
 
-  document.getElementById("messages").innerHTML = data.messages.map(message => `
-    <div class="message-row ${message.sender}">
-      <div class="message-bubble">
-        <div>${escapeHtml(message.text || message.type || "")}</div>
-        <div class="message-meta">${capitalize(message.sender)} · ${formatDateTime(message.created_at, true)}</div>
+  document.getElementById("messages").innerHTML = data.messages.length
+    ? data.messages.map(message => {
+        let content = "";
+
+        if (message.type === "image" && message.media_url) {
+          content = `
+            <img src="${message.media_url}" 
+                 style="max-width:200px;border-radius:10px;cursor:pointer"
+                 onclick="window.open('${message.media_url}','_blank')" />
+          `;
+        } else if (message.type === "document" && message.media_url) {
+          content = `
+            <a href="${message.media_url}" target="_blank" 
+               style="color:#56a5ff;text-decoration:underline">
+               📄 ${escapeHtml(message.file_name || "Open Document")}
+            </a>
+          `;
+        } else if (message.type === "video" && message.media_url) {
+          content = `
+            <video controls style="max-width:220px;border-radius:10px">
+              <source src="${message.media_url}">
+            </video>
+          `;
+        } else if (message.type === "audio" && message.media_url) {
+          content = `
+            <audio controls>
+              <source src="${message.media_url}">
+            </audio>
+          `;
+        } else {
+          content = `<div>${escapeHtml(message.text || message.type || "")}</div>`;
+        }
+
+        return `
+          <div class="message-row ${message.sender}">
+            <div class="message-bubble">
+              ${content}
+              <div class="message-meta">
+                ${capitalize(message.sender)} · ${formatDateTime(message.created_at, true)}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("")
+    : `
+      <div class="empty-chat-state">
+        <div class="empty-chat-icon">💬</div>
+        <h3>No messages found</h3>
+        <p>This conversation does not contain any saved messages yet.</p>
       </div>
-    </div>
-  `).join("") || `
-    <div class="empty-chat-state">
-      <div class="empty-chat-icon">💬</div>
-      <h3>No messages found</h3>
-      <p>This conversation does not contain any saved messages yet.</p>
-    </div>
-  `;
+    `;
 
   const messagesBox = document.getElementById("messages");
   setTimeout(() => {
