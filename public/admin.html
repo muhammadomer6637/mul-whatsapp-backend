@@ -2,50 +2,165 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>MUL Admin Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MUL Admissions Admin Panel</title>
   <link rel="stylesheet" href="admin.css" />
 </head>
 <body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div>
+        <div class="brand">
+          <img src="/mul-logo-white.png" alt="MUL Logo" class="brand-logo-img" />
+          <div class="brand-subtitle">Admissions Command Center</div>
+        </div>
 
-<div class="topbar">
-  <h2>MUL WhatsApp Panel</h2>
-</div>
+        <nav class="nav-menu">
+          <button class="nav-btn active" data-section="dashboard" onclick="showSection('dashboard', this)">
+            <span class="nav-icon">▣</span>
+            <span>Dashboard</span>
+          </button>
 
-<div class="agent-layout">
+          <button class="nav-btn" data-section="agent" onclick="showSection('agent', this)">
+            <span class="nav-icon">◉</span>
+            <span>Agent Panel</span>
+          </button>
+        </nav>
+      </div>
 
-  <!-- LEFT -->
-  <div class="chat-sidebar">
-    <div class="chat-sidebar-header">
-      <h3>Chats</h3>
-      <span id="chatCountBadge" class="pill-badge">0</span>
-    </div>
+      <div class="sidebar-footer">
+        <div class="status-dot"></div>
+        <span>System Online</span>
+      </div>
+    </aside>
 
-    <div class="search-wrap">
-      <input type="text" id="chatSearch" placeholder="Search..." oninput="filterChats()" />
-    </div>
+    <main class="main-content">
+      <header class="topbar" id="topbar">
+        <div>
+          <h1 id="pageTitle">Dashboard</h1>
+          <p id="pageSubtitle">Admissions insights, unread activity, and lead intelligence</p>
+        </div>
 
-    <div id="chatList" class="chat-list"></div>
+        <div class="topbar-actions">
+          <button class="refresh-btn" onclick="refreshCurrentSection()">Refresh</button>
+        </div>
+      </header>
+
+      <section id="dashboard" class="section">
+        <div class="toolbar">
+          <div class="range-group">
+            <button class="range-btn active" onclick="setRange(this, '24h')">24 Hours</button>
+            <button class="range-btn" onclick="setRange(this, '7d')">7 Days</button>
+            <button class="range-btn" onclick="setRange(this, '30d')">30 Days</button>
+          </div>
+        </div>
+
+        <div class="stats-grid" id="stats"></div>
+
+        <div class="content-grid">
+          <div class="panel panel-large">
+            <div class="panel-header">
+              <div>
+                <h3>Top Programs by Inquiries</h3>
+                <p>Most requested programs in the selected period</p>
+              </div>
+            </div>
+            <div id="topProgramsList" class="program-bars"></div>
+          </div>
+
+          <div class="panel panel-medium">
+            <div class="panel-header">
+              <div>
+                <h3>Queue Snapshot</h3>
+                <p>Operational overview</p>
+              </div>
+            </div>
+            <div class="mini-stats" id="queueSnapshot"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Recent Leads</h3>
+              <p>Latest inquiries captured from WhatsApp</p>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="styled-table" id="leadsTable">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Program</th>
+                  <th>Phone</th>
+                  <th>Status</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="agent" class="section hidden">
+        <div class="whatsapp-shell">
+          <div class="wa-chat-list">
+            <div class="wa-list-top">
+              <div>
+                <h3>Chats</h3>
+                <p>Live inquiries</p>
+              </div>
+              <span id="chatCountBadge" class="pill-badge">0</span>
+            </div>
+
+            <div class="wa-search">
+              <input
+                type="text"
+                id="chatSearch"
+                placeholder="Search name, phone, program..."
+                oninput="filterChats()"
+              />
+            </div>
+
+            <div class="wa-filters">
+              <button class="ghost-btn active-filter" onclick="setChatFilter('all', this)">All</button>
+              <button class="ghost-btn" onclick="setChatFilter('agent_waiting', this)">Waiting</button>
+              <button class="ghost-btn" onclick="setChatFilter('agent_active', this)">Active</button>
+            </div>
+
+            <div id="chatList" class="chat-list premium-scroll"></div>
+          </div>
+
+          <div class="wa-chat-window">
+            <div id="chatHeader" class="wa-chat-header">
+              <div class="wa-avatar">M</div>
+              <div>
+                <h3>Select a conversation</h3>
+                <p>Open any inquiry to view and respond</p>
+              </div>
+            </div>
+
+            <div id="messages" class="messages premium-scroll">
+              <div class="empty-chat-state">
+                <div class="empty-chat-icon">💬</div>
+                <h3>No conversation selected</h3>
+                <p>Choose a lead from the chat list to start responding.</p>
+              </div>
+            </div>
+
+            <div class="composer">
+              <input type="text" id="messageInput" placeholder="Type your reply..." />
+              <button class="primary-btn" onclick="sendMessage()">Send</button>
+              <button class="danger-btn" onclick="switchToBot()">Bot</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 
-  <!-- RIGHT -->
-  <div class="chat-panel">
-
-    <div id="chatHeader" class="chat-header">
-      <h3>Select a chat</h3>
-    </div>
-
-    <div id="messages" class="messages"></div>
-
-    <div class="composer">
-      <input type="text" id="messageInput" placeholder="Type a message..." />
-      <button onclick="sendMessage()">Send</button>
-      <button onclick="switchToBot()">Bot</button>
-    </div>
-
-  </div>
-
-</div>
-
-<script src="admin.js"></script>
+  <script src="admin.js"></script>
 </body>
 </html>
