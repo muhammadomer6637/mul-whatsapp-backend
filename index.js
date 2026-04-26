@@ -388,8 +388,9 @@ Please choose an option:
 2. Fee Structure
 3. Scholarships
 4. How to Apply
-5. Other Support
-6. Talk to Agent`;
+5. Why Choose MUL?
+6. Other Support
+7. Chat with Agent`;
 }
 
 function programsMenu() {
@@ -409,24 +410,40 @@ function howToApplyMenu() {
 4c. Documents Requirements`;
 }
 
+function whyChooseMenu() {
+  return `🌟 Why Choose MUL?
+
+5a. Accreditation & Recognition
+5b. International Rankings
+5c. Asia’s First Robotic Library
+5d. Vibrant Student Life & Societies
+5e. Research Excellence & Innovation`;
+}
+
 function otherSupportMenu() {
   return `📞 Other Support
 
-5a. Students Affairs Office
-5b. Examination
-5c. Accounts Office
-5d. Admissions`;
+6a. Admission Office
+6b. Students Affairs Office
+6c. Advancement Office
+6d. Account Office
+6e. PITMAN - ICE
+6f. Directorate of Examination
+6g. Directorate of Academics
+6h. Quality Enhancement Cell (QEC)
+6i. ORIC
+6j. Vice Chancellor Secretariat
+6k. Office of the Registrar
+6l. Directorate of Administration`;
 }
 
-function formatProgramChunk(title, items, currentIndex, totalChunks, baseCode) {
+function formatProgramChunk(title, items, currentIndex, totalChunks, nextCode = null) {
   const list = items.map((item) => `• ${item}`).join("\n");
   let msg = `🎓 ${title}\n\n${list}`;
 
-  if (currentIndex < totalChunks - 1) {
-    msg += `\n\nReply ${baseCode}-more for more programs`;
+  if (currentIndex < totalChunks - 1 && nextCode) {
+    msg += `\n\nReply ${nextCode} for more programs`;
   }
-
-  msg += `\nReply APPLY to apply online`;
 
   return msg;
 }
@@ -443,41 +460,179 @@ function getProgramResponse(code) {
   if (!item) return null;
 
   const chunks = splitIntoChunks(PROGRAMS[item.key], 12);
-  return formatProgramChunk(item.title, chunks[0], 0, chunks.length, code);
+  const nextCode = chunks.length > 1 ? `${code}-more` : null;
+
+  return formatProgramChunk(item.title, chunks[0], 0, chunks.length, nextCode);
 }
 
 function getMoreProgramResponse(code) {
   const mapping = {
-    "1a-more": {
-      title: "Associate Degree Programs (ADP)",
-      key: "adp",
-      index: 1
-    },
-    "1b-more": { title: "BS Programs", key: "bs", index: 1 },
-    "1c-more": { title: "M.Phil./MS Programs", key: "mphil", index: 1 },
-    "1d-more": { title: "Ph.D. Programs", key: "phd", index: 1 }
+    "1a": { title: "Associate Degree Programs (ADP)", key: "adp" },
+    "1b": { title: "BS Programs", key: "bs" },
+    "1c": { title: "M.Phil./MS Programs", key: "mphil" },
+    "1d": { title: "Ph.D. Programs", key: "phd" }
   };
 
-  const item = mapping[code];
+  const match = code.match(/^(1[a-d])-more(?:-(\d+))?$/);
+  if (!match) return null;
+
+  const baseCode = match[1];
+  const index = match[2] ? parseInt(match[2], 10) : 1;
+  const item = mapping[baseCode];
+
   if (!item) return null;
 
   const chunks = splitIntoChunks(PROGRAMS[item.key], 12);
-  if (!chunks[item.index]) {
+  if (!chunks[index]) {
     return `No more programs in this category.`;
   }
 
+  const nextCode = index < chunks.length - 1 ? `${baseCode}-more-${index + 1}` : null;
+
   return formatProgramChunk(
     item.title + " (More)",
-    chunks[item.index],
-    item.index,
+    chunks[index],
+    index,
     chunks.length,
-    code.replace("-more", "")
+    nextCode
   );
 }
 
 function applyNowMessage() {
   return `📝 Apply Now Online:
 https://admission.mul.edu.pk/`;
+}
+
+function getWhyChooseResponse(code) {
+  const responses = {
+    "5a": `✅ Accreditation & Recognition
+
+Minhaj University Lahore (MUL) is recognized by the Higher Education Commission (HEC) of Pakistan and the Punjab Higher Education Commission (PHEC). Additionally, MUL holds accreditation from HEC affiliated councils, ensuring the highest standards of academic excellence.
+
+Accreditations:
+• National Computing Education Accreditation Council - NCEAC
+• Pakistan Engineering Council - PEC
+• Pakistan Bar Council - PBC
+• National Agriculture Education Accreditation Council - NAEAC
+• Pharmacy Council of Pakistan - PCP`,
+
+    "5b": `🌍 International Rankings
+
+• Ranked 211 internationally in Higher Education Ranking 2025
+• 644th globally in UI GreenMetric (Sustainability)
+• 1501+ rank in Times Higher Education Impact Ranking (SDGs)
+• Top 100 universities worldwide in WURI 2025
+• 20th globally in Student Support & Engagement`,
+
+    "5c": `🤖 Asia’s First Robotic Library
+
+Minhaj University Lahore hosts Asia’s First Robotic Library, offering a fully automated and technology-driven learning environment. Students can access thousands of books and research materials through advanced robotic systems, ensuring quick retrieval and a modern academic experience.
+
+This innovation reflects MUL’s commitment to digital transformation and future-ready education.`,
+
+    "5d": `🎓 Vibrant Student Life & Societies
+
+A dynamic campus with active student societies, events, leadership programs, and sports activities to build confidence and personal growth.
+
+Through initiatives like the Seekers Club, students engage in character building, community service, leadership development, and intellectual discussions, creating a well-rounded university experience.`,
+
+    "5e": `🔬 Research Excellence & Innovation
+
+Minhaj University Lahore is home to leading research centers such as CHART, CRIMA, CEPD, CRC, ICRIE and the UNESCO Chair on Peace Education & Intercultural Dialogue.
+
+The university actively promotes a strong research culture through international conferences, seminars, and academic collaborations. Students and faculty contribute to impactful research published in recognized journals, fostering innovation, critical thinking, and solutions to global challenges.`
+  };
+
+  return responses[code] || null;
+}
+
+function getOtherSupportResponse(code) {
+  const responses = {
+    "6a": `🎓 Admission Office
+
+Phone: 03111222685
+Email: admissions@mul.edu.pk
+Location: Ground Floor, Omar Bin Al Khattab Block`,
+
+    "6b": `🎓 Students Affairs Office
+
+Phone: 042-35145621-6
+Extensions: 346 & 346
+Email: support.students@mul.edu.pk
+Location: First Floor, Omar Bin Al Khattab Block`,
+
+    "6c": `🤝 Advancement Office
+
+Phone: 042-35145621-6
+Extension: 368
+Email: advancement.office@mul.edu.pk
+Location: First Floor, Omar Bin Al Khattab Block`,
+
+    "6d": `💳 Account Office
+
+Phone: 042-35145621-6
+Extensions: 388 & 310
+Email: support.accounts@mul.edu.pk
+Location: Second Floor, Omar Bin Al Khattab Block`,
+
+    "6e": `🏫 PITMAN - ICE
+
+Phone: 042-35145621-6
+Extension: 416
+Email: ice-pitman@mul.edu.pk
+Location: Third Floor, Omar Bin Al Khattab Block`,
+
+    "6f": `📝 Directorate of Examination
+
+Phone: 042-35145621-6
+Extensions: 307 & 317
+Email: support.exams@mul.edu.pk
+Location: Fourth Floor, Omar Bin Al Khattab Block`,
+
+    "6g": `📚 Directorate of Academics
+
+Phone: 042-35145621-6
+Extensions: 318 & 429
+Email: coordinator.academics@mul.edu.pk
+Location: Office # 305, Ground Floor, Jabir Ibn Hayyan Block`,
+
+    "6h": `✅ Quality Enhancement Cell (QEC)
+
+Phone: 042-35145621-6
+Extensions: 374 & 349
+Email: qec@mul.edu.pk
+Location: Office # 310, Ground Floor, Jabir Ibn Hayyan Block`,
+
+    "6i": `🔬 Office of Research, Innovation & Commercialization (ORIC)
+
+Phone: 042-35145621-6
+Extensions: 417 & 344
+Email: oric@mul.edu.pk
+Location: Office # 470, 2nd Floor, Jaffar As Sadiq Block`,
+
+    "6j": `🏛️ Vice Chancellor Secretariat
+
+Phone: 042-35145621-6
+Extensions: 323 & 322
+Email: pa.vc@mul.edu.pk
+Location: First Floor, Umar Ibn Abdul Aziz Block`,
+
+    "6k": `🏢 Office of the Registrar
+
+Phone: 042-35145621-6
+Extensions: 311 & 312
+Email: pa.registrar@mul.edu.pk
+Location: 5th Floor, Omar Bin Al Khattab Block`,
+
+    "6l": `🛠️ Directorate of Administration
+
+Phone: 042-35145621-6
+Extension: 364
+Email: admin@mul.edu.pk
+Location: Office # 303, Ground Floor, Jabir Ibn Hayyan Block`
+  };
+
+  return responses[code] || null;
 }
 
 // =========================
@@ -775,7 +930,15 @@ app.post("/webhook", async (req, res) => {
     if (!userStates[from].hasInteracted) {
       userStates[from].hasInteracted = true;
 
-      if (!["1", "2", "3", "4", "5", "6", "apply"].includes(lowerText)) {
+      if (
+        ![
+          "1", "2", "3", "4", "5", "6", "7",
+          "1a", "1b", "1c", "1d",
+          "5a", "5b", "5c", "5d", "5e",
+          "6a", "6b", "6c", "6d", "6e", "6f", "6g", "6h", "6i", "6j", "6k", "6l",
+          "apply"
+        ].includes(lowerText)
+      ) {
         await sendTextMessage(from, welcomeMessage());
         return res.sendStatus(200);
       }
@@ -792,43 +955,6 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(200);
     }
 
-    if (lowerText === "back") {
-      const prev = userStates[from].previousMenu || "main";
-
-      if (prev === "main") {
-        userStates[from].currentMenu = "main";
-        await sendTextMessage(from, welcomeMessage());
-      } else if (prev === "programs") {
-        userStates[from].currentMenu = "programs";
-        userStates[from].previousMenu = "main";
-        await sendReplyButtons(
-          from,
-          programsMenu(),
-          [{ id: "main_menu", title: "Main Menu" }]
-        );
-      } else if (prev === "apply") {
-        userStates[from].currentMenu = "apply";
-        userStates[from].previousMenu = "main";
-        await sendReplyButtons(
-          from,
-          howToApplyMenu(),
-          [{ id: "main_menu", title: "Main Menu" }]
-        );
-      } else if (prev === "other_support") {
-        userStates[from].currentMenu = "other_support";
-        userStates[from].previousMenu = "main";
-        await sendReplyButtons(
-          from,
-          otherSupportMenu(),
-          [{ id: "main_menu", title: "Main Menu" }]
-        );
-      } else {
-        await sendTextMessage(from, welcomeMessage());
-      }
-
-      return res.sendStatus(200);
-    }
-
     if (lowerText === "0") {
       userStates[from] = {
         previousMenu: "main",
@@ -840,13 +966,10 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(200);
     }
 
-    if (lowerText === "9") {
+    if (lowerText === "back" || lowerText === "9") {
       const prev = userStates[from].previousMenu || "main";
 
-      if (prev === "main") {
-        userStates[from].currentMenu = "main";
-        await sendTextMessage(from, welcomeMessage());
-      } else if (prev === "programs") {
+      if (prev === "programs") {
         userStates[from].currentMenu = "programs";
         userStates[from].previousMenu = "main";
         await sendReplyButtons(
@@ -862,6 +985,14 @@ app.post("/webhook", async (req, res) => {
           howToApplyMenu(),
           [{ id: "main_menu", title: "Main Menu" }]
         );
+      } else if (prev === "why_mul") {
+        userStates[from].currentMenu = "why_mul";
+        userStates[from].previousMenu = "main";
+        await sendReplyButtons(
+          from,
+          whyChooseMenu(),
+          [{ id: "main_menu", title: "Main Menu" }]
+        );
       } else if (prev === "other_support") {
         userStates[from].currentMenu = "other_support";
         userStates[from].previousMenu = "main";
@@ -871,6 +1002,8 @@ app.post("/webhook", async (req, res) => {
           [{ id: "main_menu", title: "Main Menu" }]
         );
       } else {
+        userStates[from].currentMenu = "main";
+        userStates[from].previousMenu = "main";
         await sendTextMessage(from, welcomeMessage());
       }
 
@@ -962,6 +1095,7 @@ Please wait, our admission representative will message you shortly.`,
         from,
         response,
         [
+          { id: "apply", title: "Apply Now" },
           { id: "back", title: "Back" },
           { id: "main_menu", title: "Main Menu" }
         ]
@@ -970,7 +1104,7 @@ Please wait, our admission representative will message you shortly.`,
       return res.sendStatus(200);
     }
 
-    if (["1a-more", "1b-more", "1c-more", "1d-more"].includes(lowerText)) {
+    if (/^1[a-d]-more(?:-\d+)?$/.test(lowerText)) {
       const response = getMoreProgramResponse(lowerText);
       userStates[from].previousMenu = "programs";
       userStates[from].currentMenu = lowerText;
@@ -980,6 +1114,7 @@ Please wait, our admission representative will message you shortly.`,
         from,
         response,
         [
+          { id: "apply", title: "Apply Now" },
           { id: "back", title: "Back" },
           { id: "main_menu", title: "Main Menu" }
         ]
@@ -1123,6 +1258,39 @@ All documents should be attested.`,
 
     if (lowerText === "5") {
       userStates[from].previousMenu = "main";
+      userStates[from].currentMenu = "why_mul";
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        whyChooseMenu(),
+        [{ id: "main_menu", title: "Main Menu" }]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (["5a", "5b", "5c", "5d", "5e"].includes(lowerText)) {
+      const response = getWhyChooseResponse(lowerText);
+
+      userStates[from].previousMenu = "why_mul";
+      userStates[from].currentMenu = lowerText;
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        response,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "6") {
+      userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "other_support";
       userStates[from].hasInteracted = true;
 
@@ -1135,90 +1303,31 @@ All documents should be attested.`,
       return res.sendStatus(200);
     }
 
-    if (lowerText === "5a") {
+    if (
+      [
+        "6a", "6b", "6c", "6d", "6e", "6f",
+        "6g", "6h", "6i", "6j", "6k", "6l"
+      ].includes(lowerText)
+    ) {
+      const response = getOtherSupportResponse(lowerText);
+
       userStates[from].previousMenu = "other_support";
-      userStates[from].currentMenu = "5a";
+      userStates[from].currentMenu = lowerText;
       userStates[from].hasInteracted = true;
 
       await sendReplyButtons(
         from,
-        `🎓 Students Affairs Office
-
-Contact Details:
-042-35145621-6
-Extension: 346 & 446
-Email: support.dsa@mul.edu.pk`,
+        response,
         [
           { id: "back", title: "Back" },
           { id: "main_menu", title: "Main Menu" }
         ]
       );
+
       return res.sendStatus(200);
     }
 
-    if (lowerText === "5b") {
-      userStates[from].previousMenu = "other_support";
-      userStates[from].currentMenu = "5b";
-      userStates[from].hasInteracted = true;
-
-      await sendReplyButtons(
-        from,
-        `📝 Examination
-
-Contact Details:
-042-35145621-6
-Extension: 317 & 307
-Email: support.exams@mul.edu.pk`,
-        [
-          { id: "back", title: "Back" },
-          { id: "main_menu", title: "Main Menu" }
-        ]
-      );
-      return res.sendStatus(200);
-    }
-
-    if (lowerText === "5c") {
-      userStates[from].previousMenu = "other_support";
-      userStates[from].currentMenu = "5c";
-      userStates[from].hasInteracted = true;
-
-      await sendReplyButtons(
-        from,
-        `💳 Accounts Office
-
-Contact Details:
-042-35145621-6
-Extension: 310 & 388
-Email: support.accounts@mul.edu.pk`,
-        [
-          { id: "back", title: "Back" },
-          { id: "main_menu", title: "Main Menu" }
-        ]
-      );
-      return res.sendStatus(200);
-    }
-
-    if (lowerText === "5d") {
-      userStates[from].previousMenu = "other_support";
-      userStates[from].currentMenu = "5d";
-      userStates[from].hasInteracted = true;
-
-      await sendReplyButtons(
-        from,
-        `🎓 Admissions
-
-Contact Details:
-03111222685
-Email: admissions@mul.edu.pk`,
-        [
-          { id: "back", title: "Back" },
-          { id: "main_menu", title: "Main Menu" }
-        ]
-      );
-      return res.sendStatus(200);
-    }
-
-    if (lowerText === "6") {
+    if (lowerText === "7") {
       userStates[from].awaitingLead = true;
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "agent";
@@ -1226,7 +1335,7 @@ Email: admissions@mul.edu.pk`,
 
       await sendTextMessage(
         from,
-        `👤 Talk to Agent
+        `👤 Chat with Agent
 
 Please send your details:
 
@@ -1248,8 +1357,9 @@ Please choose:
 2 Fee Structure
 3 Scholarships
 4 How to Apply
-5 Other Support
-6 Talk to Agent`
+5 Why Choose MUL?
+6 Other Support
+7 Chat with Agent`
     );
 
     return res.sendStatus(200);
