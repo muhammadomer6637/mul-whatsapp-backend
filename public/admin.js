@@ -468,13 +468,11 @@ eventSource.addEventListener("chat_updated", function (event) {
   }
 });
 
-  setInterval(() => {
-    if (currentSection === "dashboard") {
-      loadDashboard(currentRange);
-    } else {
-      loadChats();
-      if (selectedPhone) openChat(selectedPhone, false);
-    }
-  }, 15000);
-});
+setInterval(() => {
+  if (currentSection === "dashboard") {
+    loadDashboard(currentRange);
+  } else {
+    loadChats();
+  }
+}, 15000);
 
