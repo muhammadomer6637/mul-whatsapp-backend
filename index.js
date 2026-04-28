@@ -1742,4 +1742,27 @@ app.listen(3000, async () => {
   } catch (err) {
     console.error("❌ Media columns error:", err.message);
   }
+
+    // 🔥 SYSTEM SETTINGS TABLE AUTO CREATE
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
+    `);
+
+    await pool.query(`
+      INSERT INTO system_settings (key, value)
+      VALUES ('agent_available', 'true')
+      ON CONFLICT (key) DO NOTHING;
+    `);
+
+    console.log("✅ System settings ensured in DB");
+  } catch (err) {
+    console.error("❌ System settings error:", err.message);
+  }
+  
 });
+
+
