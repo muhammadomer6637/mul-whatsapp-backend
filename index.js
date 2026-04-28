@@ -29,6 +29,18 @@ const BASE_URL =
 // Temporary in-memory user state
 const userStates = {};
 
+async function isAgentAvailable() {
+  try {
+    const result = await pool.query(
+      "SELECT value FROM system_settings WHERE key = 'agent_available'"
+    );
+    return result.rows[0]?.value === "true";
+  } catch (err) {
+    console.error("Agent status error:", err.message);
+    return true;
+  }
+}
+
 // =========================
 // REAL-TIME SSE HELPERS
 // =========================
@@ -1377,15 +1389,34 @@ All documents should be attested.`,
       return res.sendStatus(200);
     }
 
-    if (lowerText === "7") {
-      userStates[from].awaitingLead = true;
-      userStates[from].previousMenu = "main";
-      userStates[from].currentMenu = "agent";
-      userStates[from].hasInteracted = true;
+if (lowerText === "7") {
+  const available = await isAgentAvailable();
 
-      await sendTextMessage(
-        from,
-        `👤 Chat with Agent
+  if (!available) {
+    await sendTextMessage(
+      from,
+      `Thank you for contacting Minhaj University Lahore.
+
+Currently no agent available due to non office hours, Please send your query. 
+Our representative will get back to you during working hours.
+
+For urgent information, you may continue exploring the menu options.
+
+Thank you for your patience.`
+    );
+
+    return res.sendStatus(200);
+  }
+
+  // ✅ AGENT AVAILABLE → OLD FLOW CONTINUE
+  userStates[from].awaitingLead = true;
+  userStates[from].previousMenu = "main";
+  userStates[from].currentMenu = "agent";
+  userStates[from].hasInteracted = true;
+
+  await sendTextMessage(
+    from,
+    `👤 Chat with Agent
 
 Please send your details:
 
@@ -1393,10 +1424,10 @@ Name, Program
 
 Example:
 Ali, BS Computer Science`
-      );
+  );
 
-      return res.sendStatus(200);
-    }
+  return res.sendStatus(200);
+}
 
     await sendTextMessage(
       from,
@@ -1425,6 +1456,31 @@ Please choose:
 // =========================
 // AGENT PANEL APIs
 // =========================
+
+// Get agent status
+app.get("/api/agent-status", async (req, res) => {
+  const result = await pool.query(
+    "SELECT value FROM system_settings WHERE key = 'agent_available'"
+  );
+
+  res.json({
+    success: true,
+    status: result.rows[0]?.value === "true"
+  });
+});
+
+// Toggle agent status
+app.post("/api/toggle-agent", async (req, res) => {
+  const { status } = req.body;
+
+  await pool.query(
+    "UPDATE system_settings SET value = $1 WHERE key = 'agent_available'",
+    [status ? "true" : "false"]
+  );
+
+  res.json({ success: true });
+});
+
 app.get("/api/chats", async (req, res) => {
   try {
     const result = await pool.query(`
