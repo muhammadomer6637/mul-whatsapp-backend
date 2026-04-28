@@ -246,6 +246,9 @@ async function saveMessage({
       `,
       [phone, sender, type, text, media_id, media_url, file_name, mime_type]
     );
+
+    notifyChatUpdated(phone);
+    
   } catch (err) {
     console.error("saveMessage error:", err.message);
   }
