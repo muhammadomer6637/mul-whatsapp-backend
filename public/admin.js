@@ -52,6 +52,31 @@ function setRange(button, range) {
   loadDashboard(range);
 }
 
+async function loadAgentStatus() {
+  const res = await fetch(`${BASE}/api/agent-status`);
+  const data = await res.json();
+
+  const btn = document.getElementById("agentToggleBtn");
+  if (btn) {
+    btn.textContent = data.status ? "Agent ON 🟢" : "Agent OFF 🔴";
+  }
+}
+
+async function toggleAgent() {
+  const res = await fetch(`${BASE}/api/agent-status`);
+  const data = await res.json();
+
+  const newStatus = !data.status;
+
+  await fetch(`${BASE}/api/toggle-agent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: newStatus })
+  });
+
+  loadAgentStatus();
+}
+
 async function loadDashboard(range = "24h") {
   try {
     const res = await fetch(`${BASE}/api/dashboard?range=${range}`);
@@ -444,6 +469,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loadDashboard();
   loadChats();
+  loadAgentStatus();
 
   // =========================
 // REAL-TIME SSE LISTENER
