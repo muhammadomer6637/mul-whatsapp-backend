@@ -30,6 +30,30 @@ const BASE_URL =
 const userStates = {};
 
 // =========================
+// REAL-TIME SSE HELPERS
+// =========================
+const sseClients = [];
+
+function sendSseEvent(eventName, data = {}) {
+  const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
+
+  sseClients.forEach((client) => {
+    try {
+      client.write(payload);
+    } catch (err) {
+      console.error("SSE write error:", err.message);
+    }
+  });
+}
+
+function notifyChatUpdated(phone) {
+  sendSseEvent("chat_updated", {
+    phone,
+    time: new Date().toISOString()
+  });
+}
+
+// =========================
 // PROGRAM DATA
 // =========================
 const PROGRAMS = {
@@ -798,6 +822,29 @@ async function sendReplyButtons(to, bodyText, buttons, chatStatus = "active") {
 // =========================
 app.get("/", (req, res) => {
   res.send("MUL WhatsApp Backend Running 🚀");
+});
+
+// =========================
+// REAL-TIME SSE ROUTE
+// =========================
+app.get("/events", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  res.flushHeaders();
+
+  res.write(`event: connected\ndata: "SSE Connected"\n\n`);
+
+  sseClients.push(res);
+
+  req.on("close", () => {
+    const index = sseClients.indexOf(res);
+    if (index !== -1) {
+      sseClients.splice(index, 1);
+    }
+    console.log("SSE client disconnected");
+  });
 });
 
 app.get("/webhook", (req, res) => {
