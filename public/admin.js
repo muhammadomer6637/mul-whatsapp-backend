@@ -445,6 +445,29 @@ document.addEventListener("DOMContentLoaded", () => {
   loadDashboard();
   loadChats();
 
+  // =========================
+// REAL-TIME SSE LISTENER
+// =========================
+const eventSource = new EventSource(`${BASE}/events`);
+
+eventSource.onmessage = function (event) {
+  console.log("SSE message:", event.data);
+};
+
+eventSource.addEventListener("chat_updated", function (event) {
+  const data = JSON.parse(event.data);
+
+  console.log("Chat updated:", data);
+
+  // 🔄 Chat list refresh
+  loadChats();
+
+  // 🔄 Agar current chat open hai to refresh karo
+  if (selectedPhone === data.phone) {
+    openChat(selectedPhone, false);
+  }
+});
+
   setInterval(() => {
     if (currentSection === "dashboard") {
       loadDashboard(currentRange);
@@ -454,3 +477,4 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }, 15000);
 });
+
