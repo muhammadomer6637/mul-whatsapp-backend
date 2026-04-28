@@ -235,34 +235,46 @@ async function openChat(phone, markRead = true) {
     ? data.messages.map(message => {
         let content = "";
 
-        if (message.type === "image" && message.media_url) {
-          content = `
-            <img src="${message.media_url}" 
-                 style="max-width:200px;border-radius:10px;cursor:pointer"
-                 onclick="window.open('${message.media_url}','_blank')" />
-          `;
-        } else if (message.type === "document" && message.media_url) {
-          content = `
-            <a href="${message.media_url}" target="_blank" 
-               style="color:#56a5ff;text-decoration:underline">
-               📄 ${escapeHtml(message.file_name || "Open Document")}
-            </a>
-          `;
-        } else if (message.type === "video" && message.media_url) {
-          content = `
-            <video controls style="max-width:220px;border-radius:10px">
-              <source src="${message.media_url}">
-            </video>
-          `;
-        } else if (message.type === "audio" && message.media_url) {
-          content = `
-            <audio controls>
-              <source src="${message.media_url}">
-            </audio>
-          `;
-        } else {
-          content = `<div>${escapeHtml(message.text || message.type || "")}</div>`;
-        }
+        if (
+  (message.type === "image" || message.mime_type?.includes("image")) 
+  && message.media_url
+) {
+  content = `
+    <img src="${message.media_url}" 
+         style="max-width:200px;border-radius:10px;cursor:pointer"
+         onclick="window.open('${message.media_url}','_blank')" />
+  `;
+} else if (
+  (message.type === "document" || message.mime_type?.includes("pdf")) 
+  && message.media_url
+) {
+  content = `
+    <a href="${message.media_url}" target="_blank" 
+       style="color:#56a5ff;text-decoration:underline">
+       📄 ${escapeHtml(message.file_name || "Open Document")}
+    </a>
+  `;
+} else if (
+  (message.type === "video" || message.mime_type?.includes("video")) 
+  && message.media_url
+) {
+  content = `
+    <video controls style="max-width:220px;border-radius:10px">
+      <source src="${message.media_url}">
+    </video>
+  `;
+} else if (
+  (message.type === "audio" || message.mime_type?.includes("audio")) 
+  && message.media_url
+) {
+  content = `
+    <audio controls>
+      <source src="${message.media_url}">
+    </audio>
+  `;
+} else {
+  content = `<div>${escapeHtml(message.text || message.type || "")}</div>`;
+}
 
         return `
           <div class="message-row ${message.sender}">
