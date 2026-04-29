@@ -984,7 +984,7 @@ if (userStates[from]?.currentMenu === "agent_category") {
 
       await sendTextMessage(
         from,
-        "Connecting you with an admissions representative...",
+        "Connecting you with an admissions representative. Please wait a moment...",
         "agent_waiting"
       );
     } else {
