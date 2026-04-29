@@ -869,18 +869,19 @@ async function sendReplyButtons(to, bodyText, buttons, chatStatus = "active") {
 // =========================
 async function checkPendingFollowups() {
   try {
-const result = await pool.query(`
-  SELECT phone
-  FROM chats
-  WHERE status = 'agent_waiting'
-    AND followup_sent = false
-    AND last_incoming_at <= NOW() - INTERVAL '2 minutes'
-  LIMIT 20
-`);
+    const result = await pool.query(`
+      SELECT phone
+      FROM chats
+      WHERE status = 'agent_waiting'
+        AND followup_sent = false
+        AND last_incoming_at <= NOW() - INTERVAL '2 minutes'
+      LIMIT 20
+    `);
 
     for (const row of result.rows) {
       await sendFollowupMessage(row.phone);
     }
+
   } catch (err) {
     console.error("checkPendingFollowups error:", err.message);
   }
