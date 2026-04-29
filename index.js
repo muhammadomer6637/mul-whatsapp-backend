@@ -947,6 +947,45 @@ app.post("/webhook", async (req, res) => {
     }
     const lowerText = text?.toLowerCase();
 
+// =========================
+// FOLLOW-UP RESPONSE HANDLING
+// =========================
+if (lowerText === "yes") {
+  userStates[from].currentMenu = "agent";
+
+  await updateUserDetails(from, { mode: "agent" });
+  await upsertChat(from, "User re-engaged via YES", "agent_waiting");
+
+  await sendTextMessage(
+    from,
+    "Thank you. Connecting you with our representative. Please wait...",
+    "agent_waiting"
+  );
+
+  return res.sendStatus(200);
+}
+
+if (lowerText === "menu") {
+  userStates[from].currentMenu = "main";
+
+  await updateUserDetails(from, { mode: "bot" });
+
+  await sendTextMessage(
+    from,
+    `Please choose an option:
+
+1. Programs
+2. Fee Structure
+3. Scholarships
+4. How to Apply
+5. Why Choose MUL?
+6. Other Support
+7. Chat with Agent`
+  );
+
+  return res.sendStatus(200);
+}
+    
     let incomingText = "";
     let media_id = null;
     let media_url = null;
