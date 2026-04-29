@@ -1882,6 +1882,19 @@ app.listen(3000, async () => {
   } catch (err) {
     console.error("❌ System settings error:", err.message);
   }
+
+    // 🔥 24H FOLLOW-UP COLUMNS AUTO ADD
+  try {
+    await pool.query(`
+      ALTER TABLE chats
+      ADD COLUMN IF NOT EXISTS followup_sent BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS followup_sent_at TIMESTAMP NULL;
+    `);
+
+    console.log("✅ 24h follow-up columns ensured in DB");
+  } catch (err) {
+    console.error("❌ 24h follow-up columns error:", err.message);
+  }
   
 });
 
