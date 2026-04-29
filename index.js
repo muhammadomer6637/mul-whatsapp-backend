@@ -875,7 +875,7 @@ async function checkPendingFollowups() {
       WHERE status = 'agent_waiting'
         AND followup_sent = false
         AND last_outgoing_at IS NULL
-        AND last_incoming_at <= NOW() - INTERVAL '22 hours'
+        AND last_incoming_at <= NOW() - INTERVAL '2 minutes'
       LIMIT 20
     `);
 
