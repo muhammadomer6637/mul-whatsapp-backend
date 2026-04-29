@@ -865,6 +865,29 @@ async function sendReplyButtons(to, bodyText, buttons, chatStatus = "active") {
 }
 
 // =========================
+// 24H FOLLOW-UP CHECKER
+// =========================
+async function checkPendingFollowups() {
+  try {
+    const result = await pool.query(`
+      SELECT phone
+      FROM chats
+      WHERE status = 'agent_waiting'
+        AND followup_sent = false
+        AND last_outgoing_at IS NULL
+        AND last_incoming_at <= NOW() - INTERVAL '22 hours'
+      LIMIT 20
+    `);
+
+    for (const row of result.rows) {
+      await sendFollowupMessage(row.phone);
+    }
+  } catch (err) {
+    console.error("checkPendingFollowups error:", err.message);
+  }
+}
+
+// =========================
 // ROUTES
 // =========================
 app.get("/", (req, res) => {
