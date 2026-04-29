@@ -1946,6 +1946,10 @@ app.listen(3000, async () => {
   } catch (err) {
     console.error("❌ 24h follow-up columns error:", err.message);
   }
+
+  // 🔥 START 24H FOLLOW-UP CHECKER
+  setInterval(checkPendingFollowups, 10 * 60 * 1000); // every 10 minutes
+  console.log("✅ 24h follow-up checker started");
   
 });
 
