@@ -874,7 +874,7 @@ async function checkPendingFollowups() {
   FROM chats
   WHERE status = 'agent_waiting'
     AND followup_sent = false
-    AND updated_at <= NOW() - INTERVAL '2 minutes'
+    AND updated_at <= NOW() - INTERVAL '22 hours'
   LIMIT 20
 `);
 
