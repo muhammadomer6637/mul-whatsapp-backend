@@ -344,6 +344,23 @@ async function setOutgoingMeta(phone, lastMessage, status = "active") {
   }
 }
 
+async function markFollowupSent(phone) {
+  try {
+    await pool.query(
+      `
+      UPDATE chats
+      SET followup_sent = true,
+          followup_sent_at = NOW(),
+          updated_at = NOW()
+      WHERE phone = $1
+      `,
+      [phone]
+    );
+  } catch (err) {
+    console.error("markFollowupSent error:", err.message);
+  }
+}
+
 async function resetUnreadCount(phone) {
   try {
     await pool.query(
