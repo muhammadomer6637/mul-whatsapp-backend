@@ -41,6 +41,10 @@ async function isAgentAvailable() {
   }
 }
 
+// Track agent category selection
+// admissions | other
+// per user
+
 // =========================
 // REAL-TIME SSE HELPERS
 // =========================
@@ -892,6 +896,70 @@ app.post("/webhook", async (req, res) => {
     }
     const lowerText = text?.toLowerCase();
 
+    // =========================
+// AGENT CATEGORY HANDLING
+// =========================
+if (userStates[from]?.currentMenu === "agent_category") {
+  
+  if (lowerText === "1") {
+    // Admissions
+    userStates[from].agentType = "admissions";
+
+    // Check if already has data
+    const existingUser = await pool.query(
+      "SELECT name, program FROM users WHERE phone = $1",
+      [from]
+    );
+
+    if (existingUser.rows.length > 0 &&
+        existingUser.rows[0].name &&
+        existingUser.rows[0].program) {
+      
+      // Already has data → direct agent
+      userStates[from].currentMenu = "agent";
+
+      await sendTextMessage(
+        from,
+        "Connecting you with an admissions representative..."
+      );
+
+    } else {
+      // Ask for details
+      userStates[from].awaitingLead = true;
+      userStates[from].currentMenu = "agent";
+
+      await sendTextMessage(
+        from,
+        `Please send your details:
+
+Name, Program
+
+Example:
+Ali, BS Computer Science`
+      );
+    }
+
+    return res.sendStatus(200);
+  }
+
+  if (lowerText === "2") {
+    // Other → no data required
+    userStates[from].agentType = "other";
+    userStates[from].currentMenu = "agent";
+
+    await sendTextMessage(
+      from,
+      "Your query is being forwarded to our representative. Please wait..."
+    );
+
+    return res.sendStatus(200);
+  }
+
+  // invalid input
+  await sendTextMessage(from, "Please reply with 1 or 2");
+  return res.sendStatus(200);
+}
+
     let incomingText = "";
     let media_id = null;
     let media_url = null;
@@ -1407,6 +1475,22 @@ Thank you for your patience.`
 
     return res.sendStatus(200);
   }
+
+  // 👉 Ask category instead of direct lead
+  userStates[from].currentMenu = "agent_category";
+
+  await sendTextMessage(
+    from,
+    `👤 Chat with Agent
+
+Please choose:
+
+1. Admissions Related
+2. Other`
+  );
+
+  return res.sendStatus(200);
+}
 
   // ✅ AGENT AVAILABLE → OLD FLOW CONTINUE
   userStates[from].awaitingLead = true;
