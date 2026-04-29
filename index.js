@@ -960,6 +960,71 @@ app.post("/webhook", async (req, res) => {
       };
     }
 
+    // =========================
+// AGENT CATEGORY HANDLING
+// =========================
+if (userStates[from]?.currentMenu === "agent_category") {
+  if (lowerText === "1") {
+    userStates[from].agentType = "admissions";
+
+    const existingUser = await pool.query(
+      "SELECT name, program FROM users WHERE phone = $1",
+      [from]
+    );
+
+    if (
+      existingUser.rows.length > 0 &&
+      existingUser.rows[0].name &&
+      existingUser.rows[0].program
+    ) {
+      userStates[from].currentMenu = "agent";
+
+      await updateUserDetails(from, { mode: "agent" });
+      await upsertChat(from, "Admissions query forwarded to agent", "agent_waiting");
+
+      await sendTextMessage(
+        from,
+        "Connecting you with an admissions representative...",
+        "agent_waiting"
+      );
+    } else {
+      userStates[from].awaitingLead = true;
+      userStates[from].currentMenu = "agent";
+
+      await sendTextMessage(
+        from,
+        `Please send your details:
+
+Name, Program
+
+Example:
+Ali, BS Computer Science`
+      );
+    }
+
+    return res.sendStatus(200);
+  }
+
+  if (lowerText === "2") {
+    userStates[from].agentType = "other";
+    userStates[from].currentMenu = "agent";
+
+    await updateUserDetails(from, { mode: "agent" });
+    await upsertChat(from, "General query forwarded to agent", "agent_waiting");
+
+    await sendTextMessage(
+      from,
+      "Your query is being forwarded to our representative. Please wait...",
+      "agent_waiting"
+    );
+
+    return res.sendStatus(200);
+  }
+
+  await sendTextMessage(from, "Please reply with 1 or 2");
+  return res.sendStatus(200);
+}
+
     const currentUser = await getUserByPhone(from);
     const currentMode = currentUser?.mode || "bot";
 
@@ -1423,27 +1488,6 @@ Please choose:
 
 1. Admissions Related
 2. Other`
-  );
-
-  return res.sendStatus(200);
-}
-
-  // ✅ AGENT AVAILABLE → OLD FLOW CONTINUE
-  userStates[from].awaitingLead = true;
-  userStates[from].previousMenu = "main";
-  userStates[from].currentMenu = "agent";
-  userStates[from].hasInteracted = true;
-
-  await sendTextMessage(
-    from,
-    `👤 Chat with Agent
-
-Please send your details:
-
-Name, Program
-
-Example:
-Ali, BS Computer Science`
   );
 
   return res.sendStatus(200);
