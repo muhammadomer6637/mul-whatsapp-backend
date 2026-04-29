@@ -808,6 +808,17 @@ async function sendAgentTextMessage(to, message, chatStatus = "agent_active") {
   }
 }
 
+async function sendFollowupMessage(to) {
+  const message = `We tried to reach you but couldn't respond in time.
+
+If you still want to continue with an admission representative, please reply YES.
+
+To explore options, type MENU.`;
+
+  await sendTextMessage(to, message, "agent_waiting");
+  await markFollowupSent(to);
+}
+
 async function sendReplyButtons(to, bodyText, buttons, chatStatus = "active") {
   try {
     await axios.post(
