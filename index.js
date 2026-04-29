@@ -1070,13 +1070,20 @@ if (userStates[from]?.currentMenu === "agent_category") {
       userStates[from].currentMenu = "agent";
 
       await updateUserDetails(from, { mode: "agent" });
+      
       await upsertChat(from, "Admissions query forwarded to agent", "agent_waiting");
+
+      await pool.query(
+  "UPDATE chats SET followup_sent = false, followup_sent_at = NULL WHERE phone = $1",
+  [from]
+);
 
       await sendTextMessage(
         from,
         "Connecting you with an admissions representative. Please wait a moment...",
         "agent_waiting"
       );
+      
     } else {
       userStates[from].awaitingLead = true;
       userStates[from].currentMenu = "agent";
@@ -1100,7 +1107,13 @@ Ali, BS Computer Science`
     userStates[from].currentMenu = "agent";
 
     await updateUserDetails(from, { mode: "agent" });
+    
     await upsertChat(from, "General query forwarded to agent", "agent_waiting");
+
+    await pool.query(
+  "UPDATE chats SET followup_sent = false, followup_sent_at = NULL WHERE phone = $1",
+  [from]
+);
 
     await sendTextMessage(
       from,
