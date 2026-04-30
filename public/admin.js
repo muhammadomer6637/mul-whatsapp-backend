@@ -214,13 +214,15 @@ function renderChatList() {
 
   document.getElementById("chatList").innerHTML = filtered.map(chat => `
     <div class="chat-item ${selectedPhone === chat.phone ? "active-chat" : ""}" onclick="openChat('${chat.phone}')">
-      <div class="chat-topline">
-        <div class="chat-name">${escapeHtml(chat.name || chat.phone)}</div>
-        ${Number(chat.unread_count || 0) > 0 ? `<span class="unread-badge">${chat.unread_count}</span>` : ""}
-      </div>
-      <div class="chat-program">${escapeHtml(prettyProgramName(chat.program || "No program selected"))}</div>
-      <div class="chat-preview">${escapeHtml(chat.last_message || "No messages yet")}</div>
-    </div>
+    <div class="chat-topline">
+  <div class="chat-name">${escapeHtml(chat.name || chat.phone)}</div>
+  ${
+    Number(chat.unread_count || 0) > 0 &&
+    (chat.status === "agent_waiting" || chat.status === "agent_active")
+      ? `<span class="unread-badge">${chat.unread_count}</span>`
+      : ""
+  }
+</div>
   `).join("") || `
     <div class="empty-chat-state" style="min-height:220px;">
       <div class="empty-chat-icon">📭</div>
