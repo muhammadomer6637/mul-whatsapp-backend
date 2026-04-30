@@ -197,32 +197,52 @@ function renderChatList() {
     );
   }
 
+  // 🔥 SORTING FIX
   filtered.sort((a, b) => {
+    const priority = {
+      agent_waiting: 3,
+      agent_active: 2,
+      active: 1,
+      bot: 0
+    };
+
+    const aP = priority[a.status] || 0;
+    const bP = priority[b.status] || 0;
+
+    if (bP !== aP) return bP - aP;
+
     const aUnread = Number(a.unread_count || 0);
     const bUnread = Number(b.unread_count || 0);
+
     if (bUnread !== aUnread) return bUnread - aUnread;
 
-    const statusPriority = { agent_waiting: 3, agent_active: 2, active: 1 };
-    const aStatus = statusPriority[a.status] || 0;
-    const bStatus = statusPriority[b.status] || 0;
-    if (bStatus !== aStatus) return bStatus - aStatus;
-
-    return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
+    return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
   });
 
   document.getElementById("chatCountBadge").textContent = filtered.length;
 
   document.getElementById("chatList").innerHTML = filtered.map(chat => `
     <div class="chat-item ${selectedPhone === chat.phone ? "active-chat" : ""}" onclick="openChat('${chat.phone}')">
-    <div class="chat-topline">
-  <div class="chat-name">${escapeHtml(chat.name || chat.phone)}</div>
-  ${
-    Number(chat.unread_count || 0) > 0 &&
-    (chat.status === "agent_waiting" || chat.status === "agent_active")
-      ? `<span class="unread-badge">${chat.unread_count}</span>`
-      : ""
-  }
-</div>
+      
+      <div class="chat-topline">
+        <div class="chat-name">${escapeHtml(chat.name || chat.phone)}</div>
+        ${
+          Number(chat.unread_count || 0) > 0 &&
+          (chat.status === "agent_waiting" || chat.status === "agent_active")
+            ? `<span class="unread-badge">${chat.unread_count}</span>`
+            : ""
+        }
+      </div>
+
+      <div class="chat-program">
+        ${escapeHtml(prettyProgramName(chat.program || "No program selected"))}
+      </div>
+
+      <div class="chat-preview">
+        ${escapeHtml(chat.last_message || "No messages yet")}
+      </div>
+
+    </div>
   `).join("") || `
     <div class="empty-chat-state" style="min-height:220px;">
       <div class="empty-chat-icon">📭</div>
