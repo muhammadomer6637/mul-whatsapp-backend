@@ -550,11 +550,11 @@ eventSource.addEventListener("chat_updated", function (event) {
 
   console.log("Chat updated:", data);
 
-  // 🔄 Chat list refresh
-  loadChats();
+// 🔄 Chat list refresh
+loadChats();
 
-  // 🔄 Agar current chat open hai to refresh karo
-if (selectedPhone === data.phone) {
+// 🔄 Sirf current open chat refresh karo, scroll preserve ke sath
+if (selectedPhone && selectedPhone === data.phone) {
   openChat(selectedPhone, false, true);
 }
 });
