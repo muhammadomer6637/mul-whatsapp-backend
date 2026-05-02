@@ -381,7 +381,7 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
       </div>
     `;
 
-  const messagesBox = document.getElementById("messages");
+
 setTimeout(() => {
   if (preserveScroll && !wasNearBottom) {
     messagesBox.scrollTop = oldScrollTop + (messagesBox.scrollHeight - oldScrollHeight);
