@@ -719,5 +719,12 @@ body {
 .chat-item.status-agent_active:hover {
   filter: brightness(1.08);
 }
+
+  .expiring-badge {
+  font-size: 11px;
+  color: #ffb020;
+  margin-top: 4px;
+  font-weight: 600;
+}
   
 }
