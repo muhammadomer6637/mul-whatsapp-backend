@@ -208,6 +208,8 @@ function renderChatList() {
   const search = document.getElementById("chatSearch")?.value.toLowerCase().trim() || "";
   let filtered = [...allChats];
 
+  const now = Date.now();
+
   if (currentChatFilter !== "all") {
     filtered = filtered.filter(chat => chat.status === currentChatFilter);
   }
@@ -257,9 +259,17 @@ function renderChatList() {
         }
       </div>
 
-      <div class="chat-program">
-        ${escapeHtml(prettyProgramName(chat.program || "No program selected"))}
-      </div>
+<div class="chat-program">
+  ${escapeHtml(prettyProgramName(chat.program || "No program selected"))}
+</div>
+
+${
+  (chat.status === "agent_waiting" || chat.status === "agent_active") &&
+  chat.last_incoming_at &&
+  (now - new Date(chat.last_incoming_at).getTime()) > (20 * 60 * 60 * 1000)
+    ? `<div class="expiring-badge">⚠ Expiring Soon</div>`
+    : ""
+}
 
       <div class="chat-preview">
         ${escapeHtml(chat.last_message || "No messages yet")}
