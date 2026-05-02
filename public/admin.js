@@ -285,9 +285,15 @@ ${
   `;
 }
 
-async function openChat(phone, markRead = true) {
+async function openChat(phone, markRead = true, preserveScroll = false) {
   selectedPhone = phone;
   const selectedChat = allChats.find(chat => chat.phone === phone);
+
+  const messagesBox = document.getElementById("messages");
+  const oldScrollHeight = messagesBox?.scrollHeight || 0;
+  const oldScrollTop = messagesBox?.scrollTop || 0;
+  const oldClientHeight = messagesBox?.clientHeight || 0;
+  const wasNearBottom = oldScrollHeight - oldScrollTop - oldClientHeight < 80;
 
   const initials = (selectedChat?.name || "M").trim().charAt(0).toUpperCase();
 
@@ -376,11 +382,15 @@ async function openChat(phone, markRead = true) {
     `;
 
   const messagesBox = document.getElementById("messages");
-  setTimeout(() => {
+setTimeout(() => {
+  if (preserveScroll && !wasNearBottom) {
+    messagesBox.scrollTop = oldScrollTop + (messagesBox.scrollHeight - oldScrollHeight);
+  } else {
     messagesBox.scrollTop = messagesBox.scrollHeight;
-  }, 50);
+  }
+}, 50);
 
-  await loadChats();
+await loadChats();
 }
 
 async function sendMessage() {
@@ -544,9 +554,9 @@ eventSource.addEventListener("chat_updated", function (event) {
   loadChats();
 
   // 🔄 Agar current chat open hai to refresh karo
-  if (selectedPhone === data.phone) {
-    openChat(selectedPhone, false);
-  }
+if (selectedPhone === data.phone) {
+  openChat(selectedPhone, false, true);
+}
 });
 
 setInterval(() => {
