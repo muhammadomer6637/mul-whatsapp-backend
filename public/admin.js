@@ -245,7 +245,7 @@ function renderChatList() {
   document.getElementById("chatCountBadge").textContent = filtered.length;
 
   document.getElementById("chatList").innerHTML = filtered.map(chat => `
-    <div class="chat-item ${selectedPhone === chat.phone ? "active-chat" : ""}" onclick="openChat('${chat.phone}')">
+   <div class="chat-item status-${chat.status} ${selectedPhone === chat.phone ? "active-chat" : ""}" onclick="openChat('${chat.phone}')">
       
       <div class="chat-topline">
         <div class="chat-name">${escapeHtml(chat.name || chat.phone)}</div>
