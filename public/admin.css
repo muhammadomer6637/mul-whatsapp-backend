@@ -700,4 +700,24 @@ body {
   .sidebar {
     width: 250px;
   }
+
+  .chat-item.status-agent_waiting {
+  border-left: 4px solid #ff5b5b;
+  background: rgba(255, 91, 91, 0.10);
+}
+
+.chat-item.status-agent_active {
+  border-left: 4px solid #f5c542;
+  background: rgba(245, 197, 66, 0.10);
+}
+
+.chat-item.status-bot {
+  border-left: 4px solid transparent;
+}
+
+.chat-item.status-agent_waiting:hover,
+.chat-item.status-agent_active:hover {
+  filter: brightness(1.08);
+}
+  
 }
