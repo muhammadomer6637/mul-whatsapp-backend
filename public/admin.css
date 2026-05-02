@@ -727,35 +727,35 @@ body {
   font-weight: 600;
 }
 
-.agent-mini-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin: 12px 14px 14px;
+#agentMiniStats {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 10px !important;
+  margin: 12px 14px 14px !important;
 }
 
-.agent-mini-card {
-  padding: 10px 8px;
-  border-radius: 14px;
-  background: linear-gradient(145deg, rgba(47, 125, 246, 0.18), rgba(255, 255, 255, 0.05));
-  border: 1px solid rgba(86, 165, 255, 0.22);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
-  text-align: center;
+#agentMiniStats .agent-mini-card {
+  padding: 12px 10px !important;
+  border-radius: 14px !important;
+  background: rgba(47, 125, 246, 0.16) !important;
+  border: 1px solid rgba(86, 165, 255, 0.28) !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22) !important;
+  text-align: center !important;
 }
 
-.agent-mini-card span {
-  display: block;
-  font-size: 10px;
-  color: #9fc5ff;
-  margin-bottom: 5px;
-  font-weight: 600;
+#agentMiniStats .agent-mini-card span {
+  display: block !important;
+  font-size: 11px !important;
+  color: #9fc5ff !important;
+  margin-bottom: 6px !important;
+  font-weight: 700 !important;
 }
 
-.agent-mini-card strong {
-  font-size: 18px;
-  color: #ffffff;
-  font-weight: 800;
-  line-height: 1;
+#agentMiniStats .agent-mini-card strong {
+  display: block !important;
+  font-size: 22px !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
 }
   
 }
