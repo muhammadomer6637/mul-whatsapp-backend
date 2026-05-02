@@ -726,5 +726,31 @@ body {
   margin-top: 4px;
   font-weight: 600;
 }
+
+.agent-mini-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.agent-mini-card {
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.agent-mini-card span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.agent-mini-card strong {
+  font-size: 18px;
+  color: #ffffff;
+}
   
 }
