@@ -175,11 +175,34 @@ async function loadChats() {
     if (!data.success) return;
 
     allChats = data.chats || [];
-    checkAgentSound(allChats);
-    renderChatList();
+checkAgentSound(allChats);
+updateAgentMiniStats(allChats);
+renderChatList();
   } catch (error) {
     console.error("Chats load error:", error);
   }
+}
+
+function updateAgentMiniStats(chats) {
+  const total = chats.length;
+  const waiting = chats.filter(chat => chat.status === "agent_waiting").length;
+  const active = chats.filter(chat => chat.status === "agent_active").length;
+  const unread = chats.reduce((sum, chat) => {
+    if (chat.status === "agent_waiting" || chat.status === "agent_active") {
+      return sum + Number(chat.unread_count || 0);
+    }
+    return sum;
+  }, 0);
+
+  const totalEl = document.getElementById("agentTotalChats");
+  const waitingEl = document.getElementById("agentWaitingChats");
+  const activeEl = document.getElementById("agentActiveChats");
+  const unreadEl = document.getElementById("agentUnreadChats");
+
+  if (totalEl) totalEl.textContent = total;
+  if (waitingEl) waitingEl.textContent = waiting;
+  if (activeEl) activeEl.textContent = active;
+  if (unreadEl) unreadEl.textContent = unread;
 }
 
 function filterChats() {
