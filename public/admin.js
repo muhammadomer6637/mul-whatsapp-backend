@@ -303,7 +303,28 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
       <h3>${escapeHtml(selectedChat?.name || phone)}</h3>
       <p>${escapeHtml(prettyProgramName(selectedChat?.program || "No program selected"))} · ${escapeHtml(selectedChat?.phone || phone)}</p>
     </div>
-    <span class="status-chip status-${selectedChat?.status || "active"}">${formatStatus(selectedChat?.status || "active")}</span>
+   <span class="status-chip status-${selectedChat?.status || "active"}">${formatStatus(selectedChat?.status || "active")}</span>
+
+<div style="display:flex; gap:8px; margin-left:10px;">
+  ${
+    selectedChat?.status === "agent_waiting"
+      ? `<button class="ghost-btn" onclick="takeChat('${phone}')">Take Chat</button>`
+      : ""
+  }
+
+  ${
+    selectedChat?.status === "agent_active"
+      ? `<button class="ghost-btn" onclick="closeChat('${phone}')">Close Chat</button>`
+      : ""
+  }
+
+  ${
+    selectedChat?.status === "agent_waiting" || selectedChat?.status === "agent_active"
+      ? `<button class="ghost-btn" onclick="switchToBot()">Back to Bot</button>`
+      : ""
+  }
+</div>
+
   `;
 
   if (markRead) {
@@ -425,6 +446,41 @@ async function sendMessage() {
     console.error("Frontend send error:", error);
     alert("Message send failed. Check browser console and Railway logs.");
   }
+}
+
+async function takeChat(phone) {
+  if (!phone) return;
+
+  await fetch(`${BASE}/api/switch-mode`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, mode: "agent" })
+  });
+
+  await loadChats();
+  await openChat(phone, false);
+}
+
+async function closeChat(phone) {
+  if (!phone) return;
+
+  await fetch(`${BASE}/api/switch-mode`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, mode: "bot" })
+  });
+
+  await loadChats();
+  selectedPhone = null;
+
+  document.getElementById("chatHeader").innerHTML = `
+    <div>
+      <h3>Select a chat</h3>
+      <p>Choose a conversation to start replying.</p>
+    </div>
+  `;
+
+  document.getElementById("messages").innerHTML = "";
 }
 
 async function switchToBot() {
