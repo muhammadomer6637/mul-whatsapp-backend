@@ -6,6 +6,10 @@ let currentRange = "24h";
 let allChats = [];
 let currentChatFilter = "all";
 
+let lastAgentMessageMap = {};
+const notificationSound = new Audio("/notification.mp3");
+notificationSound.volume = 0.6;
+
 function showSection(id, btn = null) {
   currentSection = id;
 
@@ -171,6 +175,7 @@ async function loadChats() {
     if (!data.success) return;
 
     allChats = data.chats || [];
+    checkAgentSound(allChats);
     renderChatList();
   } catch (error) {
     console.error("Chats load error:", error);
@@ -179,6 +184,24 @@ async function loadChats() {
 
 function filterChats() {
   renderChatList();
+}
+
+function checkAgentSound(chats) {
+  chats.forEach(chat => {
+    const isAgentChat =
+      chat.status === "agent_waiting" || chat.status === "agent_active";
+
+    if (!isAgentChat) return;
+
+   const chatKey = chat.id || chat.phone;
+const lastMsgKey = `${chatKey}_${chat.last_message_time || chat.updated_at || ""}`;
+
+if (lastAgentMessageMap[chatKey] && lastAgentMessageMap[chatKey] !== lastMsgKey) {
+  notificationSound.play().catch(() => {});
+}
+
+lastAgentMessageMap[chatKey] = lastMsgKey;
+  });
 }
 
 function renderChatList() {
