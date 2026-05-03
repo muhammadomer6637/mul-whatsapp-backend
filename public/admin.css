@@ -757,5 +757,30 @@ body {
   color: #ffffff !important;
   font-weight: 900 !important;
 }
+
+.quick-replies {
+  padding: 10px 12px 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  background: rgba(255,255,255,0.02);
+}
+
+.quick-replies button {
+  border: 1px solid rgba(86,165,255,0.24);
+  background: rgba(47,125,246,0.12);
+  color: #d9eaff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.quick-replies button:hover {
+  background: rgba(47,125,246,0.24);
+  border-color: rgba(86,165,255,0.45);
+}
   
 }
