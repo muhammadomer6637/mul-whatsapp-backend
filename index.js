@@ -1832,6 +1832,28 @@ app.post("/api/mark-read", async (req, res) => {
   }
 });
 
+app.post("/api/assign-chat", async (req, res) => {
+  try {
+    const { phone, agent } = req.body;
+
+    if (!phone || !agent) {
+      return res.status(400).json({ success: false, error: "Missing data" });
+    }
+
+    await pool.query(
+      `UPDATE chats 
+       SET assigned_agent = $1, assigned_at = NOW()
+       WHERE phone = $2`,
+      [agent, phone]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Assign chat error:", error.message);
+    res.status(500).json({ success: false });
+  }
+});
+
 app.get("/api/dashboard", async (req, res) => {
   try {
     const range = req.query.range || "24h";
