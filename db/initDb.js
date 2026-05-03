@@ -60,6 +60,16 @@ module.exports = async function initDb() {
       ADD COLUMN IF NOT EXISTS last_outgoing_at TIMESTAMP;
     `);
 
+await pool.query(`
+  ALTER TABLE chats
+  ADD COLUMN IF NOT EXISTS assigned_agent TEXT;
+`);
+
+await pool.query(`
+  ALTER TABLE chats
+  ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP;
+`);
+    
     console.log("Tables created / verified successfully");
   } catch (error) {
     console.error("initDb error:", error.message);
