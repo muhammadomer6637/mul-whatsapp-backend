@@ -1836,21 +1836,30 @@ app.post("/api/assign-chat", async (req, res) => {
   try {
     const { phone, agent } = req.body;
 
-    if (!phone || !agent) {
-      return res.status(400).json({ success: false, error: "Missing data" });
+    if (!phone) {
+      return res.status(400).json({ success: false, error: "Missing phone" });
     }
 
-    await pool.query(
-      `UPDATE chats 
-       SET assigned_agent = $1, assigned_at = NOW()
-       WHERE phone = $2`,
-      [agent, phone]
+    const result = await pool.query(
+      `
+      UPDATE chats
+      SET
+        assigned_agent = $1,
+        assigned_at = CASE WHEN $1 IS NULL THEN NULL ELSE NOW() END,
+        updated_at = NOW()
+      WHERE phone = $2
+      RETURNING phone, assigned_agent, assigned_at
+      `,
+      [agent || null, phone]
     );
 
-    res.json({ success: true });
+    return res.json({
+      success: true,
+      chat: result.rows[0]
+    });
   } catch (error) {
     console.error("Assign chat error:", error.message);
-    res.status(500).json({ success: false });
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
