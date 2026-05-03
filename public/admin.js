@@ -6,7 +6,11 @@ let currentRange = "24h";
 let allChats = [];
 let currentChatFilter = "all";
 let highlightedPhone = null;
-let currentAgent = localStorage.getItem("currentAgent") || "";
+const AGENTS = [
+  { username: "omer", password: "1234", name: "Omer" },
+  { username: "agent2", password: "1234", name: "Agent 2" }
+];
+let currentAgent = "";
 
 let lastAgentMessageMap = {};
 const notificationSound = new Audio("/notification.mp3");
@@ -16,6 +20,28 @@ function setCurrentAgent(agent) {
   currentAgent = agent;
   localStorage.setItem("currentAgent", agent);
   renderChatList();
+}
+
+function handleLogin() {
+  const username = document.getElementById("loginUsername").value.trim();
+  const password = document.getElementById("loginPassword").value.trim();
+  const error = document.getElementById("loginError");
+
+  const agent = AGENTS.find(
+    a => a.username === username && a.password === password
+  );
+
+  if (!agent) {
+    error.innerText = "Invalid credentials";
+    return;
+  }
+
+  currentAgent = agent.name;
+  localStorage.setItem("currentAgent", agent.name);
+
+  document.getElementById("loginScreen").style.display = "none";
+
+  loadChats();
 }
 
 function showSection(id, btn = null) {
@@ -701,14 +727,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-const agentSelector = document.getElementById("agentSelector");
-if (agentSelector && currentAgent) {
-  agentSelector.value = currentAgent;
-}
+const savedAgent = localStorage.getItem("currentAgent");
 
-loadDashboard();
-loadChats();
-loadAgentStatus();
+if (savedAgent) {
+  currentAgent = savedAgent;
+  document.getElementById("loginScreen").style.display = "none";
+
+  loadDashboard();
+  loadChats();
+  loadAgentStatus();
+}
 
   // =========================
 // REAL-TIME SSE LISTENER
