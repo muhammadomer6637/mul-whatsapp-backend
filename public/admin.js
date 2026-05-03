@@ -5,6 +5,7 @@ let currentSection = "dashboard";
 let currentRange = "24h";
 let allChats = [];
 let currentChatFilter = "all";
+let highlightedPhone = null;
 
 let lastAgentMessageMap = {};
 const notificationSound = new Audio("/notification.mp3");
@@ -270,7 +271,7 @@ function renderChatList() {
   document.getElementById("chatCountBadge").textContent = filtered.length;
 
   document.getElementById("chatList").innerHTML = filtered.map(chat => `
-   <div class="chat-item status-${chat.status} ${selectedPhone === chat.phone ? "active-chat" : ""}" onclick="openChat('${chat.phone}')">
+  <div class="chat-item status-${chat.status} ${selectedPhone === chat.phone ? "active-chat" : ""} ${highlightedPhone === chat.phone ? "new-message-highlight" : ""}" onclick="openChat('${chat.phone}')">
       
       <div class="chat-topline">
         <div class="chat-name">${escapeHtml(chat.name || chat.phone)}</div>
@@ -310,6 +311,7 @@ ${
 
 async function openChat(phone, markRead = true, preserveScroll = false) {
   selectedPhone = phone;
+  highlightedPhone = null;
   const selectedChat = allChats.find(chat => chat.phone === phone);
 
   const messagesBox = document.getElementById("messages");
@@ -663,6 +665,7 @@ eventSource.addEventListener("chat_updated", function (event) {
   const data = JSON.parse(event.data);
 
   console.log("Chat updated:", data);
+  highlightedPhone = data.phone;
 
 // 🔄 Chat list refresh
 loadChats();
