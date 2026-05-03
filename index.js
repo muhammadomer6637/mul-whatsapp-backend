@@ -1806,6 +1806,1836 @@ app.post("/api/switch-mode", async (req, res) => {
   }
 });
 
+const express = require("express");
+const axios = require("axios");
+const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
+const pool = require("./db/db");
+const { testConnection } = require("./db/db");
+const initDb = require("./db/initDb");
+
+const app = express();
+app.use(express.json());
+
+app.use(express.static(path.join(__dirname, "public")));
+app.use("/files", express.static(path.join(__dirname, "public")));
+const uploadsDir = path.join(__dirname, "public", "uploads");
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// CONFIG
+const VERIFY_TOKEN = "mul_token_123";
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = "1065169533344109";
+const BASE_URL =
+  process.env.BASE_URL ||
+  "https://mul-whatsapp-backend-production.up.railway.app";
+
+// Temporary in-memory user state
+const userStates = {};
+
+async function isAgentAvailable() {
+  try {
+    const result = await pool.query(
+      "SELECT value FROM system_settings WHERE key = 'agent_available'"
+    );
+    return result.rows[0]?.value === "true";
+  } catch (err) {
+    console.error("Agent status error:", err.message);
+    return true;
+  }
+}
+
+// Track agent category selection
+// admissions | other
+// per user
+
+// =========================
+// REAL-TIME SSE HELPERS
+// =========================
+const sseClients = [];
+
+function sendSseEvent(eventName, data = {}) {
+  const payload = `event: ${eventName}\ndata: ${JSON.stringify(data)}\n\n`;
+
+  sseClients.forEach((client) => {
+    try {
+      client.write(payload);
+    } catch (err) {
+      console.error("SSE write error:", err.message);
+    }
+  });
+}
+
+function notifyChatUpdated(phone) {
+  sendSseEvent("chat_updated", {
+    phone,
+    time: new Date().toISOString()
+  });
+}
+
+// =========================
+// PROGRAM DATA
+// =========================
+const PROGRAMS = {
+  adp: [
+    "Associate Degree in Business Administration",
+    "Associate Degree in Accounting & Finance",
+    "Associate Degree in Islamic Banking and Finance",
+    "Associate Degree in Commerce",
+    "Associate Degree in Computer Science",
+    "ADP Information System & Technology Management",
+    "Associate Degree in Mass Communication",
+    "Associate Degree in Education",
+    "Associate Degree in Information Technology",
+    "Associate Degree in Software Engineering",
+    "Associate Degree in Artificial Intelligence",
+    "Associate Degree in Cyber Security",
+    "Associate Degree in Bioinformatics",
+    "Associate Degree in Political Science",
+    "Associate Degree in Sociology",
+    "Associate Degree in English",
+    "Associate Degree in Digital Marketing",
+    "Associate Degree in Psychology",
+    "Associate Degree in Data Science",
+    "Associate Degree in Digital Media Communication"
+  ],
+  bs: [
+    "B.Com (Hons)",
+    "BS Accounting & Finance",
+    "BBA",
+    "BS Islamic Banking & Finance",
+    "BS Islamic Banking & Finance Technology",
+    "BS Economics & Data Science",
+    "BS Economics & Financial Technology",
+    "BS Computer Science",
+    "BS Information System & Technology Management",
+    "BS Information Technology",
+    "BS Software Engineering",
+    "BS Data Science",
+    "BS Cyber Security",
+    "BS Artificial Intelligence",
+    "BS Chemistry & Industrial Entrepreneurship",
+    "Doctor of Pharmacy",
+    "BS Computational Plant Sciences",
+    "BS Zoology & Entomology",
+    "BS Bio Chemistry",
+    "BS Biotechnology",
+    "BS Medical Lab Technology",
+    "BS Human Nutrition & Dietetics",
+    "BS Food Science and Technology",
+    "BS Criminology and Forensic Sciences",
+    "BS Mathematics & Data Science",
+    "BS Statistics & Data Science",
+    "BS Information Management",
+    "BS English",
+    "BS Mass Communication",
+    "BS Sociology",
+    "BS Education",
+    "BS Peace & Conflict Studies",
+    "BS E-Commerce",
+    "BS in Digital Media Communication",
+    "BS in Digital Marketing",
+    "BS in Multimedia Arts",
+    "BS in Financial Technology",
+    "BS Defense and Strategic Studies",
+    "BS International Relations",
+    "BS Political Science",
+    "BS Economics",
+    "BS Business Analytics",
+    "BS Psychology",
+    "BS Governance and Public Policy",
+    "Doctor of Physiotherapy",
+    "Bachelor of Laws (LLB)"
+  ],
+  mphil: [
+    "MBA Professional",
+    "MBA Executive",
+    "M.Phil Management Science",
+    "M.Phil Accounting & Finance",
+    "MS Islamic Banking & Finance",
+    "M.Phil Economics",
+    "M.Phil Computer Science",
+    "MS Software Engineering",
+    "MS Data Science",
+    "M.Phil Chemistry",
+    "M.Phil Botany",
+    "M.Phil Zoology",
+    "M.Phil Clinical Nutrition",
+    "M.Phil Food Science & Technology",
+    "M.Phil Bio Chemistry",
+    "M.Phil Education",
+    "M.Phil English (Linguistics)",
+    "M.Phil English (Literature)",
+    "M.Phil Mathematics",
+    "M.Phil Statistics",
+    "M.Phil Urdu",
+    "M.Phil International Relations",
+    "M.Phil Political Science",
+    "M.Phil Sociology",
+    "M.Phil Mass Communication",
+    "M.Phil Library Information Science",
+    "M.Phil Peace & Counter Terrorism",
+    "M.Phil Theology and Religious Studies",
+    "M.Phil Criminology",
+    "M.Phil Pharmacology",
+    "M.Phil Applied Psychology",
+    "M.Phil in Halal Food Safety Management"
+  ],
+  phd: [
+    "Ph.D International Relations",
+    "Ph.D Mathematics",
+    "Ph.D Islamic Economics & Finance",
+    "Ph.D Economics",
+    "Ph.D Bio Chemistry",
+    "Ph.D Food Science & Technology",
+    "Ph.D Mass Communication",
+    "Ph.D Pharmacology",
+    "Ph.D Peace and Counter Terrorism",
+    "Ph.D Education"
+  ]
+};
+
+// =========================
+// DATABASE HELPERS
+// =========================
+async function createUserIfNotExists(phone, name = null) {
+  try {
+    await pool.query(
+      `
+      INSERT INTO users (phone, name, mode)
+      VALUES ($1, $2, 'bot')
+      ON CONFLICT (phone) DO NOTHING
+      `,
+      [phone, name]
+    );
+  } catch (err) {
+    console.error("createUserIfNotExists error:", err.message);
+  }
+}
+
+async function updateUserDetails(
+  phone,
+  { name = null, program = null, mode = null }
+) {
+  try {
+    await pool.query(
+      `
+      UPDATE users
+      SET
+        name = COALESCE($2, name),
+        program = COALESCE($3, program),
+        mode = COALESCE($4, mode)
+      WHERE phone = $1
+      `,
+      [phone, name, program, mode]
+    );
+  } catch (err) {
+    console.error("updateUserDetails error:", err.message);
+  }
+}
+
+async function getUserByPhone(phone) {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM users WHERE phone = $1 LIMIT 1`,
+      [phone]
+    );
+    return result.rows[0] || null;
+  } catch (err) {
+    console.error("getUserByPhone error:", err.message);
+    return null;
+  }
+}
+
+async function saveMessage({
+  phone,
+  sender,
+  type = "text",
+  text = null,
+  media_id = null,
+  media_url = null,
+  file_name = null,
+  mime_type = null
+}) {
+  try {
+    await pool.query(
+      `
+      INSERT INTO messages
+      (phone, sender, type, text, media_id, media_url, file_name, mime_type, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+      `,
+      [phone, sender, type, text, media_id, media_url, file_name, mime_type]
+    );
+
+    notifyChatUpdated(phone);
+    
+  } catch (err) {
+    console.error("saveMessage error:", err.message);
+  }
+}
+
+async function upsertChat(phone, lastMessage, status = "active") {
+  try {
+    await pool.query(
+      `
+      INSERT INTO chats (phone, status, last_message, updated_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (phone)
+      DO UPDATE SET
+        status = EXCLUDED.status,
+        last_message = EXCLUDED.last_message,
+        updated_at = NOW()
+      `,
+      [phone, status, lastMessage]
+    );
+  } catch (err) {
+    console.error("upsertChat error:", err.message);
+  }
+}
+
+async function incrementUnreadAndSetIncoming(phone, lastMessage, status = "active") {
+  try {
+    await pool.query(
+      `
+      INSERT INTO chats (
+        phone,
+        status,
+        last_message,
+        unread_count,
+        last_incoming_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, 1, NOW(), NOW())
+      ON CONFLICT (phone)
+      DO UPDATE SET
+        status = EXCLUDED.status,
+        last_message = EXCLUDED.last_message,
+        unread_count = chats.unread_count + 1,
+        last_incoming_at = NOW(),
+        updated_at = NOW()
+      `,
+      [phone, status, lastMessage]
+    );
+  } catch (err) {
+    console.error("incrementUnreadAndSetIncoming error:", err.message);
+  }
+}
+
+async function setOutgoingMeta(phone, lastMessage, status = "active") {
+  try {
+    await pool.query(
+      `
+      INSERT INTO chats (
+        phone,
+        status,
+        last_message,
+        unread_count,
+        last_outgoing_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, 0, NOW(), NOW())
+      ON CONFLICT (phone)
+      DO UPDATE SET
+        status = EXCLUDED.status,
+        last_message = EXCLUDED.last_message,
+        last_outgoing_at = NOW(),
+        updated_at = NOW()
+      `,
+      [phone, status, lastMessage]
+    );
+  } catch (err) {
+    console.error("setOutgoingMeta error:", err.message);
+  }
+}
+
+async function markFollowupSent(phone) {
+  try {
+    await pool.query(
+      `
+      UPDATE chats
+      SET followup_sent = true,
+          followup_sent_at = NOW(),
+          updated_at = NOW()
+      WHERE phone = $1
+      `,
+      [phone]
+    );
+  } catch (err) {
+    console.error("markFollowupSent error:", err.message);
+  }
+}
+
+async function resetUnreadCount(phone) {
+  try {
+    await pool.query(
+      `
+      UPDATE chats
+      SET unread_count = 0, updated_at = NOW()
+      WHERE phone = $1
+      `,
+      [phone]
+    );
+  } catch (err) {
+    console.error("resetUnreadCount error:", err.message);
+  }
+}
+
+// =========================
+// MEDIA HELPERS
+// =========================
+function getExtensionFromMime(mimeType = "") {
+  if (mimeType.includes("image/jpeg")) return "jpg";
+  if (mimeType.includes("image/png")) return "png";
+  if (mimeType.includes("image/webp")) return "webp";
+  if (mimeType.includes("application/pdf")) return "pdf";
+  if (mimeType.includes("video/mp4")) return "mp4";
+  if (mimeType.includes("audio/ogg")) return "ogg";
+  if (mimeType.includes("audio/mpeg")) return "mp3";
+  return "bin";
+}
+
+async function downloadWhatsAppMedia(mediaId, mimeType) {
+  try {
+    if (!mediaId) return null;
+
+    const mediaInfo = await axios.get(
+      `https://graph.facebook.com/v23.0/${mediaId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`
+        }
+      }
+    );
+
+    const mediaDownloadUrl = mediaInfo.data?.url;
+    if (!mediaDownloadUrl) return null;
+
+    const mediaFile = await axios.get(mediaDownloadUrl, {
+      responseType: "arraybuffer",
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_TOKEN}`
+      }
+    });
+
+    const ext = getExtensionFromMime(mimeType);
+    const fileName = `${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${ext}`;
+    const filePath = path.join(uploadsDir, fileName);
+
+    fs.writeFileSync(filePath, mediaFile.data);
+
+   return `${BASE_URL}/files/uploads/${fileName}`;
+  } catch (err) {
+    console.error("downloadWhatsAppMedia error:", err.response?.data || err.message);
+    return null;
+  }
+}
+
+// =========================
+// MESSAGE HELPERS
+// =========================
+function splitIntoChunks(items, size = 12) {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+function welcomeMessage() {
+  return `Assalamu Alaikum 👋
+
+Welcome to Minhaj University Lahore.
+
+Please choose an option:
+
+1. Programs
+2. Fee Structure
+3. Scholarships
+4. How to Apply
+5. Why Choose MUL?
+6. Other Support
+7. Chat with Agent`;
+}
+
+function programsMenu() {
+  return `📚 Programs Categories
+
+1a. Associate Degree Programs (ADP)
+1b. BS Programs
+1c. M.Phil./MS Programs
+1d. Ph.D. Programs`;
+}
+
+function howToApplyMenu() {
+  return `📝 How to Apply
+
+4a. On Campus
+4b. Online
+4c. Documents Requirements`;
+}
+
+function whyChooseMenu() {
+  return `🌟 Why Choose MUL?
+
+5a. Accreditation & Recognition
+5b. International Rankings
+5c. Asia’s First Robotic Library
+5d. Vibrant Student Life & Societies
+5e. Research Excellence & Innovation`;
+}
+
+function otherSupportMenu() {
+  return `📞 Other Support
+
+6a. Admission Office
+6b. Students Affairs Office
+6c. Advancement Office
+6d. Account Office
+6e. PITMAN - ICE
+6f. Directorate of Examination
+6g. Directorate of Academics
+6h. Quality Enhancement Cell (QEC)
+6i. ORIC
+6j. Vice Chancellor Secretariat
+6k. Office of the Registrar
+6l. Directorate of Administration`;
+}
+
+function formatProgramChunk(title, items, currentIndex, totalChunks, nextCode = null) {
+  const list = items.map((item) => `• ${item}`).join("\n");
+  let msg = `🎓 ${title}\n\n${list}`;
+
+  if (currentIndex < totalChunks - 1 && nextCode) {
+    msg += `\n\nReply ${nextCode} for more programs`;
+  }
+
+  return msg;
+}
+
+function getProgramResponse(code) {
+  const mapping = {
+    "1a": { title: "Associate Degree Programs (ADP)", key: "adp" },
+    "1b": { title: "BS Programs", key: "bs" },
+    "1c": { title: "M.Phil./MS Programs", key: "mphil" },
+    "1d": { title: "Ph.D. Programs", key: "phd" }
+  };
+
+  const item = mapping[code];
+  if (!item) return null;
+
+  const chunks = splitIntoChunks(PROGRAMS[item.key], 12);
+  const nextCode = chunks.length > 1 ? `${code}-more` : null;
+
+  return formatProgramChunk(item.title, chunks[0], 0, chunks.length, nextCode);
+}
+
+function getMoreProgramResponse(code) {
+  const mapping = {
+    "1a": { title: "Associate Degree Programs (ADP)", key: "adp" },
+    "1b": { title: "BS Programs", key: "bs" },
+    "1c": { title: "M.Phil./MS Programs", key: "mphil" },
+    "1d": { title: "Ph.D. Programs", key: "phd" }
+  };
+
+  const match = code.match(/^(1[a-d])-more(?:-(\d+))?$/);
+  if (!match) return null;
+
+  const baseCode = match[1];
+  const index = match[2] ? parseInt(match[2], 10) : 1;
+  const item = mapping[baseCode];
+
+  if (!item) return null;
+
+  const chunks = splitIntoChunks(PROGRAMS[item.key], 12);
+  if (!chunks[index]) {
+    return `No more programs in this category.`;
+  }
+
+  const nextCode = index < chunks.length - 1 ? `${baseCode}-more-${index + 1}` : null;
+
+  return formatProgramChunk(
+    item.title + " (More)",
+    chunks[index],
+    index,
+    chunks.length,
+    nextCode
+  );
+}
+
+function applyNowMessage() {
+  return `📝 Apply Now Online:
+https://admission.mul.edu.pk/`;
+}
+
+function getWhyChooseResponse(code) {
+  const responses = {
+    "5a": `✅ Accreditation & Recognition
+
+Minhaj University Lahore (MUL) is recognized by the Higher Education Commission (HEC) of Pakistan and the Punjab Higher Education Commission (PHEC). Additionally, MUL holds accreditation from HEC affiliated councils, ensuring the highest standards of academic excellence.
+
+Accreditations:
+• National Computing Education Accreditation Council - NCEAC
+• Pakistan Engineering Council - PEC
+• Pakistan Bar Council - PBC
+• National Agriculture Education Accreditation Council - NAEAC
+• Pharmacy Council of Pakistan - PCP`,
+
+    "5b": `🌍 International Rankings
+
+• Ranked 211 internationally in Higher Education Ranking 2025
+• 644th globally in UI GreenMetric (Sustainability)
+• 1501+ rank in Times Higher Education Impact Ranking (SDGs)
+• Top 100 universities worldwide in WURI 2025
+• 20th globally in Student Support & Engagement`,
+
+    "5c": `🤖 Asia’s First Robotic Library
+
+Minhaj University Lahore hosts Asia’s First Robotic Library, offering a fully automated and technology-driven learning environment. Students can access thousands of books and research materials through advanced robotic systems, ensuring quick retrieval and a modern academic experience.
+
+This innovation reflects MUL’s commitment to digital transformation and future-ready education.`,
+
+    "5d": `🎓 Vibrant Student Life & Societies
+
+A dynamic campus with active student societies, events, leadership programs, and sports activities to build confidence and personal growth.
+
+Through initiatives like the Seekers Club, students engage in character building, community service, leadership development, and intellectual discussions, creating a well-rounded university experience.`,
+
+    "5e": `🔬 Research Excellence & Innovation
+
+Minhaj University Lahore is home to leading research centers such as CHART, CRIMA, CEPD, CRC, ICRIE and the UNESCO Chair on Peace Education & Intercultural Dialogue.
+
+The university actively promotes a strong research culture through international conferences, seminars, and academic collaborations. Students and faculty contribute to impactful research published in recognized journals, fostering innovation, critical thinking, and solutions to global challenges.`
+  };
+
+  return responses[code] || null;
+}
+
+function getOtherSupportResponse(code) {
+  const responses = {
+    "6a": `🎓 Admission Office
+
+Phone: 03111222685
+Email: admissions@mul.edu.pk
+Location: Ground Floor, Omar Bin Al Khattab Block`,
+
+    "6b": `🎓 Students Affairs Office
+
+Phone: 042-35145621-6
+Extensions: 346 & 346
+Email: support.students@mul.edu.pk
+Location: First Floor, Omar Bin Al Khattab Block`,
+
+    "6c": `🤝 Advancement Office
+
+Phone: 042-35145621-6
+Extension: 368
+Email: advancement.office@mul.edu.pk
+Location: First Floor, Omar Bin Al Khattab Block`,
+
+    "6d": `💳 Account Office
+
+Phone: 042-35145621-6
+Extensions: 388 & 310
+Email: support.accounts@mul.edu.pk
+Location: Second Floor, Omar Bin Al Khattab Block`,
+
+    "6e": `🏫 PITMAN - ICE
+
+Phone: 042-35145621-6
+Extension: 416
+Email: ice-pitman@mul.edu.pk
+Location: Third Floor, Omar Bin Al Khattab Block`,
+
+    "6f": `📝 Directorate of Examination
+
+Phone: 042-35145621-6
+Extensions: 307 & 317
+Email: support.exams@mul.edu.pk
+Location: Fourth Floor, Omar Bin Al Khattab Block`,
+
+    "6g": `📚 Directorate of Academics
+
+Phone: 042-35145621-6
+Extensions: 318 & 429
+Email: coordinator.academics@mul.edu.pk
+Location: Office # 305, Ground Floor, Jabir Ibn Hayyan Block`,
+
+    "6h": `✅ Quality Enhancement Cell (QEC)
+
+Phone: 042-35145621-6
+Extensions: 374 & 349
+Email: qec@mul.edu.pk
+Location: Office # 310, Ground Floor, Jabir Ibn Hayyan Block`,
+
+    "6i": `🔬 Office of Research, Innovation & Commercialization (ORIC)
+
+Phone: 042-35145621-6
+Extensions: 417 & 344
+Email: oric@mul.edu.pk
+Location: Office # 470, 2nd Floor, Jaffar As Sadiq Block`,
+
+    "6j": `🏛️ Vice Chancellor Secretariat
+
+Phone: 042-35145621-6
+Extensions: 323 & 322
+Email: pa.vc@mul.edu.pk
+Location: First Floor, Umar Ibn Abdul Aziz Block`,
+
+    "6k": `🏢 Office of the Registrar
+
+Phone: 042-35145621-6
+Extensions: 311 & 312
+Email: pa.registrar@mul.edu.pk
+Location: 5th Floor, Omar Bin Al Khattab Block`,
+
+    "6l": `🛠️ Directorate of Administration
+
+Phone: 042-35145621-6
+Extension: 364
+Email: admin@mul.edu.pk
+Location: Office # 303, Ground Floor, Jabir Ibn Hayyan Block`
+  };
+
+  return responses[code] || null;
+}
+
+// =========================
+// WHATSAPP SEND HELPERS
+// =========================
+async function sendTextMessage(to, message, chatStatus = "active") {
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: { body: message }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    await saveMessage({
+      phone: to,
+      sender: "bot",
+      type: "text",
+      text: message
+    });
+
+    await setOutgoingMeta(to, message, chatStatus);
+  } catch (error) {
+    console.error("Send text error:", error.response?.data || error.message);
+  }
+}
+
+async function sendDocumentMessage(
+  to,
+  documentUrl,
+  filename,
+  caption = "",
+  chatStatus = "active"
+) {
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to,
+        type: "document",
+        document: {
+          link: documentUrl,
+          filename,
+          caption
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    await saveMessage({
+      phone: to,
+      sender: "bot",
+      type: "document",
+      text: caption || filename,
+      media_url: documentUrl,
+      file_name: filename,
+      mime_type: "application/pdf"
+    });
+
+    await setOutgoingMeta(to, caption || filename, chatStatus);
+  } catch (error) {
+    console.error("Send document error:", error.response?.data || error.message);
+  }
+}
+
+async function sendAgentTextMessage(to, message, chatStatus = "agent_active") {
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: { body: message }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    await saveMessage({
+      phone: to,
+      sender: "agent",
+      type: "text",
+      text: message
+    });
+
+    await setOutgoingMeta(to, message, chatStatus);
+  } catch (error) {
+    console.error(
+      "Send agent text error:",
+      error.response?.data || error.message
+    );
+    throw error;
+  }
+}
+
+async function sendFollowupMessage(to) {
+  const message = `We tried to reach you but couldn't respond in time.
+
+If you still want to continue with an admission representative, please reply YES.
+
+To explore options, type MENU.`;
+
+  await sendTextMessage(to, message, "agent_waiting");
+  await markFollowupSent(to);
+}
+
+async function sendReplyButtons(to, bodyText, buttons, chatStatus = "active") {
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: {
+            text: bodyText
+          },
+          action: {
+            buttons: buttons.map((btn) => ({
+              type: "reply",
+              reply: {
+                id: btn.id,
+                title: btn.title
+              }
+            }))
+          }
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    await saveMessage({
+      phone: to,
+      sender: "bot",
+      type: "interactive",
+      text: bodyText
+    });
+
+    await setOutgoingMeta(to, bodyText, chatStatus);
+  } catch (error) {
+    console.error("Send reply buttons error:", error.response?.data || error.message);
+  }
+}
+
+// =========================
+// 24H FOLLOW-UP CHECKER
+// =========================
+async function checkPendingFollowups() {
+  try {
+ const result = await pool.query(`
+  SELECT phone
+  FROM chats
+  WHERE status = 'agent_waiting'
+    AND followup_sent = false
+    AND updated_at <= NOW() - INTERVAL '22 hours'
+  LIMIT 20
+`);
+
+    for (const row of result.rows) {
+      await sendFollowupMessage(row.phone);
+    }
+
+  } catch (err) {
+    console.error("checkPendingFollowups error:", err.message);
+  }
+}
+
+// =========================
+// ROUTES
+// =========================
+app.get("/", (req, res) => {
+  res.send("MUL WhatsApp Backend Running 🚀");
+});
+
+// =========================
+// REAL-TIME SSE ROUTE
+// =========================
+app.get("/events", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  res.flushHeaders();
+
+  res.write(`event: connected\ndata: "SSE Connected"\n\n`);
+
+  sseClients.push(res);
+
+  req.on("close", () => {
+    const index = sseClients.indexOf(res);
+    if (index !== -1) {
+      sseClients.splice(index, 1);
+    }
+    console.log("SSE client disconnected");
+  });
+});
+
+app.get("/webhook", (req, res) => {
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
+
+  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+    return res.status(200).send(challenge);
+  }
+  return res.sendStatus(403);
+});
+
+app.post("/webhook", async (req, res) => {
+  try {
+    const msg = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+    const contact = req.body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0];
+
+    if (!msg) {
+      return res.sendStatus(200);
+    }
+
+    const from = msg.from;
+    const contactName = contact?.profile?.name || null;
+    const type = msg.type || "text";
+
+    let text = msg.text?.body?.trim() || "";
+    if (type === "interactive" && msg.interactive?.type === "button_reply") {
+      text = msg.interactive.button_reply.id || "";
+    }
+    const lowerText = text?.toLowerCase();
+
+// =========================
+// FOLLOW-UP RESPONSE HANDLING
+// =========================
+if (lowerText === "yes") {
+  userStates[from].currentMenu = "agent";
+
+  await updateUserDetails(from, { mode: "agent" });
+  await upsertChat(from, "User re-engaged via YES", "agent_waiting");
+
+  await sendTextMessage(
+    from,
+    "Thank you. Connecting you with our representative. Please wait...",
+    "agent_waiting"
+  );
+
+  return res.sendStatus(200);
+}
+
+if (lowerText === "menu") {
+  userStates[from].currentMenu = "main";
+
+  await updateUserDetails(from, { mode: "bot" });
+
+  await sendTextMessage(
+    from,
+    `Please choose an option:
+
+1. Programs
+2. Fee Structure
+3. Scholarships
+4. How to Apply
+5. Why Choose MUL?
+6. Other Support
+7. Chat with Agent`
+  );
+
+  return res.sendStatus(200);
+}
+    
+    let incomingText = "";
+    let media_id = null;
+    let media_url = null;
+    let file_name = null;
+    let mime_type = null;
+
+    if (type === "text") {
+      incomingText = text || "";
+    } else if (type === "interactive" && msg.interactive?.type === "button_reply") {
+      incomingText = msg.interactive.button_reply?.title || text || "[Button Reply]";
+   } else if (type === "image") {
+  incomingText = "[Image]";
+  media_id = msg.image?.id || null;
+  mime_type = msg.image?.mime_type || null;
+
+  media_url = await downloadWhatsAppMedia(media_id, mime_type);
+
+    } else if (type === "document") {
+  incomingText = msg.document?.filename || "[Document]";
+  media_id = msg.document?.id || null;
+  file_name = msg.document?.filename || null;
+  mime_type = msg.document?.mime_type || null;
+
+  media_url = await downloadWhatsAppMedia(media_id, mime_type);
+
+   } else if (type === "video") {
+  incomingText = "[Video]";
+  media_id = msg.video?.id || null;
+  mime_type = msg.video?.mime_type || null;
+
+  media_url = await downloadWhatsAppMedia(media_id, mime_type);
+
+    } else if (type === "audio") {
+  incomingText = "[Audio]";
+  media_id = msg.audio?.id || null;
+  mime_type = msg.audio?.mime_type || null;
+
+  media_url = await downloadWhatsAppMedia(media_id, mime_type);
+
+    } else {
+      incomingText = `[${type}]`;
+    }
+
+    console.log(
+      "Incoming message from:",
+      from,
+      "| type:",
+      type,
+      "| text:",
+      incomingText
+    );
+
+    await createUserIfNotExists(from, contactName);
+    await updateUserDetails(from, { name: contactName });
+
+    if (!userStates[from]) {
+      userStates[from] = {
+        previousMenu: "main",
+        currentMenu: "main",
+        awaitingLead: false,
+        hasInteracted: false
+      };
+    }
+
+    // =========================
+// AGENT CATEGORY HANDLING
+// =========================
+if (userStates[from]?.currentMenu === "agent_category") {
+  if (lowerText === "1") {
+    userStates[from].agentType = "admissions";
+
+    const existingUser = await pool.query(
+      "SELECT name, program FROM users WHERE phone = $1",
+      [from]
+    );
+
+    if (
+      existingUser.rows.length > 0 &&
+      existingUser.rows[0].name &&
+      existingUser.rows[0].program
+    ) {
+      userStates[from].currentMenu = "agent";
+
+      await updateUserDetails(from, { mode: "agent" });
+      
+      await upsertChat(from, "Admissions query forwarded to agent", "agent_waiting");
+
+      await pool.query(
+  "UPDATE chats SET followup_sent = false, followup_sent_at = NULL WHERE phone = $1",
+  [from]
+);
+
+      await sendTextMessage(
+        from,
+        "Connecting you with an admissions representative. Please wait a moment...",
+        "agent_waiting"
+      );
+      
+    } else {
+      userStates[from].awaitingLead = true;
+      userStates[from].currentMenu = "agent";
+
+      await sendTextMessage(
+        from,
+        `Please send your details:
+
+Name, Program
+
+Example:
+Ali, BS Computer Science`
+      );
+    }
+
+    return res.sendStatus(200);
+  }
+
+  if (lowerText === "2") {
+    userStates[from].agentType = "other";
+    userStates[from].currentMenu = "agent";
+
+    await updateUserDetails(from, { mode: "agent" });
+    
+    await upsertChat(from, "General query forwarded to agent", "agent_waiting");
+
+    await pool.query(
+  "UPDATE chats SET followup_sent = false, followup_sent_at = NULL WHERE phone = $1",
+  [from]
+);
+
+    await sendTextMessage(
+      from,
+      "Your query is being forwarded to our representative. Please wait...",
+      "agent_waiting"
+    );
+
+    return res.sendStatus(200);
+  }
+
+  await sendTextMessage(from, "Please reply with 1 or 2");
+  return res.sendStatus(200);
+}
+
+    const currentUser = await getUserByPhone(from);
+    const currentMode = currentUser?.mode || "bot";
+
+    await saveMessage({
+      phone: from,
+      sender: "user",
+      type,
+      text: incomingText,
+      media_id,
+      media_url,
+      file_name,
+      mime_type
+    });
+
+    const incomingChatStatus =
+      currentMode === "agent" ? "agent_waiting" : "active";
+
+    await incrementUnreadAndSetIncoming(from, incomingText, incomingChatStatus);
+
+    if (currentMode === "agent") {
+      console.log(`Bot stopped for ${from} because user is in agent mode.`);
+      return res.sendStatus(200);
+    }
+
+    if (!text && type !== "text" && type !== "interactive") {
+      return res.sendStatus(200);
+    }
+
+    if (!text) {
+      return res.sendStatus(200);
+    }
+
+    // AUTO MENU FOR FIRST MESSAGE
+    if (!userStates[from].hasInteracted) {
+      userStates[from].hasInteracted = true;
+
+      if (
+        ![
+          "1", "2", "3", "4", "5", "6", "7",
+          "1a", "1b", "1c", "1d",
+          "5a", "5b", "5c", "5d", "5e",
+          "6a", "6b", "6c", "6d", "6e", "6f", "6g", "6h", "6i", "6j", "6k", "6l",
+          "apply"
+        ].includes(lowerText)
+      ) {
+        await sendTextMessage(from, welcomeMessage());
+        return res.sendStatus(200);
+      }
+    }
+
+    if (lowerText === "main_menu") {
+      userStates[from] = {
+        previousMenu: "main",
+        currentMenu: "main",
+        awaitingLead: false,
+        hasInteracted: true
+      };
+      await sendTextMessage(from, welcomeMessage());
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "0") {
+      userStates[from] = {
+        previousMenu: "main",
+        currentMenu: "main",
+        awaitingLead: false,
+        hasInteracted: true
+      };
+      await sendTextMessage(from, welcomeMessage());
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "back" || lowerText === "9") {
+      const prev = userStates[from].previousMenu || "main";
+
+      if (prev === "programs") {
+        userStates[from].currentMenu = "programs";
+        userStates[from].previousMenu = "main";
+        await sendReplyButtons(
+          from,
+          programsMenu(),
+          [{ id: "main_menu", title: "Main Menu" }]
+        );
+      } else if (prev === "apply") {
+        userStates[from].currentMenu = "apply";
+        userStates[from].previousMenu = "main";
+        await sendReplyButtons(
+          from,
+          howToApplyMenu(),
+          [{ id: "main_menu", title: "Main Menu" }]
+        );
+      } else if (prev === "why_mul") {
+        userStates[from].currentMenu = "why_mul";
+        userStates[from].previousMenu = "main";
+        await sendReplyButtons(
+          from,
+          whyChooseMenu(),
+          [{ id: "main_menu", title: "Main Menu" }]
+        );
+      } else if (prev === "other_support") {
+        userStates[from].currentMenu = "other_support";
+        userStates[from].previousMenu = "main";
+        await sendReplyButtons(
+          from,
+          otherSupportMenu(),
+          [{ id: "main_menu", title: "Main Menu" }]
+        );
+      } else {
+        userStates[from].currentMenu = "main";
+        userStates[from].previousMenu = "main";
+        await sendTextMessage(from, welcomeMessage());
+      }
+
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "apply") {
+      await sendTextMessage(from, applyNowMessage());
+      return res.sendStatus(200);
+    }
+
+    if (userStates[from].awaitingLead && text.includes(",")) {
+      const [name, ...rest] = text.split(",");
+      const program = rest.join(",").trim();
+      const cleanName = name.trim();
+
+      console.log("Lead captured:", {
+        phone: from,
+        name: cleanName,
+        program
+      });
+
+      userStates[from].awaitingLead = false;
+      userStates[from].previousMenu = "main";
+      userStates[from].currentMenu = "agent_waiting";
+      userStates[from].hasInteracted = true;
+
+      await updateUserDetails(from, {
+        name: cleanName,
+        program,
+        mode: "agent"
+      });
+
+      await upsertChat(from, `Lead: ${cleanName} - ${program}`, "agent_waiting");
+
+      await sendTextMessage(
+        from,
+        `✅ Thank you!
+
+Your request has been forwarded to our support team.
+
+Please wait, our admission representative will message you shortly.`,
+        "agent_waiting"
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (
+      [
+        "hi",
+        "hello",
+        "assalamualaikum",
+        "assalamu alaikum",
+        "menu",
+        "start"
+      ].includes(lowerText)
+    ) {
+      userStates[from].currentMenu = "main";
+      userStates[from].previousMenu = "main";
+      userStates[from].awaitingLead = false;
+      userStates[from].hasInteracted = true;
+
+      await sendTextMessage(from, welcomeMessage());
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "1") {
+      userStates[from].previousMenu = "main";
+      userStates[from].currentMenu = "programs";
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        programsMenu(),
+        [{ id: "main_menu", title: "Main Menu" }]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (["1a", "1b", "1c", "1d"].includes(lowerText)) {
+      const response = getProgramResponse(lowerText);
+      userStates[from].previousMenu = "programs";
+      userStates[from].currentMenu = lowerText;
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        response,
+        [
+          { id: "apply", title: "Apply Now" },
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (/^1[a-d]-more(?:-\d+)?$/.test(lowerText)) {
+      const response = getMoreProgramResponse(lowerText);
+      userStates[from].previousMenu = "programs";
+      userStates[from].currentMenu = lowerText;
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        response,
+        [
+          { id: "apply", title: "Apply Now" },
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "2") {
+      userStates[from].previousMenu = "main";
+      userStates[from].currentMenu = "fee";
+      userStates[from].hasInteracted = true;
+
+      const pdfUrl = `${BASE_URL}/files/Fee%20Structure%20Spring%202026.pdf`;
+
+      await sendReplyButtons(
+        from,
+        `💰 Fee Structure – Spring 2026
+
+Please find attached the complete fee structure.`,
+        [{ id: "main_menu", title: "Main Menu" }]
+      );
+
+      await sendDocumentMessage(
+        from,
+        pdfUrl,
+        "Fee Structure Spring 2026.pdf",
+        "MUL Fee Structure Spring 2026"
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "3") {
+      userStates[from].previousMenu = "main";
+      userStates[from].currentMenu = "scholarship";
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        `🎓 Scholarships
+
+For scholarship details please visit:
+https://www.mul.edu.pk/en/scholarships-and-fee-concession`,
+        [{ id: "main_menu", title: "Main Menu" }]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "4") {
+      userStates[from].previousMenu = "main";
+      userStates[from].currentMenu = "apply";
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        howToApplyMenu(),
+        [{ id: "main_menu", title: "Main Menu" }]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "4a") {
+      userStates[from].previousMenu = "apply";
+      userStates[from].currentMenu = "4a";
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        `🏫 On Campus Admission
+
+Please visit University admissions office with required documents.
+Buy Prospectus, fill Prospectus and attach documents.
+Get Admission Fee challan and pay in Account Office or affiliated banks.`,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "4b") {
+      userStates[from].previousMenu = "apply";
+      userStates[from].currentMenu = "4b";
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        `🌐 Online Admission
+
+For Apply Online please visit:
+https://admission.mul.edu.pk/
+
+Create your account by clicking Register.
+After registration complete your Profile and download admission processing challan.
+Pay challan through online banking apps or affiliated banks.
+
+Status may take 24 hours to update after payment.
+Once status changes from Pending to Paid, upload your documents and agree to terms & conditions.
+
+Your application will be submitted successfully.
+You will receive admission fee challan once your admission application is accepted.
+It may take 24 to 48 hours for processing.`,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "4c") {
+      userStates[from].previousMenu = "apply";
+      userStates[from].currentMenu = "4c";
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        `📄 Documents Requirements
+
+• Academic Results / Transcripts / Sanad
+• Student CNIC copy or B Form
+• Father CNIC copy
+• Domicile
+• 5 Photographs
+
+All documents should be attested.`,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "5") {
+      userStates[from].previousMenu = "main";
+      userStates[from].currentMenu = "why_mul";
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        whyChooseMenu(),
+        [{ id: "main_menu", title: "Main Menu" }]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (["5a", "5b", "5c", "5d", "5e"].includes(lowerText)) {
+      const response = getWhyChooseResponse(lowerText);
+
+      userStates[from].previousMenu = "why_mul";
+      userStates[from].currentMenu = lowerText;
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        response,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (lowerText === "6") {
+      userStates[from].previousMenu = "main";
+      userStates[from].currentMenu = "other_support";
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        otherSupportMenu(),
+        [{ id: "main_menu", title: "Main Menu" }]
+      );
+
+      return res.sendStatus(200);
+    }
+
+    if (
+      [
+        "6a", "6b", "6c", "6d", "6e", "6f",
+        "6g", "6h", "6i", "6j", "6k", "6l"
+      ].includes(lowerText)
+    ) {
+      const response = getOtherSupportResponse(lowerText);
+
+      userStates[from].previousMenu = "other_support";
+      userStates[from].currentMenu = lowerText;
+      userStates[from].hasInteracted = true;
+
+      await sendReplyButtons(
+        from,
+        response,
+        [
+          { id: "back", title: "Back" },
+          { id: "main_menu", title: "Main Menu" }
+        ]
+      );
+
+      return res.sendStatus(200);
+    }
+
+if (lowerText === "7") {
+  const available = await isAgentAvailable();
+
+  if (!available) {
+    await sendTextMessage(
+      from,
+      `Thank you for contacting Minhaj University Lahore.
+
+Currently no agent available due to non office hours, Please send your query. 
+Our representative will get back to you during working hours.
+
+For urgent information, you may continue exploring the menu options.
+
+Thank you for your patience.`
+    );
+
+    return res.sendStatus(200);
+  }
+
+  // 👉 Ask category instead of direct lead
+  userStates[from].currentMenu = "agent_category";
+
+  await sendTextMessage(
+    from,
+    `👤 Chat with Agent
+
+Please choose:
+
+1. Admissions Related
+2. Other`
+  );
+
+  return res.sendStatus(200);
+}
+
+    await sendTextMessage(
+      from,
+      `Sorry, I did not understand your message.
+
+Please choose:
+1 Programs
+2 Fee Structure
+3 Scholarships
+4 How to Apply
+5 Why Choose MUL?
+6 Other Support
+7 Chat with Agent`
+    );
+
+    return res.sendStatus(200);
+  } catch (error) {
+    console.error(
+      "Webhook error:",
+      error.response?.data || error.message || error
+    );
+    return res.sendStatus(500);
+  }
+});
+
+// =========================
+// AGENT PANEL APIs
+// =========================
+
+// Get agent status
+app.get("/api/agent-status", async (req, res) => {
+  const result = await pool.query(
+    "SELECT value FROM system_settings WHERE key = 'agent_available'"
+  );
+
+  res.json({
+    success: true,
+    status: result.rows[0]?.value === "true"
+  });
+});
+
+// Toggle agent status
+app.post("/api/toggle-agent", async (req, res) => {
+  const { status } = req.body;
+
+  await pool.query(
+    "UPDATE system_settings SET value = $1 WHERE key = 'agent_available'",
+    [status ? "true" : "false"]
+  );
+
+  res.json({ success: true });
+});
+
+app.get("/api/chats", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        c.phone,
+  c.status,
+  c.last_message,
+  c.unread_count,
+  c.last_incoming_at,
+  c.last_outgoing_at,
+  c.updated_at,
+  c.assigned_agent,
+  c.assigned_at,
+  u.name,
+  u.program,
+  u.mode
+      FROM chats c
+      LEFT JOIN users u ON u.phone = c.phone
+      ORDER BY
+        CASE
+          WHEN c.status = 'agent_waiting' THEN 0
+          WHEN c.status = 'agent_active' THEN 1
+          ELSE 2
+        END,
+        c.updated_at DESC
+    `);
+
+    return res.json({
+      success: true,
+      chats: result.rows
+    });
+  } catch (error) {
+    console.error("GET /api/chats error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch chats"
+    });
+  }
+});
+
+app.get("/api/messages/:phone", async (req, res) => {
+  try {
+    const { phone } = req.params;
+
+    const result = await pool.query(
+      `
+      SELECT id, phone, sender, type, text, media_id, media_url, file_name, mime_type, created_at
+      FROM messages
+      WHERE phone = $1
+      ORDER BY created_at ASC
+      `,
+      [phone]
+    );
+
+    return res.json({
+      success: true,
+      messages: result.rows
+    });
+  } catch (error) {
+    console.error("GET /api/messages/:phone error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch messages"
+    });
+  }
+});
+
+app.post("/api/send", async (req, res) => {
+  try {
+    const { phone, message } = req.body;
+
+    console.log("API SEND REQUEST:", { phone, message });
+
+    if (!phone || !message) {
+      return res.status(400).json({
+        success: false,
+        error: "phone and message are required"
+      });
+    }
+
+    await updateUserDetails(phone, { mode: "agent" });
+    await sendAgentTextMessage(phone, message, "agent_active");
+
+    return res.json({
+      success: true,
+      message: "Agent message sent successfully"
+    });
+  } catch (error) {
+    console.error(
+      "POST /api/send full error:",
+      error.response?.data || error.message || error
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: error.response?.data?.error?.message || "Failed to send agent message"
+    });
+  }
+});
+
+app.post("/api/switch-mode", async (req, res) => {
+  try {
+    const { phone, mode } = req.body;
+
+    if (!phone || !mode) {
+      return res.status(400).json({
+        success: false,
+        error: "phone and mode are required"
+      });
+    }
+
+    if (!["bot", "agent"].includes(mode)) {
+      return res.status(400).json({
+        success: false,
+        error: "mode must be bot or agent"
+      });
+    }
+
+    await updateUserDetails(phone, { mode });
+
+    let chatStatus = "active";
+    let lastMessage = "Chat switched to bot mode";
+
+    if (mode === "agent") {
+      chatStatus = "agent_active";
+      lastMessage = "Chat switched to agent mode";
+    }
+
+    await upsertChat(phone, lastMessage, chatStatus);
+
+    if (!userStates[phone]) {
+      userStates[phone] = {
+        previousMenu: "main",
+        currentMenu: "main",
+        awaitingLead: false,
+        hasInteracted: true
+      };
+    }
+
+    if (mode === "bot") {
+      userStates[phone].awaitingLead = false;
+      userStates[phone].currentMenu = "main";
+      userStates[phone].previousMenu = "main";
+    }
+
+    return res.json({
+      success: true,
+      message: `Mode switched to ${mode}`
+    });
+  } catch (error) {
+    console.error("POST /api/switch-mode error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to switch mode"
+    });
+  }
+});
+
+app.post("/api/assign-chat", async (req, res) => {
+  try {
+    const { phone, agent } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ success: false, error: "Missing data" });
+    }
+
+    await pool.query(
+      `UPDATE chats 
+       SET assigned_agent = $1, assigned_at = NOW()
+       WHERE phone = $2`,
+      [agent, phone]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Assign chat error:", error.message);
+    res.status(500).json({ success: false });
+  }
+});
+
 app.post("/api/mark-read", async (req, res) => {
   try {
     const { phone } = req.body;
@@ -1832,25 +3662,204 @@ app.post("/api/mark-read", async (req, res) => {
   }
 });
 
-app.post("/api/assign-chat", async (req, res) => {
+app.get("/api/dashboard", async (req, res) => {
   try {
-    const { phone, agent } = req.body;
+    const range = req.query.range || "24h";
+    const start = req.query.start;
+    const end = req.query.end;
 
-    if (!phone) {
-      return res.status(400).json({ success: false, error: "Missing data" });
+    let intervalSql = "INTERVAL '24 hours'";
+    if (range === "7d") intervalSql = "INTERVAL '7 days'";
+    if (range === "30d") intervalSql = "INTERVAL '30 days'";
+
+    let whereCreated = `created_at >= NOW() - ${intervalSql}`;
+
+    if (range === "custom" && start && end) {
+      whereCreated = `created_at BETWEEN '${start}'::timestamp AND '${end}'::timestamp`;
     }
 
-    await pool.query(
-      `UPDATE chats 
-       SET assigned_agent = $1, assigned_at = NOW()
-       WHERE phone = $2`,
-      [agent, phone]
-    );
+    const conversationsStarted = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM users
+      WHERE ${whereCreated}
+    `);
 
-    res.json({ success: true });
+    const unreadConversations = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM chats
+      WHERE unread_count > 0
+    `);
+
+    const totalUnreadMessages = await pool.query(`
+      SELECT COALESCE(SUM(unread_count), 0)::int AS count
+      FROM chats
+    `);
+
+    const agentWaiting = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM chats
+      WHERE status = 'agent_waiting'
+    `);
+
+    const agentActive = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM chats
+      WHERE status = 'agent_active'
+    `);
+
+    const activeWithBot = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM users u
+      JOIN chats c ON c.phone = u.phone
+      WHERE u.mode = 'bot'
+      AND c.last_incoming_at >= NOW() - INTERVAL '10 minutes'
+    `);
+
+    const activeWithAgent = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM users u
+      JOIN chats c ON c.phone = u.phone
+      WHERE u.mode = 'agent'
+      AND c.last_incoming_at >= NOW() - INTERVAL '10 minutes'
+    `);
+
+    const topPrograms = await pool.query(`
+      SELECT
+        program,
+        COUNT(*)::int AS inquiries
+      FROM users
+      WHERE program IS NOT NULL
+        AND TRIM(program) <> ''
+        AND ${whereCreated}
+      GROUP BY program
+      ORDER BY inquiries DESC, program ASC
+      LIMIT 10
+    `);
+
+    const recentLeads = await pool.query(`
+      SELECT
+        u.name,
+        u.program,
+        u.phone,
+        c.status,
+        c.updated_at
+      FROM users u
+      LEFT JOIN chats c ON c.phone = u.phone
+      WHERE u.program IS NOT NULL
+        AND TRIM(u.program) <> ''
+      ORDER BY c.updated_at DESC NULLS LAST
+      LIMIT 10
+    `);
+
+    return res.json({
+      success: true,
+      filters: { range, start: start || null, end: end || null },
+      stats: {
+        conversationsStarted: conversationsStarted.rows[0].count,
+        unreadConversations: unreadConversations.rows[0].count,
+        totalUnreadMessages: totalUnreadMessages.rows[0].count,
+        agentWaiting: agentWaiting.rows[0].count,
+        agentActive: agentActive.rows[0].count,
+        activeWithBot: activeWithBot.rows[0].count,
+        activeWithAgent: activeWithAgent.rows[0].count
+      },
+      topPrograms: topPrograms.rows,
+      recentLeads: recentLeads.rows
+    });
   } catch (error) {
-    console.error("Assign chat error:", error.message);
-    res.status(500).json({ success: false });
+    console.error("GET /api/dashboard error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch dashboard data"
+    });
+  }
+});
+
+app.listen(3000, async () => {
+  console.log("Server running on port 3000");
+
+  await testConnection();
+  await initDb();
+
+  // 🔥 MEDIA COLUMNS AUTO ADD (RUN ONCE)
+  try {
+    await pool.query(`
+      ALTER TABLE messages
+      ADD COLUMN IF NOT EXISTS message_type VARCHAR(30) DEFAULT 'text',
+      ADD COLUMN IF NOT EXISTS media_id TEXT,
+      ADD COLUMN IF NOT EXISTS media_url TEXT,
+      ADD COLUMN IF NOT EXISTS mime_type TEXT,
+      ADD COLUMN IF NOT EXISTS file_name TEXT,
+      ADD COLUMN IF NOT EXISTS caption TEXT;
+    `);
+
+    console.log("✅ Media columns ensured in DB");
+  } catch (err) {
+    console.error("❌ Media columns error:", err.message);
+  }
+
+    // 🔥 SYSTEM SETTINGS TABLE AUTO CREATE
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
+    `);
+
+    await pool.query(`
+      INSERT INTO system_settings (key, value)
+      VALUES ('agent_available', 'true')
+      ON CONFLICT (key) DO NOTHING;
+    `);
+
+    console.log("✅ System settings ensured in DB");
+  } catch (err) {
+    console.error("❌ System settings error:", err.message);
+  }
+
+    // 🔥 24H FOLLOW-UP COLUMNS AUTO ADD
+  try {
+    await pool.query(`
+      ALTER TABLE chats
+      ADD COLUMN IF NOT EXISTS followup_sent BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS followup_sent_at TIMESTAMP NULL;
+    `);
+
+    console.log("✅ 24h follow-up columns ensured in DB");
+  } catch (err) {
+    console.error("❌ 24h follow-up columns error:", err.message);
+  }
+
+  // 🔥 START 24H FOLLOW-UP CHECKER
+  setInterval(checkPendingFollowups, 10 * 60 * 1000); // every 10 minutes
+  console.log("✅ 24h follow-up checker started");
+  
+});
+
+app.post("/api/mark-read", async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        error: "phone is required"
+      });
+    }
+
+    await resetUnreadCount(phone);
+
+    return res.json({
+      success: true,
+      message: "Unread count reset successfully"
+    });
+  } catch (error) {
+    console.error("POST /api/mark-read error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to reset unread count"
+    });
   }
 });
 
