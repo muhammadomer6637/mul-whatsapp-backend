@@ -1653,15 +1653,17 @@ app.get("/api/chats", async (req, res) => {
     const result = await pool.query(`
       SELECT
         c.phone,
-        c.status,
-        c.last_message,
-        c.unread_count,
-        c.last_incoming_at,
-        c.last_outgoing_at,
-        c.updated_at,
-        u.name,
-        u.program,
-        u.mode
+  c.status,
+  c.last_message,
+  c.unread_count,
+  c.last_incoming_at,
+  c.last_outgoing_at,
+  c.updated_at,
+  c.assigned_agent,
+  c.assigned_at,
+  u.name,
+  u.program,
+  u.mode
       FROM chats c
       LEFT JOIN users u ON u.phone = c.phone
       ORDER BY
