@@ -782,5 +782,27 @@ body {
   background: rgba(47,125,246,0.24);
   border-color: rgba(86,165,255,0.45);
 }
+
+.chat-item.new-message-highlight {
+  border-color: rgba(86, 165, 255, 0.75) !important;
+  box-shadow: 0 0 0 1px rgba(86, 165, 255, 0.28),
+              0 0 18px rgba(86, 165, 255, 0.45) !important;
+  animation: newMessagePulse 1.2s ease-in-out 2;
+}
+
+@keyframes newMessagePulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(86, 165, 255, 0);
+  }
+  50% {
+    transform: scale(1.015);
+    box-shadow: 0 0 20px rgba(86, 165, 255, 0.65);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(86, 165, 255, 0);
+  }
+}
   
 }
