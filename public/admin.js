@@ -6,10 +6,17 @@ let currentRange = "24h";
 let allChats = [];
 let currentChatFilter = "all";
 let highlightedPhone = null;
+let currentAgent = localStorage.getItem("currentAgent") || "";
 
 let lastAgentMessageMap = {};
 const notificationSound = new Audio("/notification.mp3");
 notificationSound.volume = 0.6;
+
+function setCurrentAgent(agent) {
+  currentAgent = agent;
+  localStorage.setItem("currentAgent", agent);
+  renderChatList();
+}
 
 function showSection(id, btn = null) {
   currentSection = id;
@@ -286,6 +293,12 @@ function renderChatList() {
 <div class="chat-program">
   ${escapeHtml(prettyProgramName(chat.program || "No program selected"))}
 </div>
+
+${
+  chat.assigned_agent
+    ? `<div class="assigned-badge">Assigned to ${escapeHtml(chat.assigned_agent)}</div>`
+    : `<div class="assigned-badge unassigned">Unassigned</div>`
+} 
 
 ${
   (chat.status === "agent_waiting" || chat.status === "agent_active") &&
@@ -648,9 +661,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  loadDashboard();
-  loadChats();
-  loadAgentStatus();
+const agentSelector = document.getElementById("agentSelector");
+if (agentSelector && currentAgent) {
+  agentSelector.value = currentAgent;
+}
+
+loadDashboard();
+loadChats();
+loadAgentStatus();
 
   // =========================
 // REAL-TIME SSE LISTENER
