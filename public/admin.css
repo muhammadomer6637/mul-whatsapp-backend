@@ -803,6 +803,39 @@ body {
     transform: scale(1);
     box-shadow: 0 0 0 rgba(86, 165, 255, 0);
   }
+
+  .agent-selector {
+  width: 100%;
+  margin-top: 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(86,165,255,0.25);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 9px 10px;
+  outline: none;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.agent-selector option {
+  color: #111;
+}
+
+.assigned-badge {
+  display: inline-flex;
+  margin-bottom: 6px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(47,125,246,0.14);
+  color: #9fc5ff;
+  border: 1px solid rgba(86,165,255,0.25);
+}
+
+.assigned-badge.unassigned {
+  background: rgba(255,255,255,0.04);
+  color: var(--muted);
+  border-color: rgba(255,255,255,0.08);
 }
   
-}
