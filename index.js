@@ -1829,7 +1829,7 @@ app.post("/api/assign-chat", async (req, res) => {
       WHERE phone = $2
       RETURNING phone, assigned_agent, assigned_at
       `,
-      [agent || null, phone]
+      [agent ? String(agent) : null, phone]
     );
 
     console.log("ASSIGN RESULT:", result.rows[0]);
