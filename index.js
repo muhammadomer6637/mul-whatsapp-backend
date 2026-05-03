@@ -1819,18 +1819,18 @@ app.post("/api/assign-chat", async (req, res) => {
       });
     }
 
-    const result = await pool.query(
-      `
-      UPDATE chats
-      SET
-        assigned_agent = $1,
-        assigned_at = CASE WHEN $1 IS NULL THEN NULL ELSE NOW() END,
-        updated_at = NOW()
-      WHERE phone = $2
-      RETURNING phone, assigned_agent, assigned_at
-      `,
-      [agent ? String(agent) : null, phone]
-    );
+const result = await pool.query(
+  `
+  UPDATE chats
+  SET
+    assigned_agent = $1::text,
+    assigned_at = CASE WHEN $1::text IS NULL THEN NULL ELSE NOW() END,
+    updated_at = NOW()
+  WHERE phone = $2
+  RETURNING phone, assigned_agent, assigned_at
+  `,
+  [agent ? String(agent) : null, phone]
+);
 
     console.log("ASSIGN RESULT:", result.rows[0]);
 
