@@ -437,6 +437,41 @@ setTimeout(() => {
 await loadChats();
 }
 
+function insertQuickReply(type) {
+  const input = document.getElementById("messageInput");
+  if (!input) return;
+
+  const replies = {
+    fee: `You can view the complete fee structure here:
+https://www.mul.edu.pk/en/fee-calculator`,
+
+    apply: `You can apply online through the official admission portal:
+https://admission.mul.edu.pk/
+
+Please register your account, complete your profile, submit the processing fee, and upload required documents.`,
+
+    scholarship: `Scholarship details are available here:
+https://www.mul.edu.pk/en/scholarships-and-fee-concession`,
+
+    docs: `Required documents:
+• Academic Result / Transcript
+• Student CNIC or B-Form
+• Father/Guardian CNIC
+• Domicile
+• Recent Photographs
+
+Please make sure all documents are clear and attested where required.`,
+
+    helpline: `For admission support, please contact:
+0311-1222685
+
+You may also share your name and interested program here so our admission representative can guide you further.`
+  };
+
+  input.value = replies[type] || "";
+  input.focus();
+}
+
 async function sendMessage() {
   const input = document.getElementById("messageInput");
   const msg = input.value.trim();
