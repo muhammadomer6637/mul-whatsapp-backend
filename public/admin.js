@@ -524,10 +524,37 @@ async function sendMessage() {
 async function takeChat(phone) {
   if (!phone) return;
 
+  if (!currentAgent) {
+    alert("Please select an agent first.");
+    return;
+  }
+
+  const chat = allChats.find(c => c.phone === phone);
+
+  // 🚫 Agar already kisi aur ko assigned hai
+  if (chat.assigned_agent && chat.assigned_agent !== currentAgent) {
+    alert(`This chat is already assigned to ${chat.assigned_agent}`);
+    return;
+  }
+
+  // ✅ Assign chat
+  await fetch(`${BASE}/api/assign-chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      phone,
+      agent: currentAgent
+    })
+  });
+
+  // ✅ Switch to agent mode
   await fetch(`${BASE}/api/switch-mode`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, mode: "agent" })
+    body: JSON.stringify({
+      phone,
+      mode: "agent"
+    })
   });
 
   await loadChats();
@@ -537,22 +564,35 @@ async function takeChat(phone) {
 async function closeChat(phone) {
   if (!phone) return;
 
+  // release assignment
+  await fetch(`${BASE}/api/assign-chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      phone,
+      agent: null
+    })
+  });
+
+  // back to bot
   await fetch(`${BASE}/api/switch-mode`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ phone, mode: "bot" })
+    body: JSON.stringify({
+      phone,
+      mode: "bot"
+    })
   });
 
   await loadChats();
-  selectedPhone = null;
 
+  selectedPhone = null;
   document.getElementById("chatHeader").innerHTML = `
     <div>
       <h3>Select a chat</h3>
       <p>Choose a conversation to start replying.</p>
     </div>
   `;
-
   document.getElementById("messages").innerHTML = "";
 }
 
