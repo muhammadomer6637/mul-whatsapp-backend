@@ -7,6 +7,18 @@
   <link rel="stylesheet" href="admin.css" />
 </head>
 <body>
+  <div id="loginScreen" class="login-screen">
+  <div class="login-box">
+    <h2>Agent Login</h2>
+
+    <input type="text" id="loginUsername" placeholder="Username" />
+    <input type="password" id="loginPassword" placeholder="Password" />
+
+    <button onclick="handleLogin()">Login</button>
+
+    <p id="loginError" class="login-error"></p>
+  </div>
+</div>
   <div class="app-shell">
     <aside class="sidebar">
       <div>
