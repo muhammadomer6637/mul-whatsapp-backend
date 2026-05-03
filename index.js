@@ -1806,6 +1806,47 @@ app.post("/api/switch-mode", async (req, res) => {
   }
 });
 
+app.post("/api/assign-chat", async (req, res) => {
+  try {
+    const { phone, agent } = req.body;
+
+    console.log("ASSIGN API HIT:", { phone, agent });
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing phone"
+      });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE chats
+      SET
+        assigned_agent = $1,
+        assigned_at = CASE WHEN $1 IS NULL THEN NULL ELSE NOW() END,
+        updated_at = NOW()
+      WHERE phone = $2
+      RETURNING phone, assigned_agent, assigned_at
+      `,
+      [agent || null, phone]
+    );
+
+    console.log("ASSIGN RESULT:", result.rows[0]);
+
+    return res.json({
+      success: true,
+      chat: result.rows[0]
+    });
+  } catch (error) {
+    console.error("Assign chat error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 app.post("/api/mark-read", async (req, res) => {
   try {
     const { phone } = req.body;
@@ -1829,37 +1870,6 @@ app.post("/api/mark-read", async (req, res) => {
       success: false,
       error: "Failed to reset unread count"
     });
-  }
-});
-
-app.post("/api/assign-chat", async (req, res) => {
-  try {
-    const { phone, agent } = req.body;
-
-    if (!phone) {
-      return res.status(400).json({ success: false, error: "Missing phone" });
-    }
-
-    const result = await pool.query(
-      `
-      UPDATE chats
-      SET
-        assigned_agent = $1,
-        assigned_at = CASE WHEN $1 IS NULL THEN NULL ELSE NOW() END,
-        updated_at = NOW()
-      WHERE phone = $2
-      RETURNING phone, assigned_agent, assigned_at
-      `,
-      [agent || null, phone]
-    );
-
-    return res.json({
-      success: true,
-      chat: result.rows[0]
-    });
-  } catch (error) {
-    console.error("Assign chat error:", error.message);
-    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
