@@ -1836,7 +1836,7 @@ app.post("/api/assign-chat", async (req, res) => {
   try {
     const { phone, agent } = req.body;
 
-    if (!phone || !agent) {
+    if (!phone) {
       return res.status(400).json({ success: false, error: "Missing data" });
     }
 
