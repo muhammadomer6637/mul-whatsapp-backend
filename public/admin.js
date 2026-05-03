@@ -783,3 +783,21 @@ setInterval(() => {
 
   });
 
+window.logout = function () {
+  localStorage.removeItem("currentAgent");
+  currentAgent = "";
+
+  const loginScreen = document.getElementById("loginScreen");
+  if (loginScreen) {
+    loginScreen.style.display = "flex";
+  }
+
+  const username = document.getElementById("loginUsername");
+  const password = document.getElementById("loginPassword");
+  const error = document.getElementById("loginError");
+
+  if (username) username.value = "";
+  if (password) password.value = "";
+  if (error) error.innerText = "";
+};
+
