@@ -19,14 +19,97 @@
   justify-content: center;
   z-index: 999999;
 ">
- <div class="login-box" style="
-  background: rgba(255,255,255,0.06);
-  padding: 30px;
-  border-radius: 16px;
-  width: 320px;
+<div class="login-box" style="
+  background: linear-gradient(180deg, rgba(9,26,53,0.96), rgba(8,21,43,0.96));
+  padding: 36px;
+  border-radius: 22px;
+  width: 400px;
   text-align: center;
-  backdrop-filter: blur(12px);
+  border: 1px solid rgba(86,165,255,0.22);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.55);
 ">
+
+  <!-- LOGO -->
+  <img src="/mul-logo-white.png" alt="MUL Logo" style="width:220px; margin-bottom:18px;" />
+
+  <!-- SYSTEM NAME -->
+  <h2 style="
+    margin: 0;
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+  ">
+    MUL Connect
+  </h2>
+
+  <!-- TAGLINE -->
+  <p style="
+    margin: 6px 0 24px;
+    color: #9fb8dc;
+    font-size: 13px;
+  ">
+    Powering Smart Conversations, Driving Admissions.
+  </p>
+
+  <!-- INPUTS -->
+  <input 
+    type="text" 
+    id="loginUsername" 
+    placeholder="Username" 
+    style="
+      width:100%;
+      margin-bottom:12px;
+      padding:13px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.15);
+      background:rgba(255,255,255,0.08);
+      color:white;
+      font-size:14px;
+    "
+  />
+
+  <input 
+    type="password" 
+    id="loginPassword" 
+    placeholder="Password" 
+    style="
+      width:100%;
+      margin-bottom:18px;
+      padding:13px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,0.15);
+      background:rgba(255,255,255,0.08);
+      color:white;
+      font-size:14px;
+    "
+  />
+
+  <!-- BUTTON -->
+  <button 
+    onclick="handleLogin()" 
+    style="
+      width:100%;
+      padding:13px;
+      border:none;
+      border-radius:14px;
+      background:linear-gradient(135deg,#2f7df6,#56a5ff);
+      color:white;
+      font-weight:900;
+      font-size:14px;
+      cursor:pointer;
+    "
+  >
+    Login to Dashboard
+  </button>
+
+  <!-- ERROR -->
+  <p id="loginError" style="
+    color:#ff6b6b;
+    font-size:12px;
+    margin-top:12px;
+  "></p>
+
+</div>
     <h2>Agent Login</h2>
 
     <input type="text" id="loginUsername" placeholder="Username" />
