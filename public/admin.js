@@ -23,6 +23,17 @@ function setCurrentAgent(agent) {
 }
 
 function handleLogin() {
+function logout() {
+  localStorage.removeItem("currentAgent");
+  currentAgent = "";
+
+  document.getElementById("loginScreen").style.display = "flex";
+
+  // optional reset
+  document.getElementById("loginUsername").value = "";
+  document.getElementById("loginPassword").value = "";
+}
+  
   const username = document.getElementById("loginUsername").value.trim();
   const password = document.getElementById("loginPassword").value.trim();
   const error = document.getElementById("loginError");
