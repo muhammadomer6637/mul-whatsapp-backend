@@ -266,16 +266,19 @@ lastAgentMessageMap[chatKey] = lastMsgKey;
 
 function renderChatList() {
   const search = document.getElementById("chatSearch")?.value.toLowerCase().trim() || "";
- let filtered = allChats.filter(chat => {
-
+let filtered = allChats.filter(chat => {
   // login safety
-  if (!currentAgent) return false;
+  if (!currentAgent || currentAgent === "") return false;
 
-  // unassigned chats sab ko
-  if (!chat.assigned_agent) return true;
+  // Omer admin hai — sab chats dekhega
+  if (currentAgent === "Omer") return true;
 
-  // sirf apni chats
-  return chat.assigned_agent === currentAgent;
+  // baqi agents ko unassigned chats dikhengi
+  if (!chat.assigned_agent || chat.assigned_agent === null) return true;
+
+  // baqi agents sirf apni assigned chats dekhen
+  return String(chat.assigned_agent).trim().toLowerCase() ===
+         String(currentAgent).trim().toLowerCase();
 });
 
   const now = Date.now();
