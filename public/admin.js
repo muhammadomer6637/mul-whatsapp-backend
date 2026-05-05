@@ -585,7 +585,6 @@ async function takeChat(phone) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       phone,
-      console.log("Assigning to:", currentAgent);
       agent: currentAgent
     })
   });
@@ -755,15 +754,6 @@ if (savedAgent) {
   loadAgentStatus();
 } else {
   document.getElementById("loginScreen").style.display = "flex";
-}
-
-if (savedAgent) {
-  currentAgent = savedAgent;
-  document.getElementById("loginScreen").style.display = "none";
-
-  loadDashboard();
-  loadChats();
-  loadAgentStatus();
 }
 
   // =========================
