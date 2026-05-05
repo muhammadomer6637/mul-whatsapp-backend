@@ -41,6 +41,7 @@ function handleLogin() {
 
   document.getElementById("loginScreen").style.display = "none";
 
+  // 🔥 important
   loadDashboard();
   loadChats();
   loadAgentStatus();
@@ -745,16 +746,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const savedAgent = localStorage.getItem("currentAgent");
 
-if (savedAgent && savedAgent !== "undefined" && savedAgent !== "null") {
+if (savedAgent) {
   currentAgent = savedAgent;
-
   document.getElementById("loginScreen").style.display = "none";
 
   loadDashboard();
   loadChats();
   loadAgentStatus();
 } else {
-  currentAgent = "";
   document.getElementById("loginScreen").style.display = "flex";
 }
 
