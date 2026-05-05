@@ -744,6 +744,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const savedAgent = localStorage.getItem("currentAgent");
 
+if (savedAgent && savedAgent !== "undefined" && savedAgent !== "null") {
+  currentAgent = savedAgent;
+
+  document.getElementById("loginScreen").style.display = "none";
+
+  loadDashboard();
+  loadChats();
+  loadAgentStatus();
+} else {
+  currentAgent = "";
+  document.getElementById("loginScreen").style.display = "flex";
+}
+
 if (savedAgent) {
   currentAgent = savedAgent;
   document.getElementById("loginScreen").style.display = "none";
