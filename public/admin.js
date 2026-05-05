@@ -23,17 +23,6 @@ function setCurrentAgent(agent) {
 }
 
 function handleLogin() {
-function logout() {
-  localStorage.removeItem("currentAgent");
-  currentAgent = "";
-
-  document.getElementById("loginScreen").style.display = "flex";
-
-  // optional reset
-  document.getElementById("loginUsername").value = "";
-  document.getElementById("loginPassword").value = "";
-}
-  
   const username = document.getElementById("loginUsername").value.trim();
   const password = document.getElementById("loginPassword").value.trim();
   const error = document.getElementById("loginError");
@@ -52,7 +41,9 @@ function logout() {
 
   document.getElementById("loginScreen").style.display = "none";
 
+  loadDashboard();
   loadChats();
+  loadAgentStatus();
 }
 
 function showSection(id, btn = null) {
@@ -274,7 +265,17 @@ lastAgentMessageMap[chatKey] = lastMsgKey;
 
 function renderChatList() {
   const search = document.getElementById("chatSearch")?.value.toLowerCase().trim() || "";
-  let filtered = [...allChats];
+ let filtered = allChats.filter(chat => {
+
+  // login safety
+  if (!currentAgent) return false;
+
+  // unassigned chats sab ko
+  if (!chat.assigned_agent) return true;
+
+  // sirf apni chats
+  return chat.assigned_agent === currentAgent;
+});
 
   const now = Date.now();
 
@@ -292,6 +293,9 @@ function renderChatList() {
 
   // 🔥 SORTING FIX
   filtered.sort((a, b) => {
+    // 🔥 apni chats top par
+if (a.assigned_agent === currentAgent && b.assigned_agent !== currentAgent) return -1;
+if (a.assigned_agent !== currentAgent && b.assigned_agent === currentAgent) return 1;
     const priority = {
       agent_waiting: 3,
       agent_active: 2,
