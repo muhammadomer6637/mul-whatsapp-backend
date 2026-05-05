@@ -584,6 +584,7 @@ async function takeChat(phone) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       phone,
+      console.log("Assigning to:", currentAgent);
       agent: currentAgent
     })
   });
