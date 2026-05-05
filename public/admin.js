@@ -267,18 +267,28 @@ lastAgentMessageMap[chatKey] = lastMsgKey;
 function renderChatList() {
   const search = document.getElementById("chatSearch")?.value.toLowerCase().trim() || "";
 let filtered = allChats.filter(chat => {
-  // login safety
   if (!currentAgent || currentAgent === "") return false;
 
-  // Omer admin hai — sab chats dekhega
+  // Omer = Admin, sab chats dekhega
   if (currentAgent === "Omer") return true;
 
-  // baqi agents ko unassigned chats dikhengi
-  if (!chat.assigned_agent || chat.assigned_agent === null) return true;
+  // Agent 2/3 apni assigned chats dekhen
+  if (
+    chat.assigned_agent &&
+    String(chat.assigned_agent).trim().toLowerCase() === String(currentAgent).trim().toLowerCase()
+  ) {
+    return true;
+  }
 
-  // baqi agents sirf apni assigned chats dekhen
-  return String(chat.assigned_agent).trim().toLowerCase() ===
-         String(currentAgent).trim().toLowerCase();
+  // Agent 2/3 sirf unassigned waiting chats dekhen
+  if (
+    (!chat.assigned_agent || chat.assigned_agent === null) &&
+    chat.status === "agent_waiting"
+  ) {
+    return true;
+  }
+
+  return false;
 });
 
   const now = Date.now();
