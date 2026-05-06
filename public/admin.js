@@ -6,46 +6,11 @@ let currentRange = "24h";
 let allChats = [];
 let currentChatFilter = "all";
 let highlightedPhone = null;
-const AGENTS = [
-  { username: "omer", password: "1234", name: "Omer" },
-  { username: "agent2", password: "1234", name: "Agent 2" }
-];
-let currentAgent = "";
+
 
 let lastAgentMessageMap = {};
 const notificationSound = new Audio("/notification.mp3");
 notificationSound.volume = 0.6;
-
-function setCurrentAgent(agent) {
-  currentAgent = agent;
-  localStorage.setItem("currentAgent", agent);
-  renderChatList();
-}
-
-function handleLogin() {
-  const username = document.getElementById("loginUsername").value.trim();
-  const password = document.getElementById("loginPassword").value.trim();
-  const error = document.getElementById("loginError");
-
-  const agent = AGENTS.find(
-    a => a.username === username && a.password === password
-  );
-
-  if (!agent) {
-    error.innerText = "Invalid credentials";
-    return;
-  }
-
-  currentAgent = agent.name;
-  localStorage.setItem("currentAgent", agent.name);
-
-  document.getElementById("loginScreen").style.display = "none";
-
-  // 🔥 important
-  loadDashboard();
-  loadChats();
-  loadAgentStatus();
-}
 
 function showSection(id, btn = null) {
   currentSection = id;
@@ -266,30 +231,7 @@ lastAgentMessageMap[chatKey] = lastMsgKey;
 
 function renderChatList() {
   const search = document.getElementById("chatSearch")?.value.toLowerCase().trim() || "";
-let filtered = allChats.filter(chat => {
-  if (!currentAgent || currentAgent === "") return false;
-
-  // Omer = Admin, sab chats dekhega
-  if (currentAgent === "Omer") return true;
-
-  // Agent 2/3 apni assigned chats dekhen
-  if (
-    chat.assigned_agent &&
-    String(chat.assigned_agent).trim().toLowerCase() === String(currentAgent).trim().toLowerCase()
-  ) {
-    return true;
-  }
-
-  // Agent 2/3 sirf unassigned waiting chats dekhen
-  if (
-    (!chat.assigned_agent || chat.assigned_agent === null) &&
-    chat.status === "agent_waiting"
-  ) {
-    return true;
-  }
-
-  return false;
-});
+  let filtered = [...allChats];
 
   const now = Date.now();
 
@@ -307,9 +249,6 @@ let filtered = allChats.filter(chat => {
 
   // 🔥 SORTING FIX
   filtered.sort((a, b) => {
-    // 🔥 apni chats top par
-if (a.assigned_agent === currentAgent && b.assigned_agent !== currentAgent) return -1;
-if (a.assigned_agent !== currentAgent && b.assigned_agent === currentAgent) return 1;
     const priority = {
       agent_waiting: 3,
       agent_active: 2,
@@ -579,26 +518,13 @@ async function sendMessage() {
 async function takeChat(phone) {
   if (!phone) return;
 
-  if (!currentAgent) {
-    alert("Please select an agent first.");
-    return;
-  }
-
-  const chat = allChats.find(c => c.phone === phone);
-
-  // 🚫 Agar already kisi aur ko assigned hai
-  if (chat.assigned_agent && chat.assigned_agent !== currentAgent) {
-    alert(`This chat is already assigned to ${chat.assigned_agent}`);
-    return;
-  }
-
   // ✅ Assign chat
   await fetch(`${BASE}/api/assign-chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       phone,
-      agent: currentAgent
+      agent: "Admin"
     })
   });
 
@@ -756,18 +682,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-const savedAgent = localStorage.getItem("currentAgent");
-
-if (savedAgent) {
-  currentAgent = savedAgent;
-  document.getElementById("loginScreen").style.display = "none";
-
-  loadDashboard();
-  loadChats();
-  loadAgentStatus();
-} else {
-  document.getElementById("loginScreen").style.display = "flex";
-}
+loadDashboard();
+loadChats();
+loadAgentStatus();
 
   // =========================
 // REAL-TIME SSE LISTENER
@@ -802,22 +719,4 @@ setInterval(() => {
 }, 15000);
 
   });
-
-window.logout = function () {
-  localStorage.removeItem("currentAgent");
-  currentAgent = "";
-
-  const loginScreen = document.getElementById("loginScreen");
-  if (loginScreen) {
-    loginScreen.style.display = "flex";
-  }
-
-  const username = document.getElementById("loginUsername");
-  const password = document.getElementById("loginPassword");
-  const error = document.getElementById("loginError");
-
-  if (username) username.value = "";
-  if (password) password.value = "";
-  if (error) error.innerText = "";
-};
 
