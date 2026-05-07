@@ -48,11 +48,27 @@
 
       <section id="dashboard" class="section">
         <div class="toolbar">
-          <div class="range-group">
-            <button class="range-btn active" onclick="setRange(this, '24h')">24 Hours</button>
-            <button class="range-btn" onclick="setRange(this, '7d')">7 Days</button>
-            <button class="range-btn" onclick="setRange(this, '30d')">30 Days</button>
-          </div>
+        <div class="range-toolbar">
+
+  <div class="range-group">
+    <button class="range-btn active" onclick="setRange(this, '24h')">24 Hours</button>
+    <button class="range-btn" onclick="setRange(this, '7d')">7 Days</button>
+    <button class="range-btn" onclick="setRange(this, '30d')">30 Days</button>
+  </div>
+
+  <div class="custom-range-wrap">
+
+    <input type="date" id="startDate" class="date-input" />
+
+    <input type="date" id="endDate" class="date-input" />
+
+    <button class="range-btn" onclick="applyCustomRange()">
+      Apply
+    </button>
+
+    <button class="export-btn" onclick="exportDashboardData()">
+      Export Data
+    </button>
         </div>
 
 <button onclick="toggleAgent()" id="agentToggleBtn" style="margin-bottom:10px;">
