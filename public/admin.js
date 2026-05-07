@@ -134,18 +134,33 @@ async function loadDashboard(range = "24h") {
       const normalized = normalizeProgramsForDisplay(data.topPrograms);
       const maxCount = Math.max(...normalized.map(p => p.inquiries), 1);
 
-      topProgramsWrap.innerHTML = normalized.map(program => {
-        const width = (program.inquiries / maxCount) * 100;
-        return `
-          <div class="program-row">
-            <div class="program-row-head">
-              <div class="program-name">${escapeHtml(program.program)}</div>
-              <div class="program-count">${program.inquiries}</div>
-            </div>
-            <div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div>
-          </div>
-        `;
-      }).join("");
+  REPLACE with:
+topProgramsWrap.innerHTML = normalized.map(program => {
+  const width = Math.round((program.inquiries / maxCount) * 100);
+
+  return `
+    <div class="program-card">
+      <div class="program-header">
+        <div>
+          <div class="program-name">${escapeHtml(program.program)}</div>
+          <div class="program-trend">🔥 High Demand</div>
+        </div>
+
+        <div class="program-count-pill">
+          ${program.inquiries} Inquiries
+        </div>
+      </div>
+
+      <div class="program-progress-wrap">
+        <div class="program-progress-fill" style="width:${width}%"></div>
+      </div>
+
+      <div class="program-footer">
+        <span>${width}% engagement</span>
+      </div>
+    </div>
+  `;
+}).join("");
     }
 
     const leadsBody = document.querySelector("#leadsTable tbody");
