@@ -62,10 +62,10 @@ async function loadAgentStatus() {
   const res = await fetch(`${BASE}/api/agent-status`);
   const data = await res.json();
 
-  const btn = document.getElementById("agentToggleBtn");
-  if (btn) {
-    btn.textContent = data.status ? "Agent ON 🟢" : "Agent OFF 🔴";
-  }
+const toggle = document.getElementById("agentToggleSwitch");
+if (toggle) {
+  toggle.checked = !!data.status;
+}
 }
 
 async function toggleAgent() {
@@ -718,7 +718,9 @@ setInterval(() => {
   }
 }, 15000);
 
-  function applyCustomRange() {
+  });
+
+function applyCustomRange() {
   const start = document.getElementById("startDate")?.value;
   const end = document.getElementById("endDate")?.value;
 
@@ -728,14 +730,8 @@ setInterval(() => {
   }
 
   alert(`Custom reporting applied:\n${start} → ${end}`);
-
-  // future backend integration
 }
 
 function exportDashboardData() {
   alert("Export started...");
-
-  // future CSV/PDF export
 }
-  });
-
