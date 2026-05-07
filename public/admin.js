@@ -53,8 +53,16 @@ function refreshCurrentSection() {
 
 function setRange(button, range) {
   currentRange = range;
-  document.querySelectorAll(".range-btn").forEach(btn => btn.classList.remove("active"));
-  button.classList.add("active");
+
+  // sirf 24h / 7d / 30d buttons par active class apply hogi
+  document
+    .querySelectorAll(".range-group .range-btn")
+    .forEach(btn => btn.classList.remove("active"));
+
+  if (button) button.classList.add("active");
+
+  console.log("Dashboard range selected:", range);
+
   loadDashboard(range);
 }
 
