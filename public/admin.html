@@ -28,11 +28,19 @@
         </nav>
       </div>
 
-      <div class="sidebar-footer">
-        <div class="status-dot"></div>
-        <span>System Online</span>
-      </div>
-    </aside>
+   <div class="sidebar-footer">
+  <div class="agent-status-wrap">
+    <div>
+      <div class="status-title">Agent Status</div>
+      <div class="status-sub">Live admission availability</div>
+    </div>
+
+    <label class="switch">
+      <input type="checkbox" id="agentToggleSwitch" checked onchange="toggleAgent()" />
+      <span class="slider"></span>
+    </label>
+  </div>
+</div>
 
     <main class="main-content">
       <header class="topbar" id="topbar">
@@ -69,11 +77,11 @@
     <button class="export-btn" onclick="exportDashboardData()">
       Export Data
     </button>
-        </div>
+  </div>
 
-<button onclick="toggleAgent()" id="agentToggleBtn" style="margin-bottom:10px;">
-  Loading...
-</button>
+</div>
+</div>
+
         
         <div class="stats-grid" id="stats"></div>
 
