@@ -718,5 +718,24 @@ setInterval(() => {
   }
 }, 15000);
 
+  function applyCustomRange() {
+  const start = document.getElementById("startDate")?.value;
+  const end = document.getElementById("endDate")?.value;
+
+  if (!start || !end) {
+    alert("Please select both dates.");
+    return;
+  }
+
+  alert(`Custom reporting applied:\n${start} → ${end}`);
+
+  // future backend integration
+}
+
+function exportDashboardData() {
+  alert("Export started...");
+
+  // future CSV/PDF export
+}
   });
 
