@@ -1060,3 +1060,127 @@ body {
 .switch input:checked + .slider:before{
   transform:translateX(27px);
 }
+
+/* ===== Dashboard Toolbar ===== */
+
+.range-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  flex-wrap:wrap;
+  margin-bottom:22px;
+}
+
+.range-group{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.custom-range-wrap{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:18px;
+  background:rgba(15,28,52,0.72);
+  border:1px solid rgba(86,165,255,0.15);
+  box-shadow:0 10px 25px rgba(0,0,0,0.18);
+}
+
+.date-input{
+  height:44px;
+  min-width:160px;
+  background:#081223;
+  border:1px solid rgba(86,165,255,0.18);
+  color:#ffffff;
+  padding:0 14px;
+  border-radius:14px;
+  outline:none;
+  font-size:13px;
+  font-weight:700;
+}
+
+.date-input::-webkit-calendar-picker-indicator{
+  filter:invert(1);
+  opacity:0.8;
+  cursor:pointer;
+}
+
+.export-btn{
+  height:44px;
+  border:none;
+  padding:0 18px;
+  border-radius:14px;
+  font-weight:800;
+  cursor:pointer;
+  color:#fff;
+  background:linear-gradient(135deg,#00c896,#2f7df6);
+  box-shadow:0 12px 24px rgba(47,125,246,0.22);
+}
+
+/* ===== Agent Toggle ===== */
+
+.agent-status-wrap{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.status-title{
+  color:#fff;
+  font-size:15px;
+  font-weight:800;
+}
+
+.status-sub{
+  color:#8ea7d1;
+  font-size:12px;
+  margin-top:4px;
+}
+
+.switch{
+  position:relative;
+  display:inline-block;
+  width:58px;
+  height:30px;
+}
+
+.switch input{
+  opacity:0;
+  width:0;
+  height:0;
+}
+
+.slider{
+  position:absolute;
+  inset:0;
+  cursor:pointer;
+  background:#1b2c4d;
+  transition:.3s;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.08);
+}
+
+.slider:before{
+  content:"";
+  position:absolute;
+  height:22px;
+  width:22px;
+  left:4px;
+  top:3px;
+  background:#fff;
+  border-radius:50%;
+  transition:.3s;
+}
+
+.switch input:checked + .slider{
+  background:linear-gradient(135deg,#00c896,#2f7df6);
+}
+
+.switch input:checked + .slider:before{
+  transform:translateX(27px);
+}
