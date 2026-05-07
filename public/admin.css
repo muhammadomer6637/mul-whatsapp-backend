@@ -1381,3 +1381,80 @@ body {
   font-size:12px;
 }
 }
+
+/* ===== Live Admissions Activity ===== */
+
+.live-feed-card{
+  margin-bottom:28px;
+  padding:26px;
+  border-radius:28px;
+  background:linear-gradient(180deg,rgba(10,24,50,0.95),rgba(7,18,37,0.95));
+  border:1px solid rgba(86,165,255,0.12);
+  box-shadow:0 18px 45px rgba(0,0,0,0.22);
+}
+
+.live-feed-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:22px;
+}
+
+.live-feed-header h2{
+  margin:0 0 6px;
+  font-size:26px;
+  color:#fff;
+}
+
+.live-feed-header p{
+  margin:0;
+  color:#8ea7d1;
+  font-size:14px;
+}
+
+.live-dot{
+  padding:7px 12px;
+  border-radius:999px;
+  background:rgba(24,195,126,0.14);
+  color:#82efbf;
+  border:1px solid rgba(24,195,126,0.28);
+  font-size:12px;
+  font-weight:900;
+}
+
+.live-feed-list{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:14px;
+}
+
+.feed-item{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  padding:16px;
+  border-radius:18px;
+  background:rgba(255,255,255,0.035);
+  border:1px solid rgba(255,255,255,0.06);
+}
+
+.feed-item strong{
+  color:#eef5ff;
+  font-size:14px;
+}
+
+.feed-item p{
+  margin:5px 0 0;
+  color:#8ea7d1;
+  font-size:12px;
+}
+
+.feed-icon{
+  font-size:18px;
+  line-height:1;
+}
+
+.feed-icon.green{ color:#18c37e; }
+.feed-icon.blue{ color:#56a5ff; }
+.feed-icon.yellow{ color:#f3b544; }
+.feed-icon.purple{ color:#b084ff; }
