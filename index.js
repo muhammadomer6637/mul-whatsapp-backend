@@ -1080,6 +1080,59 @@ app.get("/generate-hash/:password", async (req, res) => {
   }
 });
 
+// TEMP CREATE ADMIN
+app.get("/create-admin", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      INSERT INTO agents (
+        name,
+        username,
+        password_hash,
+        role,
+        active,
+        can_view_dashboard,
+        can_view_all_chats,
+        can_create_agents,
+        can_export_data
+      )
+      VALUES (
+        'Omer',
+        'omer',
+        '$2b$10$eL0q/0ZPaVI7u59Pv5Pg2O2qUv52GcuAjNBu4M9EyYBZuitHdLwuy',
+        'admin',
+        true,
+        true,
+        true,
+        true,
+        true
+      )
+      ON CONFLICT (username)
+      DO UPDATE SET
+        password_hash = EXCLUDED.password_hash,
+        role = 'admin',
+        active = true,
+        can_view_dashboard = true,
+        can_view_all_chats = true,
+        can_create_agents = true,
+        can_export_data = true
+      RETURNING id, name, username, role;
+      `
+    );
+
+    return res.json({
+      success: true,
+      admin: result.rows[0]
+    });
+  } catch (error) {
+    console.error("Create admin error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Admin creation failed"
+    });
+  }
+});
+
 // =========================
 // REAL-TIME SSE ROUTE
 // =========================
