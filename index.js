@@ -27,6 +27,42 @@ const PHONE_NUMBER_ID = "1065169533344109";
 const BASE_URL =
   process.env.BASE_URL ||
   "https://mul-whatsapp-backend-production.up.railway.app";
+const JWT_SECRET = process.env.JWT_SECRET || "mul_nexus_dev_secret_change_later";
+
+function authenticateAgent(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized access"
+      });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    req.agent = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      error: "Invalid or expired token"
+    });
+  }
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.agent || req.agent.role !== "admin") {
+    return res.status(403).json({
+      success: false,
+      error: "Admin access required"
+    });
+  }
+
+  next();
+}
 
 // Temporary in-memory user state
 const userStates = {};
