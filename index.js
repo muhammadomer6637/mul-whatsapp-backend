@@ -1013,6 +1013,52 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
+// CURRENT LOGGED-IN AGENT
+app.get("/api/me", authenticateAgent, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        name,
+        username,
+        role,
+        active,
+        can_view_dashboard,
+        can_view_all_chats,
+        can_create_agents,
+        can_export_data,
+        created_at
+      FROM agents
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [req.agent.id]
+    );
+
+    const agent = result.rows[0];
+
+    if (!agent || agent.active !== true) {
+      return res.status(401).json({
+        success: false,
+        error: "Agent not found or inactive"
+      });
+    }
+
+    return res.json({
+      success: true,
+      agent
+    });
+  } catch (error) {
+    console.error("GET /api/me error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch agent profile"
+    });
+  }
+});
+
 app.get("/", (req, res) => {
   res.send("MUL WhatsApp Backend Running 🚀");
 });
