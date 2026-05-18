@@ -48,9 +48,7 @@ async function loginAgent() {
 
     document.getElementById("loginOverlay").style.display = "none";
 
-    loadDashboard();
-    loadChats();
-    loadAgentStatus();
+    checkAuth();
 
   } catch (error) {
     console.error("Login error:", error);
