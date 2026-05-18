@@ -1898,13 +1898,15 @@ app.get("/api/chats", authenticateAgent, async (req, res) => {
   c.last_incoming_at,
   c.last_outgoing_at,
   c.updated_at,
-  c.assigned_agent,
-  c.assigned_at,
+ c.assigned_agent_id,
+a.name AS assigned_agent,
+c.assigned_at,
   u.name,
   u.program,
   u.mode
       FROM chats c
       LEFT JOIN users u ON u.phone = c.phone
+      LEFT JOIN agents a ON a.id = c.assigned_agent_id
       ORDER BY
         CASE
           WHEN c.status = 'agent_waiting' THEN 0
@@ -2049,7 +2051,11 @@ app.post("/api/assign-chat", authenticateAgent, async (req, res) => {
   try {
     const { phone, agent } = req.body;
 
-    console.log("ASSIGN API HIT:", { phone, agent });
+   console.log("ASSIGN API HIT:", {
+  phone,
+  agentFromRequest: agent,
+  loggedInAgent: req.agent
+});
 
     if (!phone) {
       return res.status(400).json({
@@ -2058,17 +2064,20 @@ app.post("/api/assign-chat", authenticateAgent, async (req, res) => {
       });
     }
 
+const shouldAssign = agent !== null && agent !== false && agent !== "";
+
 const result = await pool.query(
   `
   UPDATE chats
   SET
-    assigned_agent = $1::text,
-    assigned_at = CASE WHEN $1::text IS NULL THEN NULL ELSE NOW() END,
+    assigned_agent_id = $1,
+    assigned_at = CASE WHEN $1 IS NULL THEN NULL ELSE NOW() END,
+    status = CASE WHEN $1 IS NULL THEN status ELSE 'agent_active' END,
     updated_at = NOW()
   WHERE phone = $2
-  RETURNING phone, assigned_agent, assigned_at
+  RETURNING phone, assigned_agent_id, assigned_at, status
   `,
-  [agent ? String(agent) : null, phone]
+  [shouldAssign ? req.agent.id : null, phone]
 );
 
     console.log("ASSIGN RESULT:", result.rows[0]);
