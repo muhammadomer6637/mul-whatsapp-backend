@@ -928,6 +928,91 @@ async function checkPendingFollowups() {
 // =========================
 // ROUTES
 // =========================
+// =========================
+// AUTH APIs
+// =========================
+
+// LOGIN
+app.post("/api/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        error: "Username and password are required"
+      });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT *
+      FROM agents
+      WHERE username = $1
+      AND active = true
+      LIMIT 1
+      `,
+      [username]
+    );
+
+    const agent = result.rows[0];
+
+    if (!agent) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid username or password"
+      });
+    }
+
+    const passwordMatch = await bcrypt.compare(
+      password,
+      agent.password_hash
+    );
+
+    if (!passwordMatch) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid username or password"
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        id: agent.id,
+        name: agent.name,
+        username: agent.username,
+        role: agent.role
+      },
+      JWT_SECRET,
+      {
+        expiresIn: "7d"
+      }
+    );
+
+    return res.json({
+      success: true,
+      token,
+      agent: {
+        id: agent.id,
+        name: agent.name,
+        username: agent.username,
+        role: agent.role,
+        can_view_dashboard: agent.can_view_dashboard,
+        can_view_all_chats: agent.can_view_all_chats,
+        can_create_agents: agent.can_create_agents,
+        can_export_data: agent.can_export_data
+      }
+    });
+  } catch (error) {
+    console.error("POST /api/login error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: "Login failed"
+    });
+  }
+});
+
 app.get("/", (req, res) => {
   res.send("MUL WhatsApp Backend Running 🚀");
 });
