@@ -44,6 +44,28 @@ module.exports = async function initDb() {
       );
     `);
 
+    // AGENTS TABLE
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS agents (
+        id SERIAL PRIMARY KEY,
+
+        name TEXT NOT NULL,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+
+        role VARCHAR(30) DEFAULT 'chat_agent',
+
+        active BOOLEAN DEFAULT true,
+
+        can_view_dashboard BOOLEAN DEFAULT false,
+        can_view_all_chats BOOLEAN DEFAULT true,
+        can_create_agents BOOLEAN DEFAULT false,
+        can_export_data BOOLEAN DEFAULT false,
+
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
     // Safe ALTERs for existing DB
     await pool.query(`
       ALTER TABLE chats
@@ -60,16 +82,44 @@ module.exports = async function initDb() {
       ADD COLUMN IF NOT EXISTS last_outgoing_at TIMESTAMP;
     `);
 
-await pool.query(`
-  ALTER TABLE chats
-  ADD COLUMN IF NOT EXISTS assigned_agent TEXT;
-`);
+    await pool.query(`
+      ALTER TABLE chats
+      ADD COLUMN IF NOT EXISTS assigned_agent_id INTEGER;
+    `);
 
-await pool.query(`
-  ALTER TABLE chats
-  ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP;
-`);
-    
+    await pool.query(`
+      ALTER TABLE chats
+      ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP;
+    `);
+
+    await pool.query(`
+      ALTER TABLE chats
+      ADD COLUMN IF NOT EXISTS callback_requested BOOLEAN DEFAULT false;
+    `);
+
+    await pool.query(`
+      ALTER TABLE chats
+      ADD COLUMN IF NOT EXISTS callback_status VARCHAR(30);
+    `);
+
+    await pool.query(`
+      ALTER TABLE chats
+      ADD COLUMN IF NOT EXISTS callback_requested_at TIMESTAMP;
+    `);
+
+    // Safe foreign key for assigned agent
+    try {
+      await pool.query(`
+        ALTER TABLE chats
+        ADD CONSTRAINT chats_assigned_agent_fk
+        FOREIGN KEY (assigned_agent_id)
+        REFERENCES agents(id)
+        ON DELETE SET NULL;
+      `);
+    } catch (err) {
+      // Ignore if constraint already exists
+    }
+
     console.log("Tables created / verified successfully");
   } catch (error) {
     console.error("initDb error:", error.message);
