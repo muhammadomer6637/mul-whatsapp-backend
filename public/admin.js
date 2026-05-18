@@ -1,4 +1,95 @@
 const BASE = window.location.origin;
+// =========================
+// AUTH
+// =========================
+
+let authToken = localStorage.getItem("mul_nexus_token");
+let currentAgent = null;
+
+function authHeaders(extraHeaders = {}) {
+  return {
+    ...extraHeaders,
+    Authorization: `Bearer ${authToken}`
+  };
+}
+
+async function loginAgent() {
+  const username = document.getElementById("loginUsername").value.trim();
+  const password = document.getElementById("loginPassword").value.trim();
+  const errorBox = document.getElementById("loginError");
+
+  errorBox.innerText = "";
+
+  if (!username || !password) {
+    errorBox.innerText = "Please enter username and password";
+    return;
+  }
+
+  try {
+    const response = await fetch(`${BASE}/api/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+      errorBox.innerText = data.error || "Login failed";
+      return;
+    }
+
+    authToken = data.token;
+    currentAgent = data.agent;
+
+    localStorage.setItem("mul_nexus_token", authToken);
+
+    document.getElementById("loginOverlay").style.display = "none";
+
+    loadDashboard();
+    loadChats();
+    loadAgentStatus();
+
+  } catch (error) {
+    console.error("Login error:", error);
+    errorBox.innerText = "Server connection failed";
+  }
+}
+
+async function checkAuth() {
+  if (!authToken) {
+    document.getElementById("loginOverlay").style.display = "flex";
+    return;
+  }
+
+  try {
+    const response = await fetch(`${BASE}/api/me`, {
+      headers: authHeaders()
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+      localStorage.removeItem("mul_nexus_token");
+      authToken = null;
+      document.getElementById("loginOverlay").style.display = "flex";
+      return;
+    }
+
+    currentAgent = data.agent;
+    document.getElementById("loginOverlay").style.display = "none";
+
+    loadDashboard();
+    loadChats();
+    loadAgentStatus();
+
+  } catch (error) {
+    console.error("Auth check error:", error);
+    document.getElementById("loginOverlay").style.display = "flex";
+  }
+}
 
 let selectedPhone = null;
 let currentSection = "dashboard";
