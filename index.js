@@ -1864,7 +1864,7 @@ Please choose:
 // =========================
 
 // Get agent status
-app.get("/api/agent-status", async (req, res) => {
+app.get("/api/agent-status", authenticateAgent, async (req, res) => {
   const result = await pool.query(
     "SELECT value FROM system_settings WHERE key = 'agent_available'"
   );
@@ -1876,7 +1876,7 @@ app.get("/api/agent-status", async (req, res) => {
 });
 
 // Toggle agent status
-app.post("/api/toggle-agent", async (req, res) => {
+app.post("/api/toggle-agent", authenticateAgent, requireAdmin, async (req, res) => {
   const { status } = req.body;
 
   await pool.query(
@@ -1887,7 +1887,7 @@ app.post("/api/toggle-agent", async (req, res) => {
   res.json({ success: true });
 });
 
-app.get("/api/chats", async (req, res) => {
+app.get("/api/chats", authenticateAgent, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
@@ -1927,7 +1927,7 @@ app.get("/api/chats", async (req, res) => {
   }
 });
 
-app.get("/api/messages/:phone", async (req, res) => {
+app.get("/api/messages/:phone", authenticateAgent, async (req, res) => {
   try {
     const { phone } = req.params;
 
@@ -1954,7 +1954,7 @@ app.get("/api/messages/:phone", async (req, res) => {
   }
 });
 
-app.post("/api/send", async (req, res) => {
+app.post("/api/send", authenticateAgent, async (req, res) => {
   try {
     const { phone, message } = req.body;
 
@@ -1987,7 +1987,7 @@ app.post("/api/send", async (req, res) => {
   }
 });
 
-app.post("/api/switch-mode", async (req, res) => {
+app.post("/api/switch-mode", authenticateAgent, async (req, res) => {
   try {
     const { phone, mode } = req.body;
 
@@ -2045,7 +2045,7 @@ app.post("/api/switch-mode", async (req, res) => {
   }
 });
 
-app.post("/api/assign-chat", async (req, res) => {
+app.post("/api/assign-chat", authenticateAgent, async (req, res) => {
   try {
     const { phone, agent } = req.body;
 
@@ -2086,7 +2086,7 @@ const result = await pool.query(
   }
 });
 
-app.post("/api/mark-read", async (req, res) => {
+app.post("/api/mark-read", authenticateAgent, async (req, res) => {
   try {
     const { phone } = req.body;
 
@@ -2112,7 +2112,7 @@ app.post("/api/mark-read", async (req, res) => {
   }
 });
 
-app.get("/api/dashboard", async (req, res) => {
+app.get("/api/dashboard", authenticateAgent, async (req, res) => {
   try {
     const range = req.query.range || "24h";
     const start = req.query.start;
