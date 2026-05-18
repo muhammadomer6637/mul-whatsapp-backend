@@ -461,12 +461,14 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
   if (markRead) {
     await fetch(`${BASE}/api/mark-read`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+     headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ phone })
     });
   }
 
-  const res = await fetch(`${BASE}/api/messages/${phone}`);
+ const res = await fetch(`${BASE}/api/messages/${phone}`, {
+  headers: authHeaders()
+});
   const data = await res.json();
 
   document.getElementById("messages").innerHTML = data.messages.length
@@ -594,7 +596,7 @@ async function sendMessage() {
   try {
     const res = await fetch(`${BASE}/api/send`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+     headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ phone: selectedPhone, message: msg })
     });
 
@@ -620,17 +622,17 @@ async function takeChat(phone) {
   // ✅ Assign chat
   await fetch(`${BASE}/api/assign-chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+   headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       phone,
-      agent: "Admin"
+      agent: "assign"
     })
   });
 
   // ✅ Switch to agent mode
   await fetch(`${BASE}/api/switch-mode`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+   headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       phone,
       mode: "agent"
@@ -647,7 +649,7 @@ async function closeChat(phone) {
   // release assignment
   await fetch(`${BASE}/api/assign-chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+   headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       phone,
       agent: null
@@ -657,7 +659,7 @@ async function closeChat(phone) {
   // back to bot
   await fetch(`${BASE}/api/switch-mode`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+   headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       phone,
       mode: "bot"
@@ -684,7 +686,7 @@ async function switchToBot() {
 
   await fetch(`${BASE}/api/switch-mode`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+   headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ phone: selectedPhone, mode: "bot" })
   });
 
