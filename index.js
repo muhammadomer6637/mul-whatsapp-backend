@@ -1063,6 +1063,23 @@ app.get("/", (req, res) => {
   res.send("MUL WhatsApp Backend Running 🚀");
 });
 
+// TEMP HASH GENERATOR
+app.get("/generate-hash/:password", async (req, res) => {
+  try {
+    const hash = await bcrypt.hash(req.params.password, 10);
+
+    return res.json({
+      success: true,
+      hash
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: "Hash generation failed"
+    });
+  }
+});
+
 // =========================
 // REAL-TIME SSE ROUTE
 // =========================
