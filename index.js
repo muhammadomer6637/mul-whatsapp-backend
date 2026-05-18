@@ -2070,9 +2070,9 @@ const result = await pool.query(
   `
   UPDATE chats
   SET
-    assigned_agent_id = $1,
-    assigned_at = CASE WHEN $1 IS NULL THEN NULL ELSE NOW() END,
-    status = CASE WHEN $1 IS NULL THEN status ELSE 'agent_active' END,
+    assigned_agent_id = $1::integer,
+  assigned_at = CASE WHEN $1::integer IS NULL THEN NULL ELSE NOW() END,
+   status = CASE WHEN $1::integer IS NULL THEN status ELSE 'agent_active' END,
     updated_at = NOW()
   WHERE phone = $2
   RETURNING phone, assigned_agent_id, assigned_at, status
