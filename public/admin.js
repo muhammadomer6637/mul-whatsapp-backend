@@ -150,7 +150,9 @@ function setRange(button, range) {
 }
 
 async function loadAgentStatus() {
-  const res = await fetch(`${BASE}/api/agent-status`);
+  const res = await fetch(`${BASE}/api/agent-status`, {
+  headers: authHeaders()
+});
   const data = await res.json();
 
 const toggle = document.getElementById("agentToggleSwitch");
@@ -160,14 +162,16 @@ if (toggle) {
 }
 
 async function toggleAgent() {
-  const res = await fetch(`${BASE}/api/agent-status`);
+  const res = await fetch(`${BASE}/api/agent-status`, {
+  headers: authHeaders()
+});
   const data = await res.json();
 
   const newStatus = !data.status;
 
   await fetch(`${BASE}/api/toggle-agent`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+   headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ status: newStatus })
   });
 
@@ -176,7 +180,9 @@ async function toggleAgent() {
 
 async function loadDashboard(range = "24h") {
   try {
-    const res = await fetch(`${BASE}/api/dashboard?range=${range}`);
+   const res = await fetch(`${BASE}/api/dashboard?range=${range}`, {
+  headers: authHeaders()
+});
     const data = await res.json();
     if (!data.success) return;
 
@@ -263,7 +269,9 @@ function setChatFilter(filter, button) {
 
 async function loadChats() {
   try {
-    const res = await fetch(`${BASE}/api/chats`);
+   const res = await fetch(`${BASE}/api/chats`, {
+  headers: authHeaders()
+});
     const data = await res.json();
     if (!data.success) return;
 
