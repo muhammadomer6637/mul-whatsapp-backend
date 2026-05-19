@@ -1308,6 +1308,106 @@ app.post("/api/agents", authenticateAgent, requireAdmin, async (req, res) => {
   }
 });
 
+// =========================
+// CALLBACK APIs
+// =========================
+
+// GET CALLBACK REQUESTS
+app.get("/api/callbacks", authenticateAgent, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        cb.id,
+        cb.phone,
+        cb.name,
+        cb.program,
+        cb.status,
+        cb.notes,
+        cb.assigned_call_agent_id,
+        cb.next_followup_at,
+        cb.created_at,
+        cb.updated_at,
+        a.name AS assigned_call_agent
+      FROM callback_requests cb
+      LEFT JOIN agents a ON a.id = cb.assigned_call_agent_id
+      ORDER BY
+        CASE
+          WHEN cb.status = 'pending' THEN 0
+          WHEN cb.status = 'follow_up_required' THEN 1
+          WHEN cb.status = 'not_responded' THEN 2
+          WHEN cb.status = 'called' THEN 3
+          WHEN cb.status = 'converted' THEN 4
+          ELSE 5
+        END,
+        cb.updated_at DESC
+    `);
+
+    return res.json({
+      success: true,
+      callbacks: result.rows
+    });
+  } catch (error) {
+    console.error("GET /api/callbacks error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch callback requests"
+    });
+  }
+});
+
+// UPDATE CALLBACK REQUEST
+app.put("/api/callbacks/:id", authenticateAgent, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      status,
+      notes,
+      next_followup_at
+    } = req.body;
+
+    const result = await pool.query(
+      `
+      UPDATE callback_requests
+      SET
+        status = COALESCE($1, status),
+        notes = COALESCE($2, notes),
+        next_followup_at = COALESCE($3, next_followup_at),
+        assigned_call_agent_id = COALESCE(assigned_call_agent_id, $4),
+        updated_at = NOW()
+      WHERE id = $5
+      RETURNING *
+      `,
+      [
+        status ?? null,
+        notes ?? null,
+        next_followup_at ?? null,
+        req.agent.id,
+        id
+      ]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        error: "Callback request not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      callback: result.rows[0]
+    });
+  } catch (error) {
+    console.error("PUT /api/callbacks/:id error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update callback request"
+    });
+  }
+});
+
 app.get("/", (req, res) => {
   res.send("MUL WhatsApp Backend Running 🚀");
 });
