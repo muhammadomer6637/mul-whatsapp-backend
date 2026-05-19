@@ -1047,3 +1047,16 @@ function applyCustomRange() {
 function exportDashboardData() {
   alert("Export started...");
 }
+
+// =========================
+// LOGOUT
+// =========================
+
+function logoutAgent() {
+  localStorage.removeItem("mul_nexus_token");
+
+  authToken = null;
+  currentAgent = null;
+
+  location.reload();
+}
