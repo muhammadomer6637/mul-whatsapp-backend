@@ -1589,6 +1589,35 @@ app.post("/webhook", async (req, res) => {
     }
     const lowerText = text?.toLowerCase();
 
+    const currentChatForCallback = await pool.query(
+  `
+  SELECT status, followup_sent
+  FROM chats
+  WHERE phone = $1
+  LIMIT 1
+  `,
+  [from]
+);
+
+const chatForCallback = currentChatForCallback.rows[0];
+
+if (
+  chatForCallback?.status === "agent_waiting" &&
+  lowerText === "2"
+) {
+  await createCallbackRequest(from);
+
+  await sendTextMessage(
+    from,
+    `Thank you. Your callback request has been received.
+
+Our admissions support team will contact you soon.`,
+    "callback_requested"
+  );
+
+  return res.sendStatus(200);
+}
+
 // =========================
 // FOLLOW-UP RESPONSE HANDLING
 // =========================
