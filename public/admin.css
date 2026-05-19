@@ -1590,3 +1590,70 @@ body {
   font-size: 14px;
   min-height: 18px;
 }
+
+/* =========================
+   AGENT MANAGEMENT
+========================= */
+
+.agent-create-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.agent-create-form input,
+.agent-create-form select {
+  background: #111c31;
+  border: 1px solid rgba(255,255,255,0.06);
+  color: #fff;
+  padding: 12px 14px;
+  border-radius: 12px;
+  outline: none;
+}
+
+.agent-create-form input:focus,
+.agent-create-form select:focus {
+  border-color: #2563eb;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+.role-badge {
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.role-admin {
+  background: rgba(239,68,68,0.15);
+  color: #ef4444;
+}
+
+.role-chat_agent {
+  background: rgba(37,99,235,0.15);
+  color: #60a5fa;
+}
+
+.role-call_agent {
+  background: rgba(16,185,129,0.15);
+  color: #34d399;
+}
+
+.status-active {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.status-inactive {
+  color: #ef4444;
+  font-weight: 600;
+}
