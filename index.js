@@ -1059,6 +1059,137 @@ app.get("/api/me", authenticateAgent, async (req, res) => {
   }
 });
 
+// =========================
+// AGENT MANAGEMENT APIs
+// =========================
+
+// GET ALL AGENTS
+app.get("/api/agents", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        id,
+        name,
+        username,
+        role,
+        active,
+        can_view_dashboard,
+        can_view_all_chats,
+        can_create_agents,
+        can_export_data,
+        created_at
+      FROM agents
+      ORDER BY id ASC
+    `);
+
+    return res.json({
+      success: true,
+      agents: result.rows
+    });
+
+  } catch (error) {
+    console.error("GET /api/agents error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch agents"
+    });
+  }
+});
+
+// CREATE AGENT
+app.post("/api/agents", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const {
+      name,
+      username,
+      password,
+      role,
+      can_view_dashboard
+    } = req.body;
+
+    if (!name || !username || !password) {
+      return res.status(400).json({
+        success: false,
+        error: "Name, username and password are required"
+      });
+    }
+
+    const existing = await pool.query(
+      `
+      SELECT id
+      FROM agents
+      WHERE username = $1
+      LIMIT 1
+      `,
+      [username]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Username already exists"
+      });
+    }
+
+    const password_hash = await bcrypt.hash(password, 10);
+
+    const result = await pool.query(
+      `
+      INSERT INTO agents (
+        name,
+        username,
+        password_hash,
+        role,
+        active,
+        can_view_dashboard,
+        can_view_all_chats,
+        can_create_agents,
+        can_export_data
+      )
+      VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        true,
+        $5,
+        true,
+        false,
+        false
+      )
+      RETURNING
+        id,
+        name,
+        username,
+        role,
+        active,
+        can_view_dashboard
+      `,
+      [
+        name,
+        username,
+        password_hash,
+        role || "chat_agent",
+        !!can_view_dashboard
+      ]
+    );
+
+    return res.json({
+      success: true,
+      agent: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error("POST /api/agents error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to create agent"
+    });
+  }
+});
+
 app.get("/", (req, res) => {
   res.send("MUL WhatsApp Backend Running 🚀");
 });
