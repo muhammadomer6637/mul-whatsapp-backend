@@ -794,18 +794,26 @@ async function loadAgents() {
           </span>
         </td>
 
-        <td>
-          <button
-            class="ghost-btn"
-            onclick="toggleAgentStatus(${agent.id}, ${agent.active})"
-          >
-            ${
-              agent.active
-                ? "Disable"
-                : "Enable"
-            }
-          </button>
-        </td>
+     <td>
+  <button class="ghost-btn" onclick="editAgent(${agent.id}, '${escapeHtml(agent.name)}', '${agent.role}', ${agent.can_view_dashboard})">
+    Edit
+  </button>
+
+  <button class="ghost-btn" onclick="resetAgentPassword(${agent.id})">
+    Password
+  </button>
+
+  <button
+    class="ghost-btn"
+    onclick="toggleAgentStatus(${agent.id}, ${agent.active})"
+  >
+    ${
+      agent.active
+        ? "Disable"
+        : "Enable"
+    }
+  </button>
+</td>
       </tr>
     `).join("");
 
