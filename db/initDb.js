@@ -129,7 +129,16 @@ await pool.query(`
       ALTER TABLE chats
       ADD COLUMN IF NOT EXISTS callback_requested_at TIMESTAMP;
     `);
+await pool.query(`
+  ALTER TABLE chats
+  ADD COLUMN IF NOT EXISTS callback_offer_last_sent_at TIMESTAMP;
+`);
 
+await pool.query(`
+  ALTER TABLE chats
+  ADD COLUMN IF NOT EXISTS callback_offer_count INTEGER DEFAULT 0;
+`);
+    
     // Safe foreign key for assigned agent
     try {
       await pool.query(`
