@@ -1097,6 +1097,77 @@ app.get("/api/agents", authenticateAgent, requireAdmin, async (req, res) => {
   }
 });
 
+// UPDATE AGENT
+app.put("/api/agents/:id", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const {
+      name,
+      role,
+      active,
+      can_view_dashboard,
+      can_view_all_chats,
+      can_create_agents,
+      can_export_data
+    } = req.body;
+
+    const result = await pool.query(
+      `
+      UPDATE agents
+      SET
+        name = COALESCE($1, name),
+        role = COALESCE($2, role),
+        active = COALESCE($3, active),
+        can_view_dashboard = COALESCE($4, can_view_dashboard),
+        can_view_all_chats = COALESCE($5, can_view_all_chats),
+        can_create_agents = COALESCE($6, can_create_agents),
+        can_export_data = COALESCE($7, can_export_data)
+      WHERE id = $8
+      RETURNING
+        id,
+        name,
+        username,
+        role,
+        active,
+        can_view_dashboard,
+        can_view_all_chats,
+        can_create_agents,
+        can_export_data
+      `,
+      [
+        name ?? null,
+        role ?? null,
+        active ?? null,
+        can_view_dashboard ?? null,
+        can_view_all_chats ?? null,
+        can_create_agents ?? null,
+        can_export_data ?? null,
+        id
+      ]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        error: "Agent not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      agent: result.rows[0]
+    });
+  } catch (error) {
+    console.error("PUT /api/agents/:id error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update agent"
+    });
+  }
+});
+
 // CREATE AGENT
 app.post("/api/agents", authenticateAgent, requireAdmin, async (req, res) => {
   try {
