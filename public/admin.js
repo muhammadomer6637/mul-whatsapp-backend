@@ -915,6 +915,109 @@ async function toggleAgentStatus(id, currentStatus) {
   }
 }
 
+async function editAgent(id) {
+  const agent = (await getAgentById(id));
+
+  if (!agent) {
+    alert("Agent not found");
+    return;
+  }
+
+  const newName = prompt("Enter agent name:", agent.name);
+  if (!newName) return;
+
+  const newRole = prompt(
+    "Enter role: admin, chat_agent, call_agent",
+    agent.role
+  );
+  if (!newRole) return;
+
+  const dashboardAccess = confirm(
+    "Allow dashboard access for this agent?"
+  );
+
+  try {
+    const res = await fetch(`${BASE}/api/agents/${id}`, {
+      method: "PUT",
+      headers: authHeaders({
+        "Content-Type": "application/json"
+      }),
+      body: JSON.stringify({
+        name: newName,
+        role: newRole,
+        can_view_dashboard: dashboardAccess
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "Failed to update agent");
+      return;
+    }
+
+    alert("Agent updated successfully");
+    loadAgents();
+
+  } catch (error) {
+    console.error("Edit agent error:", error);
+    alert("Failed to update agent");
+  }
+}
+
+async function resetAgentPassword(id) {
+  const newPassword = prompt("Enter new password:");
+
+  if (!newPassword) return;
+
+  if (newPassword.length < 6) {
+    alert("Password must be at least 6 characters");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${BASE}/api/agents/${id}/password`, {
+      method: "PUT",
+      headers: authHeaders({
+        "Content-Type": "application/json"
+      }),
+      body: JSON.stringify({
+        password: newPassword
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "Failed to reset password");
+      return;
+    }
+
+    alert("Password reset successfully");
+
+  } catch (error) {
+    console.error("Password reset error:", error);
+    alert("Failed to reset password");
+  }
+}
+
+async function getAgentById(id) {
+  try {
+    const res = await fetch(`${BASE}/api/agents`, {
+      headers: authHeaders()
+    });
+
+    const data = await res.json();
+
+    if (!data.success) return null;
+
+    return data.agents.find(agent => Number(agent.id) === Number(id));
+  } catch (error) {
+    console.error("Get agent error:", error);
+    return null;
+  }
+}
+
 function formatStatus(status) {
   if (!status) return "Unknown";
   if (status === "agent_waiting") return "Agent Waiting";
