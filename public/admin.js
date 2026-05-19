@@ -794,22 +794,14 @@ async function loadAgents() {
           </span>
         </td>
 
-     <td>
-  <button class="ghost-btn" onclick="editAgent(${agent.id}, '${escapeHtml(agent.name)}', '${agent.role}', ${agent.can_view_dashboard})">
+    <td>
+  <button class="ghost-btn" onclick="editAgent(${agent.id})">
     Edit
   </button>
 
   <button class="ghost-btn" onclick="resetAgentPassword(${agent.id})">
     Password
   </button>
-
-<button class="ghost-btn" onclick="editAgent(${agent.id})">
-  Edit
-</button>
-
-<button class="ghost-btn" onclick="resetAgentPassword(${agent.id})">
-  Password
-</button>
 
   <button
     class="ghost-btn"
