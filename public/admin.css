@@ -1657,3 +1657,17 @@ body {
   color: #ef4444;
   font-weight: 600;
 }
+
+.danger-btn {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  border: none;
+  padding: 12px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.danger-btn:hover {
+  opacity: 0.9;
+}
