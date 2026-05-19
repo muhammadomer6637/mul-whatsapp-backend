@@ -979,6 +979,61 @@ async function checkPendingFollowups() {
   }
 }
 
+async function checkCallbackOffers() {
+  try {
+
+    const result = await pool.query(`
+      SELECT phone
+      FROM chats
+      WHERE
+        status = 'agent_waiting'
+
+        AND COALESCE(callback_requested, false) = false
+
+        AND (
+          callback_offer_last_sent_at IS NULL
+          OR callback_offer_last_sent_at <= NOW() - INTERVAL '10 minutes'
+        )
+
+      LIMIT 20
+    `);
+
+    for (const row of result.rows) {
+
+      const message = `Our admissions representatives are currently assisting other students.
+
+Please choose an option:
+
+1. Continue waiting for live agent
+2. Request a callback from admissions team`;
+
+      await sendTextMessage(
+        row.phone,
+        message,
+        "agent_waiting"
+      );
+
+      await pool.query(
+        `
+        UPDATE chats
+        SET
+          callback_offer_last_sent_at = NOW(),
+          callback_offer_count = COALESCE(callback_offer_count, 0) + 1,
+          updated_at = NOW()
+        WHERE phone = $1
+        `,
+        [row.phone]
+      );
+    }
+
+  } catch (error) {
+    console.error(
+      "checkCallbackOffers error:",
+      error.message
+    );
+  }
+}
+
 // =========================
 // ROUTES
 // =========================
