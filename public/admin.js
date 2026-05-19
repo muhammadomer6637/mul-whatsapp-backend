@@ -120,15 +120,21 @@ function showSection(id, btn = null) {
   const subtitle = document.getElementById("pageSubtitle");
   const topbar = document.getElementById("topbar");
 
-  if (id === "dashboard") {
-    topbar.classList.remove("agent-mode");
-    title.textContent = "Dashboard";
-    subtitle.textContent = "Admissions insights, unread activity, and lead intelligence";
-    loadDashboard(currentRange);
-  } else {
-    topbar.classList.add("agent-mode");
-    loadChats();
-  }
+if (id === "dashboard") {
+  topbar.classList.remove("agent-mode");
+  title.textContent = "Dashboard";
+  subtitle.textContent = "Admissions insights, unread activity, and lead intelligence";
+  loadDashboard(currentRange);
+} else if (id === "agent") {
+  topbar.classList.add("agent-mode");
+  title.textContent = "Agent Panel";
+  subtitle.textContent = "Live WhatsApp conversations and admissions support";
+  loadChats();
+} else if (id === "agents") {
+  topbar.classList.remove("agent-mode");
+  title.textContent = "Agent Management";
+  subtitle.textContent = "Create, manage, and control support team access";
+  loadAgents();
 }
 
 function refreshCurrentSection() {
