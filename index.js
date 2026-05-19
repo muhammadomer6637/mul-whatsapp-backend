@@ -1168,6 +1168,53 @@ app.put("/api/agents/:id", authenticateAgent, requireAdmin, async (req, res) => 
   }
 });
 
+// RESET AGENT PASSWORD
+app.put("/api/agents/:id/password", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { password } = req.body;
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: "Password must be at least 6 characters"
+      });
+    }
+
+    const password_hash = await bcrypt.hash(password, 10);
+
+    const result = await pool.query(
+      `
+      UPDATE agents
+      SET password_hash = $1
+      WHERE id = $2
+      RETURNING id, name, username, role
+      `,
+      [password_hash, id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        error: "Agent not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      agent: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error("PUT /api/agents/:id/password error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to reset password"
+    });
+  }
+});
+
 // CREATE AGENT
 app.post("/api/agents", authenticateAgent, requireAdmin, async (req, res) => {
   try {
