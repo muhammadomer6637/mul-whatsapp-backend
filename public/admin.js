@@ -693,6 +693,161 @@ async function switchToBot() {
   await openChat(selectedPhone, false);
 }
 
+// =========================
+// AGENT MANAGEMENT
+// =========================
+
+async function loadAgents() {
+  try {
+    const res = await fetch(`${BASE}/api/agents`, {
+      headers: authHeaders()
+    });
+
+    const data = await res.json();
+
+    if (!data.success) return;
+
+    const tbody = document.getElementById("agentsTableBody");
+
+    tbody.innerHTML = data.agents.map(agent => `
+      <tr>
+        <td>${escapeHtml(agent.name)}</td>
+
+        <td>${escapeHtml(agent.username)}</td>
+
+        <td>
+          <span class="role-badge role-${agent.role}">
+            ${escapeHtml(agent.role)}
+          </span>
+        </td>
+
+        <td>
+          ${
+            agent.can_view_dashboard
+              ? "✅ Yes"
+              : "❌ No"
+          }
+        </td>
+
+        <td>
+          <span class="${
+            agent.active
+              ? "status-active"
+              : "status-inactive"
+          }">
+            ${
+              agent.active
+                ? "Active"
+                : "Inactive"
+            }
+          </span>
+        </td>
+
+        <td>
+          <button
+            class="ghost-btn"
+            onclick="toggleAgentStatus(${agent.id}, ${agent.active})"
+          >
+            ${
+              agent.active
+                ? "Disable"
+                : "Enable"
+            }
+          </button>
+        </td>
+      </tr>
+    `).join("");
+
+  } catch (error) {
+    console.error("Load agents error:", error);
+  }
+}
+
+async function createAgent() {
+  const name = document.getElementById("newAgentName").value.trim();
+
+  const username = document.getElementById("newAgentUsername").value.trim();
+
+  const password = document.getElementById("newAgentPassword").value.trim();
+
+  const role = document.getElementById("newAgentRole").value;
+
+  const can_view_dashboard =
+    document.getElementById("newAgentDashboardAccess").checked;
+
+  if (!name || !username || !password) {
+    alert("Please fill all required fields");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${BASE}/api/agents`, {
+      method: "POST",
+
+      headers: authHeaders({
+        "Content-Type": "application/json"
+      }),
+
+      body: JSON.stringify({
+        name,
+        username,
+        password,
+        role,
+        can_view_dashboard
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "Failed to create agent");
+      return;
+    }
+
+    alert("Agent created successfully");
+
+    document.getElementById("newAgentName").value = "";
+    document.getElementById("newAgentUsername").value = "";
+    document.getElementById("newAgentPassword").value = "";
+    document.getElementById("newAgentDashboardAccess").checked = false;
+
+    loadAgents();
+
+  } catch (error) {
+    console.error("Create agent error:", error);
+
+    alert("Failed to create agent");
+  }
+}
+
+async function toggleAgentStatus(id, currentStatus) {
+  try {
+    const res = await fetch(`${BASE}/api/agents/${id}`, {
+      method: "PUT",
+
+      headers: authHeaders({
+        "Content-Type": "application/json"
+      }),
+
+      body: JSON.stringify({
+        active: !currentStatus
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "Failed to update agent");
+      return;
+    }
+
+    loadAgents();
+
+  } catch (error) {
+    console.error("Toggle agent status error:", error);
+  }
+}
+
 function formatStatus(status) {
   if (!status) return "Unknown";
   if (status === "agent_waiting") return "Agent Waiting";
