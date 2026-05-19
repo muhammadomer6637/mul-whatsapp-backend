@@ -803,6 +803,14 @@ async function loadAgents() {
     Password
   </button>
 
+<button class="ghost-btn" onclick="editAgent(${agent.id})">
+  Edit
+</button>
+
+<button class="ghost-btn" onclick="resetAgentPassword(${agent.id})">
+  Password
+</button>
+
   <button
     class="ghost-btn"
     onclick="toggleAgentStatus(${agent.id}, ${agent.active})"
