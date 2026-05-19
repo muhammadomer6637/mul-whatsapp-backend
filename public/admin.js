@@ -76,16 +76,60 @@ async function checkAuth() {
       return;
     }
 
-    currentAgent = data.agent;
-    document.getElementById("loginOverlay").style.display = "none";
+   currentAgent = data.agent;
+document.getElementById("loginOverlay").style.display = "none";
 
-    loadDashboard();
-    loadChats();
-    loadAgentStatus();
+applyRolePermissions();
+
+if (currentAgent.role === "admin" || currentAgent.can_view_dashboard) {
+  loadDashboard();
+} else {
+  showSection("agent");
+}
+
+loadChats();
+
+if (currentAgent.role === "admin") {
+  loadAgentStatus();
+}
 
   } catch (error) {
     console.error("Auth check error:", error);
     document.getElementById("loginOverlay").style.display = "flex";
+  }
+}
+
+function applyRolePermissions() {
+  if (!currentAgent) return;
+
+  const agentManagementBtn = document.querySelector(
+    '.nav-btn[data-section="agents"]'
+  );
+
+  const dashboardBtn = document.querySelector(
+    '.nav-btn[data-section="dashboard"]'
+  );
+
+  const agentStatusWrap = document.querySelector(
+    ".agent-status-wrap"
+  );
+
+  if (currentAgent.role !== "admin") {
+    if (agentManagementBtn) agentManagementBtn.style.display = "none";
+    if (agentStatusWrap) agentStatusWrap.style.display = "none";
+  } else {
+    if (agentManagementBtn) agentManagementBtn.style.display = "flex";
+    if (agentStatusWrap) agentStatusWrap.style.display = "flex";
+  }
+
+  if (
+    currentAgent.role !== "admin" &&
+    currentAgent.can_view_dashboard !== true
+  ) {
+    if (dashboardBtn) dashboardBtn.style.display = "none";
+    showSection("agent");
+  } else {
+    if (dashboardBtn) dashboardBtn.style.display = "flex";
   }
 }
 
