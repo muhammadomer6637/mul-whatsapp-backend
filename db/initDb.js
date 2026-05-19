@@ -66,6 +66,29 @@ module.exports = async function initDb() {
       );
     `);
 
+// CALLBACK REQUESTS TABLE
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS callback_requests (
+    id SERIAL PRIMARY KEY,
+
+    phone VARCHAR(30) NOT NULL,
+
+    name TEXT,
+    program TEXT,
+
+    status VARCHAR(30) DEFAULT 'pending',
+
+    notes TEXT,
+
+    assigned_call_agent_id INTEGER,
+
+    next_followup_at TIMESTAMP,
+
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+  );
+`);
+    
     // Safe ALTERs for existing DB
     await pool.query(`
       ALTER TABLE chats
