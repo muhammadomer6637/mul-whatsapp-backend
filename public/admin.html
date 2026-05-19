@@ -61,6 +61,10 @@
             <span class="nav-icon">◉</span>
             <span>Agent Panel</span>
           </button>
+          <button class="nav-btn admin-only" data-section="agents" onclick="showSection('agents', this)">
+  <span class="nav-icon">◎</span>
+  <span>Agent Management</span>
+</button>
         </nav>
       </div>
 
@@ -369,6 +373,54 @@
           </div>
         </div>
       </section>
+<section id="agents" class="section hidden">
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <h3>Agent Management</h3>
+        <p>Create and manage admission support agents</p>
+      </div>
+    </div>
+
+    <div class="agent-create-form">
+      <input type="text" id="newAgentName" placeholder="Agent Name" />
+      <input type="text" id="newAgentUsername" placeholder="Username" />
+      <input type="password" id="newAgentPassword" placeholder="Password" />
+
+      <select id="newAgentRole">
+        <option value="chat_agent">Chat Agent</option>
+        <option value="call_agent">Call Agent</option>
+        <option value="admin">Admin</option>
+      </select>
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="newAgentDashboardAccess" />
+        Dashboard Access
+      </label>
+
+      <button class="primary-btn" onclick="createAgent()">
+        Create Agent
+      </button>
+    </div>
+
+    <div class="table-wrap" style="margin-top:20px;">
+      <table class="styled-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Username</th>
+            <th>Role</th>
+            <th>Dashboard</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="agentsTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+      
     </main>
   </div>
 
