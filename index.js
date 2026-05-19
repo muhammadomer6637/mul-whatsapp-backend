@@ -281,6 +281,60 @@ async function getUserByPhone(phone) {
   }
 }
 
+async function createCallbackRequest(phone) {
+  try {
+    const userResult = await pool.query(
+      `
+      SELECT name, program
+      FROM users
+      WHERE phone = $1
+      LIMIT 1
+      `,
+      [phone]
+    );
+
+    const user = userResult.rows[0] || {};
+
+    await pool.query(
+      `
+      INSERT INTO callback_requests (
+        phone,
+        name,
+        program,
+        status,
+        created_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, 'pending', NOW(), NOW())
+      `,
+      [
+        phone,
+        user.name || null,
+        user.program || null
+      ]
+    );
+
+    await pool.query(
+      `
+      UPDATE chats
+      SET
+        callback_requested = true,
+        callback_status = 'pending',
+        callback_requested_at = NOW(),
+        status = 'callback_requested',
+        updated_at = NOW()
+      WHERE phone = $1
+      `,
+      [phone]
+    );
+
+    notifyChatUpdated(phone);
+
+  } catch (error) {
+    console.error("createCallbackRequest error:", error.message);
+  }
+}
+
 async function saveMessage({
   phone,
   sender,
