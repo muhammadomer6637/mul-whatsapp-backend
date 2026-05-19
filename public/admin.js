@@ -942,43 +942,42 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-loadDashboard();
-loadChats();
-loadAgentStatus();
+  checkAuth();
 
   // =========================
-// REAL-TIME SSE LISTENER
-// =========================
-const eventSource = new EventSource(`${BASE}/events`);
+  // REAL-TIME SSE LISTENER
+  // =========================
+  const eventSource = new EventSource(`${BASE}/events`);
 
-eventSource.onmessage = function (event) {
-  console.log("SSE message:", event.data);
-};
+  eventSource.onmessage = function (event) {
+    console.log("SSE message:", event.data);
+  };
 
-eventSource.addEventListener("chat_updated", function (event) {
-  const data = JSON.parse(event.data);
+  eventSource.addEventListener("chat_updated", function (event) {
+    const data = JSON.parse(event.data);
 
-  console.log("Chat updated:", data);
-  highlightedPhone = data.phone;
+    console.log("Chat updated:", data);
+    highlightedPhone = data.phone;
 
-// 🔄 Chat list refresh
-loadChats();
-
-// 🔄 Sirf current open chat refresh karo, scroll preserve ke sath
-if (selectedPhone && selectedPhone === data.phone) {
-  openChat(selectedPhone, false, true);
-}
-});
-
-setInterval(() => {
-  if (currentSection === "dashboard") {
-    loadDashboard(currentRange);
-  } else {
     loadChats();
-  }
-}, 15000);
 
+    if (selectedPhone && selectedPhone === data.phone) {
+      openChat(selectedPhone, false, true);
+    }
   });
+
+  setInterval(() => {
+    if (!authToken) return;
+
+    if (currentSection === "dashboard") {
+      loadDashboard(currentRange);
+    } else if (currentSection === "agent") {
+      loadChats();
+    } else if (currentSection === "agents") {
+      loadAgents();
+    }
+  }, 15000);
+});
 
 function applyCustomRange() {
   const start = document.getElementById("startDate")?.value;
