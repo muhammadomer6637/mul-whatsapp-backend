@@ -136,6 +136,7 @@ if (id === "dashboard") {
   subtitle.textContent = "Create, manage, and control support team access";
   loadAgents();
 }
+}
 
 function refreshCurrentSection() {
   if (currentSection === "dashboard") {
