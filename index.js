@@ -2782,6 +2782,8 @@ app.listen(3000, async () => {
   // 🔥 START 24H FOLLOW-UP CHECKER
   setInterval(checkPendingFollowups, 10 * 60 * 1000); // every 10 minutes
   setInterval(checkCallbackOffers, 10 * 60 * 1000);
+  console.log("10m callback offer checker started");
+  checkCallbackOffers();
   console.log("✅ 24h follow-up checker started");
   
 });
