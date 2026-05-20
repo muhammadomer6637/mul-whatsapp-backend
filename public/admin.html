@@ -434,6 +434,43 @@
     </div>
   </div>
 </section>
+
+      <section id="callbacks" class="section hidden">
+
+  <div class="page-header">
+    <div>
+      <h1>Callback Requests</h1>
+      <p>
+        Manage pending callback leads and follow-ups
+      </p>
+    </div>
+
+    <button
+      class="refresh-btn"
+      onclick="loadCallbacks()"
+    >
+      Refresh
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="table-wrap">
+      <table class="styled-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Program</th>
+            <th>Status</th>
+            <th>Notes</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="callbackTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
       
     </main>
   </div>
