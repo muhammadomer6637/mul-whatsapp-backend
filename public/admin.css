@@ -1692,3 +1692,34 @@ body {
   cursor: pointer;
   font-weight: 700;
 }
+/* =========================
+   CALLBACK REQUESTS
+========================= */
+
+.callback-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: #111827;
+  color: white;
+  outline: none;
+}
+
+.callback-notes {
+  width: 100%;
+  min-width: 220px;
+  min-height: 80px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: #111827;
+  color: white;
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+}
+
+.callback-notes::placeholder {
+  color: rgba(255,255,255,0.4);
+}
