@@ -984,6 +984,18 @@ async function checkCallbackOffers() {
 
     console.log("Running callback offer checker...");
 
+    const debugRows = await pool.query(`
+  SELECT
+    phone,
+    status,
+    callback_requested,
+    callback_offer_last_sent_at
+  FROM chats
+  WHERE phone = '923008867613'
+`);
+
+console.log("Callback debug row:", debugRows.rows);
+
     const result = await pool.query(`
       SELECT phone
       FROM chats
