@@ -981,8 +981,10 @@ async function checkPendingFollowups() {
 
 async function checkCallbackOffers() {
   try {
-
+console.log("Running callback offer checker...");
+    
     const result = await pool.query(`
+    console.log("Callback offer chats:", result.rows.length);
       SELECT phone
       FROM chats
       WHERE
