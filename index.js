@@ -981,6 +981,7 @@ async function checkPendingFollowups() {
 
 async function checkCallbackOffers() {
   try {
+
     console.log("Running callback offer checker...");
 
     const result = await pool.query(`
@@ -996,9 +997,13 @@ async function checkCallbackOffers() {
       LIMIT 20
     `);
 
-    console.log("Callback offer chats:", result.rows.length);
+    console.log(
+      "Callback offer chats:",
+      result.rows.length
+    );
 
     for (const row of result.rows) {
+
       const message = `Our admissions representatives are currently assisting other students.
 
 Please choose an option:
@@ -1006,7 +1011,11 @@ Please choose an option:
 1. Continue waiting for live agent
 2. Request a callback from admissions team`;
 
-      await sendTextMessage(row.phone, message, "agent_waiting");
+      await sendTextMessage(
+        row.phone,
+        message,
+        "agent_waiting"
+      );
 
       await pool.query(
         `
@@ -1020,10 +1029,13 @@ Please choose an option:
         [row.phone]
       );
     }
+
   } catch (error) {
-    console.error("checkCallbackOffers error:", error.message);
+    console.error(
+      "checkCallbackOffers error:",
+      error.message
+    );
   }
-}
 }
 
 // =========================
