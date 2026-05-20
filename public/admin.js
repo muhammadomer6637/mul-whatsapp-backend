@@ -1010,6 +1010,97 @@ async function getAgentById(id) {
   }
 }
 
+// =========================
+// CALLBACK REQUESTS
+// =========================
+
+async function loadCallbacks() {
+  try {
+    const res = await fetch(`${BASE}/api/callbacks`, {
+      headers: authHeaders()
+    });
+
+    const data = await res.json();
+
+    if (!data.success) return;
+
+    const tbody = document.getElementById("callbackTableBody");
+
+    tbody.innerHTML = data.callbacks.map(item => `
+      <tr>
+        <td>${escapeHtml(item.name || "-")}</td>
+        <td>${escapeHtml(item.phone || "-")}</td>
+        <td>${escapeHtml(prettyProgramName(item.program || "-"))}</td>
+
+        <td>
+          <select
+            class="callback-select"
+            id="callbackStatus_${item.id}"
+          >
+            <option value="pending" ${item.status === "pending" ? "selected" : ""}>Pending</option>
+            <option value="called" ${item.status === "called" ? "selected" : ""}>Called</option>
+            <option value="not_responded" ${item.status === "not_responded" ? "selected" : ""}>Not Responded</option>
+            <option value="follow_up_required" ${item.status === "follow_up_required" ? "selected" : ""}>Follow-up Required</option>
+            <option value="converted" ${item.status === "converted" ? "selected" : ""}>Converted</option>
+          </select>
+        </td>
+
+        <td>
+          <textarea
+            class="callback-notes"
+            id="callbackNotes_${item.id}"
+            placeholder="Add call notes..."
+          >${escapeHtml(item.notes || "")}</textarea>
+        </td>
+
+        <td>
+          <button
+            class="primary-btn"
+            onclick="updateCallback(${item.id})"
+          >
+            Save
+          </button>
+        </td>
+      </tr>
+    `).join("");
+
+  } catch (error) {
+    console.error("Load callbacks error:", error);
+  }
+}
+
+async function updateCallback(id) {
+  const status = document.getElementById(`callbackStatus_${id}`).value;
+  const notes = document.getElementById(`callbackNotes_${id}`).value.trim();
+
+  try {
+    const res = await fetch(`${BASE}/api/callbacks/${id}`, {
+      method: "PUT",
+      headers: authHeaders({
+        "Content-Type": "application/json"
+      }),
+      body: JSON.stringify({
+        status,
+        notes
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "Failed to update callback");
+      return;
+    }
+
+    alert("Callback updated successfully");
+    loadCallbacks();
+
+  } catch (error) {
+    console.error("Update callback error:", error);
+    alert("Failed to update callback");
+  }
+}
+
 function formatStatus(status) {
   if (!status) return "Unknown";
   if (status === "agent_waiting") return "Agent Waiting";
