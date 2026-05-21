@@ -1003,17 +1003,14 @@ async function sendReplyButtons(to, bodyText, buttons, chatStatus = "active") {
 // =========================
 async function checkPendingFollowups() {
   try {
-const result = await pool.query(`
-  SELECT phone
-  FROM chats
-  WHERE
-    status = 'agent_waiting'
-    AND (
-      callback_offer_last_sent_at IS NULL
-      OR callback_offer_last_sent_at <= NOW() - INTERVAL '10 minutes'
-    )
-  LIMIT 20
-`);
+    const result = await pool.query(`
+      SELECT phone
+      FROM chats
+      WHERE status = 'agent_waiting'
+        AND followup_sent = false
+        AND updated_at <= NOW() - INTERVAL '22 hours'
+      LIMIT 20
+    `);
 
     for (const row of result.rows) {
       await sendFollowupMessage(row.phone);
@@ -1026,27 +1023,12 @@ const result = await pool.query(`
 
 async function checkCallbackOffers() {
   try {
-
     console.log("Running callback offer checker...");
-
-    const debugRows = await pool.query(`
-  SELECT
-    phone,
-    status,
-    callback_requested,
-    callback_offer_last_sent_at
-  FROM chats
-  WHERE phone = '923008867613'
-`);
-
-console.log("Callback debug row:", debugRows.rows);
 
     const result = await pool.query(`
       SELECT phone
       FROM chats
-      WHERE
-        status = 'agent_waiting'
-        AND COALESCE(callback_requested, false) = false
+      WHERE status = 'agent_waiting'
         AND (
           callback_offer_last_sent_at IS NULL
           OR callback_offer_last_sent_at <= NOW() - INTERVAL '10 minutes'
@@ -1055,19 +1037,9 @@ console.log("Callback debug row:", debugRows.rows);
     `);
 
     console.log("Callback offer chats:", result.rows.length);
-
-console.log(
-  "Callback phones:",
-  result.rows.map(x => x.phone)
-);
-
-    console.log(
-      "Callback offer chats:",
-      result.rows.length
-    );
+    console.log("Callback phones:", result.rows.map(x => x.phone));
 
     for (const row of result.rows) {
-
       const message = `Our admissions representatives are currently assisting other students.
 
 Please choose an option:
@@ -1075,11 +1047,7 @@ Please choose an option:
 1. Continue waiting for live agent
 2. Request a callback from admissions team`;
 
-      await sendTextMessage(
-        row.phone,
-        message,
-        "agent_waiting"
-      );
+      await sendTextMessage(row.phone, message, "agent_waiting");
 
       await pool.query(
         `
@@ -1095,13 +1063,9 @@ Please choose an option:
     }
 
   } catch (error) {
-    console.error(
-      "checkCallbackOffers error:",
-      error.message
-    );
+    console.error("checkCallbackOffers error:", error.message);
   }
 }
-
 // =========================
 // ROUTES
 // =========================
