@@ -194,7 +194,7 @@ if (id === "dashboard") {
   loadAgents();
 }
 
-  else if (id === "callbacks") {
+else if (id === "callbacks") {
   topbar.classList.remove("agent-mode");
 
   title.textContent = "Callback Center";
