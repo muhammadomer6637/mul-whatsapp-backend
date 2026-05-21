@@ -193,10 +193,15 @@ if (id === "dashboard") {
   subtitle.textContent = "Create, manage, and control support team access";
   loadAgents();
 }
+
   else if (id === "callbacks") {
   topbar.classList.remove("agent-mode");
-  title.textContent = "Callback Requests";
-  subtitle.textContent = "Manage callback leads, call outcomes, and follow-ups";
+
+  title.textContent = "Callback Center";
+
+  subtitle.textContent =
+    "Manage callback requests and follow-up activity";
+
   loadCallbacks();
 }
 }
