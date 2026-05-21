@@ -1185,6 +1185,84 @@ async function getAgentById(id) {
   }
 }
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formatStatus(status) {
+  if (!status) return "Unknown";
+  if (status === "agent_waiting") return "Agent Waiting";
+  if (status === "agent_active") return "Agent Active";
+  if (status === "active") return "Active";
+  if (status === "bot") return "Bot";
+  return status.replaceAll("_", " ");
+}
+
+function capitalize(text) {
+  if (!text) return "";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
+function titleCase(str) {
+  return String(str)
+    .split(" ")
+    .map(word => word ? word.charAt(0).toUpperCase() + word.slice(1) : "")
+    .join(" ");
+}
+
+function normalizeProgramKey(name) {
+  if (!name) return "";
+  const raw = String(name).trim().toLowerCase().replace(/\s+/g, " ");
+
+  const map = {
+    "bscs": "BS Computer Science",
+    "bs cs": "BS Computer Science",
+    "bs computer science": "BS Computer Science",
+    "bsse": "BS Software Engineering",
+    "bs se": "BS Software Engineering",
+    "bs software engineering": "BS Software Engineering",
+    "bba": "BBA",
+    "dpt": "Doctor of Physiotherapy",
+    "llb": "Bachelor of Laws (LLB)",
+    "m.phil education": "M.Phil Education",
+    "mphil education": "M.Phil Education",
+    "m.phil sociology": "M.Phil Sociology",
+    "mphil sociology": "M.Phil Sociology"
+  };
+
+  return map[raw] || titleCase(raw);
+}
+
+function prettyProgramName(name) {
+  return normalizeProgramKey(name);
+}
+
+function normalizeProgramsForDisplay(programs) {
+  const merged = {};
+
+  programs.forEach(item => {
+    const key = normalizeProgramKey(item.program);
+    if (!merged[key]) merged[key] = 0;
+    merged[key] += Number(item.inquiries || 0);
+  });
+
+  return Object.entries(merged)
+    .map(([program, inquiries]) => ({ program, inquiries }))
+    .sort((a, b) => b.inquiries - a.inquiries || a.program.localeCompare(b.program));
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   const input = document.getElementById("messageInput");
