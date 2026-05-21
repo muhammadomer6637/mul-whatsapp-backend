@@ -1186,6 +1186,17 @@ async function getAgentById(id) {
 }
 
 
+document.addEventListener("DOMContentLoaded", () => {
+  const input = document.getElementById("messageInput");
+
+  if (input) {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+  }
+
+  checkAuth();
+
   // =========================
   // REAL-TIME SSE LISTENER
   // =========================
@@ -1201,26 +1212,31 @@ async function getAgentById(id) {
     console.log("Chat updated:", data);
     highlightedPhone = data.phone;
 
-    loadChats();
+    if (
+      currentAgent &&
+      (currentAgent.role === "admin" || currentAgent.role === "chat_agent")
+    ) {
+      loadChats();
 
-    if (selectedPhone && selectedPhone === data.phone) {
-      openChat(selectedPhone, false, true);
+      if (selectedPhone && selectedPhone === data.phone) {
+        openChat(selectedPhone, false, true);
+      }
     }
   });
 
-setInterval(() => {
-  if (!authToken) return;
+  setInterval(() => {
+    if (!authToken) return;
 
-  if (currentSection === "dashboard") {
-    loadDashboard(currentRange);
-  } else if (currentSection === "agent") {
-    loadChats();
-  } else if (currentSection === "agents") {
-    loadAgents();
-  } else if (currentSection === "callbacks") {
-    loadCallbacks();
-  }
-}, 15000);
+    if (currentSection === "dashboard") {
+      loadDashboard(currentRange);
+    } else if (currentSection === "agent") {
+      loadChats();
+    } else if (currentSection === "agents") {
+      loadAgents();
+    } else if (currentSection === "callbacks") {
+      loadCallbacks();
+    }
+  }, 15000);
 });
 
 function applyCustomRange() {
