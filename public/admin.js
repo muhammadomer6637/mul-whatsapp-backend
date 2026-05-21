@@ -114,34 +114,35 @@ if (currentAgent.role === "admin") {
 function applyRolePermissions() {
   if (!currentAgent) return;
 
-  const agentManagementBtn = document.querySelector(
-    '.nav-btn[data-section="agents"]'
-  );
+  const dashboardBtn = document.querySelector('.nav-btn[data-section="dashboard"]');
+  const agentPanelBtn = document.querySelector('.nav-btn[data-section="agent"]');
+  const agentManagementBtn = document.querySelector('.nav-btn[data-section="agents"]');
+  const callbackBtn = document.querySelector('.nav-btn[data-section="callbacks"]');
+  const agentStatusWrap = document.querySelector(".agent-status-wrap");
 
-  const dashboardBtn = document.querySelector(
-    '.nav-btn[data-section="dashboard"]'
-  );
+  if (dashboardBtn) dashboardBtn.style.display = "none";
+  if (agentPanelBtn) agentPanelBtn.style.display = "none";
+  if (agentManagementBtn) agentManagementBtn.style.display = "none";
+  if (callbackBtn) callbackBtn.style.display = "none";
+  if (agentStatusWrap) agentStatusWrap.style.display = "none";
 
-  const agentStatusWrap = document.querySelector(
-    ".agent-status-wrap"
-  );
-
-  if (currentAgent.role !== "admin") {
-    if (agentManagementBtn) agentManagementBtn.style.display = "none";
-    if (agentStatusWrap) agentStatusWrap.style.display = "none";
-  } else {
+  if (currentAgent.role === "admin") {
+    if (dashboardBtn) dashboardBtn.style.display = "flex";
+    if (agentPanelBtn) agentPanelBtn.style.display = "flex";
     if (agentManagementBtn) agentManagementBtn.style.display = "flex";
+    if (callbackBtn) callbackBtn.style.display = "flex";
     if (agentStatusWrap) agentStatusWrap.style.display = "flex";
+    return;
   }
 
-  if (
-    currentAgent.role !== "admin" &&
-    currentAgent.can_view_dashboard !== true
-  ) {
-    if (dashboardBtn) dashboardBtn.style.display = "none";
-    showSection("agent");
-  } else {
-    if (dashboardBtn) dashboardBtn.style.display = "flex";
+  if (currentAgent.role === "chat_agent") {
+    if (agentPanelBtn) agentPanelBtn.style.display = "flex";
+    return;
+  }
+
+  if (currentAgent.role === "call_agent") {
+    if (callbackBtn) callbackBtn.style.display = "flex";
+    return;
   }
 }
 
