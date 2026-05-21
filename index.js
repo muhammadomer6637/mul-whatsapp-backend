@@ -1527,12 +1527,7 @@ app.put(
   async (req, res) => {
     try {
       const { id } = req.params;
-
-      const {
-        status,
-        notes,
-        next_followup_at
-      } = req.body;
+      const { status, notes, next_followup_at } = req.body;
 
       const allowedStatuses = [
         "pending",
@@ -1583,7 +1578,6 @@ app.put(
       });
     } catch (error) {
       console.error("PUT /api/callbacks/:id error:", error.message);
-
       return res.status(500).json({
         success: false,
         error: "Failed to update callback request"
