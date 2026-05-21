@@ -1208,20 +1208,19 @@ async function getAgentById(id) {
     }
   });
 
-  setInterval(() => {
-    if (!authToken) return;
+setInterval(() => {
+  if (!authToken) return;
 
-    if (currentSection === "dashboard") {
-      loadDashboard(currentRange);
-    } else if (currentSection === "agent") {
-      loadChats();
-    } else if (currentSection === "agents") {
-      loadAgents();
-    }
-    else if (currentSection === "callbacks") {
-  loadCallbacks();
-}
-  }, 15000);
+  if (currentSection === "dashboard") {
+    loadDashboard(currentRange);
+  } else if (currentSection === "agent") {
+    loadChats();
+  } else if (currentSection === "agents") {
+    loadAgents();
+  } else if (currentSection === "callbacks") {
+    loadCallbacks();
+  }
+}, 15000);
 });
 
 function applyCustomRange() {
