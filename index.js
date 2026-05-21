@@ -1443,6 +1443,8 @@ app.get("/api/callbacks", authenticateAgent, async (req, res) => {
         cb.next_followup_at,
         cb.created_at,
         cb.updated_at,
+        cb.request_count,
+cb.is_repeat,
         a.name AS assigned_call_agent
       FROM callback_requests cb
       LEFT JOIN agents a ON a.id = cb.assigned_call_agent_id
