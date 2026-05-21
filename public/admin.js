@@ -779,6 +779,101 @@ async function switchToBot() {
 // =========================
 // AGENT MANAGEMENT
 // =========================
+async function loadCallbacks() {
+  try {
+    const res = await fetch(`${BASE}/api/callbacks`, {
+      headers: authHeaders()
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      console.error("Callbacks load failed:", data.error);
+      return;
+    }
+
+    const wrap = document.getElementById("callbacksList");
+
+    if (!wrap) return;
+
+    const callbacks = data.callbacks || [];
+
+    if (!callbacks.length) {
+      wrap.innerHTML = `
+        <div class="empty-chat-state">
+          <div class="empty-chat-icon">📞</div>
+          <h3>No callback requests found</h3>
+          <p>Callback requests will appear here when students request a call.</p>
+        </div>
+      `;
+      return;
+    }
+
+    wrap.innerHTML = callbacks.map(cb => {
+      const repeatBadge =
+        Number(cb.request_count || 1) > 1
+          ? `<span class="repeat-badge">Again #${cb.request_count}</span>`
+          : "";
+
+      return `
+        <div class="callback-card">
+          <div class="callback-card-head">
+            <div>
+              <h3>${escapeHtml(cb.name || "Unknown Student")}</h3>
+              <p>${escapeHtml(cb.phone || "-")}</p>
+            </div>
+            ${repeatBadge}
+          </div>
+
+          <div class="callback-meta">
+            <div>
+              <span>Program</span>
+              <strong>${escapeHtml(prettyProgramName(cb.program || "-"))}</strong>
+            </div>
+            <div>
+              <span>Assigned</span>
+              <strong>${escapeHtml(cb.assigned_call_agent || "Unassigned")}</strong>
+            </div>
+            <div>
+              <span>Requested</span>
+              <strong>${formatDateTime(cb.created_at)}</strong>
+            </div>
+          </div>
+
+          <div class="callback-form">
+            <label>Status</label>
+            <select id="callbackStatus_${cb.id}">
+              <option value="pending" ${cb.status === "pending" ? "selected" : ""}>Pending</option>
+              <option value="called" ${cb.status === "called" ? "selected" : ""}>Called</option>
+              <option value="not_responded" ${cb.status === "not_responded" ? "selected" : ""}>Not Responded</option>
+              <option value="follow_up_required" ${cb.status === "follow_up_required" ? "selected" : ""}>Follow-up Required</option>
+              <option value="converted" ${cb.status === "converted" ? "selected" : ""}>Converted</option>
+            </select>
+
+            <label>Follow-up Date</label>
+            <input
+              type="datetime-local"
+              id="callbackFollowup_${cb.id}"
+              value="${cb.next_followup_at ? toDateTimeLocal(cb.next_followup_at) : ""}"
+            />
+
+            <label>Notes</label>
+            <textarea
+              id="callbackNotes_${cb.id}"
+              placeholder="Add call notes..."
+            >${escapeHtml(cb.notes || "")}</textarea>
+
+            <button class="primary-btn callback-save-btn" onclick="updateCallback(${cb.id})">
+              Save
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  } catch (error) {
+    console.error("loadCallbacks error:", error);
+  }
+}
 
 async function loadAgents() {
   try {
