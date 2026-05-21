@@ -1003,12 +1003,15 @@ async function sendReplyButtons(to, bodyText, buttons, chatStatus = "active") {
 // =========================
 async function checkPendingFollowups() {
   try {
- const result = await pool.query(`
+const result = await pool.query(`
   SELECT phone
   FROM chats
-  WHERE status = 'agent_waiting'
-    AND followup_sent = false
-    AND updated_at <= NOW() - INTERVAL '22 hours'
+  WHERE
+    status = 'agent_waiting'
+    AND (
+      callback_offer_last_sent_at IS NULL
+      OR callback_offer_last_sent_at <= NOW() - INTERVAL '10 minutes'
+    )
   LIMIT 20
 `);
 
