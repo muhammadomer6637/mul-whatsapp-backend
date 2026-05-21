@@ -794,84 +794,70 @@ async function loadCallbacks() {
       return;
     }
 
-    const wrap = document.getElementById("callbacksList");
+    const tbody = document.getElementById("callbackTableBody");
 
-    if (!wrap) return;
+    if (!tbody) return;
 
     const callbacks = data.callbacks || [];
 
     if (!callbacks.length) {
-      wrap.innerHTML = `
-        <div class="empty-chat-state">
-          <div class="empty-chat-icon">📞</div>
-          <h3>No callback requests found</h3>
-          <p>Callback requests will appear here when students request a call.</p>
-        </div>
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align:center; color:var(--muted); padding:24px;">
+            No callback requests found
+          </td>
+        </tr>
       `;
       return;
     }
 
-    wrap.innerHTML = callbacks.map(cb => {
-      const repeatBadge =
-        Number(cb.request_count || 1) > 1
-          ? `<span class="repeat-badge">Again #${cb.request_count}</span>`
-          : "";
+    tbody.innerHTML = callbacks.map(item => `
+      <tr>
+        <td>
+          ${escapeHtml(item.name || "-")}
+          ${
+            Number(item.request_count || 1) > 1
+              ? `<div class="repeat-badge">Again #${item.request_count}</div>`
+              : ""
+          }
+        </td>
 
-      return `
-        <div class="callback-card">
-          <div class="callback-card-head">
-            <div>
-              <h3>${escapeHtml(cb.name || "Unknown Student")}</h3>
-              <p>${escapeHtml(cb.phone || "-")}</p>
-            </div>
-            ${repeatBadge}
-          </div>
+        <td>${escapeHtml(item.phone || "-")}</td>
 
-          <div class="callback-meta">
-            <div>
-              <span>Program</span>
-              <strong>${escapeHtml(prettyProgramName(cb.program || "-"))}</strong>
-            </div>
-            <div>
-              <span>Assigned</span>
-              <strong>${escapeHtml(cb.assigned_call_agent || "Unassigned")}</strong>
-            </div>
-            <div>
-              <span>Requested</span>
-              <strong>${formatDateTime(cb.created_at)}</strong>
-            </div>
-          </div>
+        <td>${escapeHtml(prettyProgramName(item.program || "-"))}</td>
 
-          <div class="callback-form">
-            <label>Status</label>
-            <select id="callbackStatus_${cb.id}">
-              <option value="pending" ${cb.status === "pending" ? "selected" : ""}>Pending</option>
-              <option value="called" ${cb.status === "called" ? "selected" : ""}>Called</option>
-              <option value="not_responded" ${cb.status === "not_responded" ? "selected" : ""}>Not Responded</option>
-              <option value="follow_up_required" ${cb.status === "follow_up_required" ? "selected" : ""}>Follow-up Required</option>
-              <option value="converted" ${cb.status === "converted" ? "selected" : ""}>Converted</option>
-            </select>
+        <td>
+          <select
+            class="callback-select"
+            id="callbackStatus_${item.id}"
+          >
+            <option value="pending" ${item.status === "pending" ? "selected" : ""}>Pending</option>
+            <option value="called" ${item.status === "called" ? "selected" : ""}>Called</option>
+            <option value="not_responded" ${item.status === "not_responded" ? "selected" : ""}>Not Responded</option>
+            <option value="follow_up_required" ${item.status === "follow_up_required" ? "selected" : ""}>Follow-up Required</option>
+            <option value="converted" ${item.status === "converted" ? "selected" : ""}>Converted</option>
+          </select>
+        </td>
 
-            <label>Follow-up Date</label>
-            <input
-              type="datetime-local"
-              id="callbackFollowup_${cb.id}"
-              value="${cb.next_followup_at ? toDateTimeLocal(cb.next_followup_at) : ""}"
-            />
+        <td>
+          <textarea
+            class="callback-notes"
+            id="callbackNotes_${item.id}"
+            placeholder="Add call notes..."
+          >${escapeHtml(item.notes || "")}</textarea>
+        </td>
 
-            <label>Notes</label>
-            <textarea
-              id="callbackNotes_${cb.id}"
-              placeholder="Add call notes..."
-            >${escapeHtml(cb.notes || "")}</textarea>
+        <td>
+          <button
+            class="primary-btn"
+            onclick="updateCallback(${item.id})"
+          >
+            Save
+          </button>
+        </td>
+      </tr>
+    `).join("");
 
-            <button class="primary-btn callback-save-btn" onclick="updateCallback(${cb.id})">
-              Save
-            </button>
-          </div>
-        </div>
-      `;
-    }).join("");
   } catch (error) {
     console.error("loadCallbacks error:", error);
   }
