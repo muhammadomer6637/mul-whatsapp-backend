@@ -81,13 +81,25 @@ document.getElementById("loginOverlay").style.display = "none";
 
 applyRolePermissions();
 
-if (currentAgent.role === "admin" || currentAgent.can_view_dashboard) {
+if (currentAgent.role === "call_agent") {
+  showSection("callbacks");
+}
+else if (
+  currentAgent.role === "admin" ||
+  currentAgent.can_view_dashboard
+) {
   loadDashboard();
-} else {
+}
+else {
   showSection("agent");
 }
 
-loadChats();
+if (
+  currentAgent.role === "admin" ||
+  currentAgent.role === "chat_agent"
+) {
+  loadChats();
+}
 
 if (currentAgent.role === "admin") {
   loadAgentStatus();
