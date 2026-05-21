@@ -295,6 +295,20 @@ async function createCallbackRequest(phone) {
 
     const user = userResult.rows[0] || {};
 
+    const previousCallback = await pool.query(
+      `
+      SELECT
+        COUNT(*)::int AS total
+      FROM callback_requests
+      WHERE phone = $1
+      `,
+      [phone]
+    );
+
+    const previousCount = previousCallback.rows[0]?.total || 0;
+    const newCount = previousCount + 1;
+    const isRepeat = previousCount > 0;
+
     await pool.query(
       `
       INSERT INTO callback_requests (
@@ -302,15 +316,19 @@ async function createCallbackRequest(phone) {
         name,
         program,
         status,
+        request_count,
+        is_repeat,
         created_at,
         updated_at
       )
-      VALUES ($1, $2, $3, 'pending', NOW(), NOW())
+      VALUES ($1, $2, $3, 'pending', $4, $5, NOW(), NOW())
       `,
       [
         phone,
         user.name || null,
-        user.program || null
+        user.program || null,
+        newCount,
+        isRepeat
       ]
     );
 
@@ -332,33 +350,6 @@ async function createCallbackRequest(phone) {
 
   } catch (error) {
     console.error("createCallbackRequest error:", error.message);
-  }
-}
-
-async function saveMessage({
-  phone,
-  sender,
-  type = "text",
-  text = null,
-  media_id = null,
-  media_url = null,
-  file_name = null,
-  mime_type = null
-}) {
-  try {
-    await pool.query(
-      `
-      INSERT INTO messages
-      (phone, sender, type, text, media_id, media_url, file_name, mime_type, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-      `,
-      [phone, sender, type, text, media_id, media_url, file_name, mime_type]
-    );
-
-    notifyChatUpdated(phone);
-    
-  } catch (err) {
-    console.error("saveMessage error:", err.message);
   }
 }
 
