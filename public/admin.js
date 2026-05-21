@@ -209,10 +209,18 @@ if (id === "dashboard") {
 function refreshCurrentSection() {
   if (currentSection === "dashboard") {
     loadDashboard(currentRange);
-  } else {
+  } else if (currentSection === "agent") {
     loadChats();
-    if (selectedPhone) openChat(selectedPhone, false);
+
+    if (selectedPhone) {
+      openChat(selectedPhone, false);
+    }
+  } else if (currentSection === "agents") {
+    loadAgents();
+  } else if (currentSection === "callbacks") {
+    loadCallbacks();
   }
+}
 }
 
 function setRange(button, range) {
