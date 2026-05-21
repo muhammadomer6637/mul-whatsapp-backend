@@ -875,6 +875,52 @@ async function loadCallbacks() {
   }
 }
 
+function toDateTimeLocal(value) {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - offset * 60000);
+
+  return localDate.toISOString().slice(0, 16);
+}
+
+async function updateCallback(id) {
+  try {
+    const status = document.getElementById(`callbackStatus_${id}`)?.value;
+    const notes = document.getElementById(`callbackNotes_${id}`)?.value;
+    const next_followup_at =
+      document.getElementById(`callbackFollowup_${id}`)?.value || null;
+
+    const res = await fetch(`${BASE}/api/callbacks/${id}`, {
+      method: "PUT",
+      headers: authHeaders({
+        "Content-Type": "application/json"
+      }),
+      body: JSON.stringify({
+        status,
+        notes,
+        next_followup_at
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "Failed to update callback");
+      return;
+    }
+
+    loadCallbacks();
+  } catch (error) {
+    console.error("updateCallback error:", error);
+    alert("Callback update failed");
+  }
+}
+
 async function loadAgents() {
   try {
     const res = await fetch(`${BASE}/api/agents`, {
