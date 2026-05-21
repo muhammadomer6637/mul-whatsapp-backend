@@ -353,6 +353,57 @@ async function createCallbackRequest(phone) {
   }
 }
 
+async function saveMessage({
+  phone,
+  sender,
+  type = "text",
+  text = null,
+  media_id = null,
+  media_url = null,
+  file_name = null,
+  mime_type = null
+}) {
+  try {
+    await pool.query(
+      `
+      INSERT INTO messages
+      (
+        phone,
+        sender,
+        type,
+        text,
+        media_id,
+        media_url,
+        file_name,
+        mime_type,
+        created_at
+      )
+      VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,NOW()
+      )
+      `,
+      [
+        phone,
+        sender,
+        type,
+        text,
+        media_id,
+        media_url,
+        file_name,
+        mime_type
+      ]
+    );
+
+    notifyChatUpdated(phone);
+
+  } catch (err) {
+    console.error(
+      "saveMessage error:",
+      err.message
+    );
+  }
+}
+
 async function upsertChat(phone, lastMessage, status = "active") {
   try {
     await pool.query(
