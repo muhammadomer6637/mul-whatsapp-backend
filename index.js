@@ -1051,6 +1051,13 @@ console.log("Callback debug row:", debugRows.rows);
       LIMIT 20
     `);
 
+    console.log("Callback offer chats:", result.rows.length);
+
+console.log(
+  "Callback phones:",
+  result.rows.map(x => x.phone)
+);
+
     console.log(
       "Callback offer chats:",
       result.rows.length
