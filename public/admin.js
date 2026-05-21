@@ -209,18 +209,20 @@ else if (id === "callbacks") {
 function refreshCurrentSection() {
   if (currentSection === "dashboard") {
     loadDashboard(currentRange);
+
   } else if (currentSection === "agent") {
     loadChats();
 
     if (selectedPhone) {
       openChat(selectedPhone, false);
     }
+
   } else if (currentSection === "agents") {
     loadAgents();
+
   } else if (currentSection === "callbacks") {
     loadCallbacks();
   }
-}
 }
 
 function setRange(button, range) {
@@ -1183,200 +1185,6 @@ async function getAgentById(id) {
   }
 }
 
-// =========================
-// CALLBACK REQUESTS
-// =========================
-
-async function loadCallbacks() {
-  try {
-    const res = await fetch(`${BASE}/api/callbacks`, {
-      headers: authHeaders()
-    });
-
-    const data = await res.json();
-
-    if (!data.success) return;
-
-    const tbody = document.getElementById("callbackTableBody");
-
-    tbody.innerHTML = data.callbacks.map(item => `
-      <tr>
-       <td>
-
-${escapeHtml(item.name || "-")}
-
-${
-  item.is_repeat
-    ? `
-      <div class="repeat-badge">
-        🔁 Again #${item.request_count}
-      </div>
-    `
-    : ""
-}
-
-</td>
-        <td>${escapeHtml(item.phone || "-")}</td>
-        <td>${escapeHtml(prettyProgramName(item.program || "-"))}</td>
-
-        <td>
-          <select
-            class="callback-select"
-            id="callbackStatus_${item.id}"
-          >
-            <option value="pending" ${item.status === "pending" ? "selected" : ""}>Pending</option>
-            <option value="called" ${item.status === "called" ? "selected" : ""}>Called</option>
-            <option value="not_responded" ${item.status === "not_responded" ? "selected" : ""}>Not Responded</option>
-            <option value="follow_up_required" ${item.status === "follow_up_required" ? "selected" : ""}>Follow-up Required</option>
-            <option value="converted" ${item.status === "converted" ? "selected" : ""}>Converted</option>
-          </select>
-        </td>
-
-        <td>
-          <textarea
-            class="callback-notes"
-            id="callbackNotes_${item.id}"
-            placeholder="Add call notes..."
-          >${escapeHtml(item.notes || "")}</textarea>
-        </td>
-
-        <td>
-          <button
-            class="primary-btn"
-            onclick="updateCallback(${item.id})"
-          >
-            Save
-          </button>
-        </td>
-      </tr>
-    `).join("");
-
-  } catch (error) {
-    console.error("Load callbacks error:", error);
-  }
-}
-
-async function updateCallback(id) {
-  const status = document.getElementById(`callbackStatus_${id}`).value;
-  const notes = document.getElementById(`callbackNotes_${id}`).value.trim();
-
-  try {
-    const res = await fetch(`${BASE}/api/callbacks/${id}`, {
-      method: "PUT",
-      headers: authHeaders({
-        "Content-Type": "application/json"
-      }),
-      body: JSON.stringify({
-        status,
-        notes
-      })
-    });
-
-    const data = await res.json();
-
-    if (!data.success) {
-      alert(data.error || "Failed to update callback");
-      return;
-    }
-
-    alert("Callback updated successfully");
-    loadCallbacks();
-
-  } catch (error) {
-    console.error("Update callback error:", error);
-    alert("Failed to update callback");
-  }
-}
-
-function formatStatus(status) {
-  if (!status) return "Unknown";
-  if (status === "agent_waiting") return "Agent Waiting";
-  if (status === "agent_active") return "Agent Active";
-  if (status === "active") return "Active";
-  if (status === "bot") return "Bot";
-  return status.replaceAll("_", " ");
-}
-
-function capitalize(text) {
-  if (!text) return "";
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-function formatDateTime(value) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
-function normalizeProgramKey(name) {
-  if (!name) return "";
-  const raw = String(name).trim().toLowerCase().replace(/\s+/g, " ");
-
-  const map = {
-    "bscs": "BS Computer Science",
-    "bs cs": "BS Computer Science",
-    "bs computer science": "BS Computer Science",
-    "bsse": "BS Software Engineering",
-    "bs se": "BS Software Engineering",
-    "bs software engineering": "BS Software Engineering",
-    "bba": "BBA",
-    "dpt": "Doctor of Physiotherapy",
-    "llb": "Bachelor of Laws (LLB)",
-    "m.phil education": "M.Phil Education",
-    "mphil education": "M.Phil Education",
-    "m.phil sociology": "M.Phil Sociology",
-    "mphil sociology": "M.Phil Sociology"
-  };
-
-  return map[raw] || titleCase(raw);
-}
-
-function prettyProgramName(name) {
-  return normalizeProgramKey(name);
-}
-
-function normalizeProgramsForDisplay(programs) {
-  const merged = {};
-
-  programs.forEach(item => {
-    const key = normalizeProgramKey(item.program);
-    if (!merged[key]) merged[key] = 0;
-    merged[key] += Number(item.inquiries || 0);
-  });
-
-  return Object.entries(merged)
-    .map(([program, inquiries]) => ({ program, inquiries }))
-    .sort((a, b) => b.inquiries - a.inquiries || a.program.localeCompare(b.program));
-}
-
-function titleCase(str) {
-  return String(str)
-    .split(" ")
-    .map(word => word ? word.charAt(0).toUpperCase() + word.slice(1) : "")
-    .join(" ");
-}
-
-function escapeHtml(str) {
-  if (str === null || str === undefined) return "";
-  return String(str)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  const input = document.getElementById("messageInput");
-
-  if (input) {
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") sendMessage();
-    });
-  }
-
-  checkAuth();
 
   // =========================
   // REAL-TIME SSE LISTENER
