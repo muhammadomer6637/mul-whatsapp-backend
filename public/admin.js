@@ -1261,6 +1261,9 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (currentSection === "agents") {
       loadAgents();
     }
+    else if (currentSection === "callbacks") {
+  loadCallbacks();
+}
   }, 15000);
 });
 
