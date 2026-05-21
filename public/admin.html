@@ -441,6 +441,29 @@
 </section>
 
       <section id="callbacks" class="section hidden">
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <h3>Callback Center</h3>
+        <p>Track pending callbacks, call outcomes, and follow-up activity.</p>
+      </div>
+
+      <button class="refresh-btn" onclick="loadCallbacks()">
+        Refresh
+      </button>
+    </div>
+
+    <div id="callbacksList" class="callbacks-list">
+      <div class="empty-chat-state">
+        <div class="empty-chat-icon">📞</div>
+        <h3>No callback requests loaded</h3>
+        <p>Callback requests will appear here.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+      <section id="callbacks" class="section hidden">
 
   <div class="page-header">
     <div>
