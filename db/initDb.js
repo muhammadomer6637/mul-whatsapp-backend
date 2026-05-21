@@ -148,6 +148,26 @@ await pool.query(`
   ALTER TABLE callback_requests
   ADD COLUMN IF NOT EXISTS is_repeat BOOLEAN DEFAULT false;
 `);
+
+    await pool.query(`
+  ALTER TABLE callback_requests
+  ADD COLUMN IF NOT EXISTS assigned_to INTEGER;
+`);
+
+await pool.query(`
+  ALTER TABLE callback_requests
+  ADD COLUMN IF NOT EXISTS updated_by INTEGER;
+`);
+
+await pool.query(`
+  ALTER TABLE callback_requests
+  ADD COLUMN IF NOT EXISTS followup_date TIMESTAMP;
+`);
+
+await pool.query(`
+  ALTER TABLE callback_requests
+  ADD COLUMN IF NOT EXISTS callback_notes TEXT;
+`);
     
     // Safe foreign key for assigned agent
     try {
