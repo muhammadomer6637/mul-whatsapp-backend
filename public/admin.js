@@ -1034,7 +1034,21 @@ async function loadCallbacks() {
 
     tbody.innerHTML = data.callbacks.map(item => `
       <tr>
-        <td>${escapeHtml(item.name || "-")}</td>
+       <td>
+
+${escapeHtml(item.name || "-")}
+
+${
+  item.is_repeat
+    ? `
+      <div class="repeat-badge">
+        🔁 Again #${item.request_count}
+      </div>
+    `
+    : ""
+}
+
+</td>
         <td>${escapeHtml(item.phone || "-")}</td>
         <td>${escapeHtml(prettyProgramName(item.program || "-"))}</td>
 
