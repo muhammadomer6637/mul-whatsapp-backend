@@ -138,6 +138,16 @@ await pool.query(`
   ALTER TABLE chats
   ADD COLUMN IF NOT EXISTS callback_offer_count INTEGER DEFAULT 0;
 `);
+
+    await pool.query(`
+  ALTER TABLE callback_requests
+  ADD COLUMN IF NOT EXISTS request_count INTEGER DEFAULT 1;
+`);
+
+await pool.query(`
+  ALTER TABLE callback_requests
+  ADD COLUMN IF NOT EXISTS is_repeat BOOLEAN DEFAULT false;
+`);
     
     // Safe foreign key for assigned agent
     try {
