@@ -1880,3 +1880,29 @@ color:#ffb84d;
 
 border:1px solid rgba(255,145,0,.35);
 }
+
+html,
+body {
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.main-content {
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.section {
+  padding-bottom: 60px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+}
