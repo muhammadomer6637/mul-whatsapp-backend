@@ -295,41 +295,68 @@ async function createCallbackRequest(phone) {
 
     const user = userResult.rows[0] || {};
 
-    const previousCallback = await pool.query(
+    const existingCallback = await pool.query(
       `
-      SELECT
-        COUNT(*)::int AS total
+      SELECT id, request_count
       FROM callback_requests
       WHERE phone = $1
+      ORDER BY created_at DESC
+      LIMIT 1
       `,
       [phone]
     );
 
-    const previousCount = previousCallback.rows[0]?.total || 0;
-    const newCount = previousCount + 1;
-    const isRepeat = previousCount > 0;
+    if (existingCallback.rows.length > 0) {
+      const existing = existingCallback.rows[0];
+
+      await pool.query(
+        `
+        UPDATE callback_requests
+        SET
+          name = COALESCE($2, name),
+          program = COALESCE($3, program),
+          status = 'pending',
+          request_count = COALESCE(request_count, 1) + 1,
+          is_repeat = true,
+          updated_at = NOW()
+        WHERE id = $1
+        `,
+        [
+          existing.id,
+          user.name || null,
+          user.program || null
+        ]
+      );
+    } else {
+      await pool.query(
+        `
+        INSERT INTO callback_requests (
+          phone,
+          name,
+          program,
+          status,
+          request_count,
+          is_repeat,
+          created_at,
+          updated_at
+        )
+        VALUES ($1, $2, $3, 'pending', 1, false, NOW(), NOW())
+        `,
+        [
+          phone,
+          user.name || null,
+          user.program || null
+        ]
+      );
+    }
 
     await pool.query(
       `
-      INSERT INTO callback_requests (
-        phone,
-        name,
-        program,
-        status,
-        request_count,
-        is_repeat,
-        created_at,
-        updated_at
-      )
-      VALUES ($1, $2, $3, 'pending', $4, $5, NOW(), NOW())
+      UPDATE users
+      SET mode = 'bot'
+      WHERE phone = $1
       `,
-      [
-        phone,
-        user.name || null,
-        user.program || null,
-        newCount,
-        isRepeat
-      ]
+      [phone]
     );
 
     await pool.query(
@@ -339,7 +366,9 @@ async function createCallbackRequest(phone) {
         callback_requested = true,
         callback_status = 'pending',
         callback_requested_at = NOW(),
-        status = 'callback_requested',
+        status = 'active',
+        unread_count = 0,
+        last_message = 'Callback requested - shifted back to bot',
         updated_at = NOW()
       WHERE phone = $1
       `,
@@ -1733,10 +1762,14 @@ if (
 
   await sendTextMessage(
     from,
-    `Thank you. Your callback request has been received.
+    `Thank you for requesting a callback.
 
-Our admissions support team will contact you soon.`,
-    "callback_requested"
+Our admissions representative will contact you shortly.
+
+Meanwhile, you have been shifted back to our automated assistant and may continue exploring admissions information anytime.
+
+${welcomeMessage()}`,
+    "active"
   );
 
   return res.sendStatus(200);
