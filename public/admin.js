@@ -803,7 +803,7 @@ async function loadCallbacks() {
     if (!callbacks.length) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="6" style="text-align:center; color:var(--muted); padding:24px;">
+          <td colspan="7" style="text-align:center; color:var(--muted); padding:24px;">
             No callback requests found
           </td>
         </tr>
@@ -825,6 +825,7 @@ async function loadCallbacks() {
         <td>${escapeHtml(item.phone || "-")}</td>
 
         <td>${escapeHtml(prettyProgramName(item.program || "-"))}</td>
+        <td>${formatDateTime(item.created_at)}</td>
 
         <td>
           <select
