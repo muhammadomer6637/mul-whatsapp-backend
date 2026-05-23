@@ -52,9 +52,9 @@ body {
 
 .brand-logo-img {
   width: 100%;
-  max-width: 210px;
+  max-width: 250px;
   display: block;
-  margin-bottom: 14px;
+  margin: 0 auto 18px;
 }
 
 .brand-subtitle {
@@ -1660,12 +1660,80 @@ CALLBACK CENTER
 .login-card {
   width: 100%;
   max-width: 420px;
+
   background: rgba(15, 23, 41, 0.96);
+
   border: 1px solid rgba(255,255,255,0.06);
+
   border-radius: 24px;
+
   padding: 40px;
+
   box-shadow: 0 30px 60px rgba(0,0,0,0.45);
+
   text-align: center;
+
+  position: relative;
+
+  overflow: visible;
+}
+
+.login-card::after{
+  content:"";
+
+  position:absolute;
+
+  left:50%;
+
+  bottom:-55px;
+
+  transform:translateX(-50%);
+
+  width:260px;
+
+  height:80px;
+
+  border-radius:50%;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(47,125,246,.55),
+      rgba(47,125,246,.10),
+      transparent
+    );
+
+  filter:blur(34px);
+
+  animation:
+    loginGlow 3.5s ease-in-out infinite;
+
+  z-index:-1;
+}
+
+@keyframes loginGlow{
+
+0%{
+opacity:.55;
+transform:
+translateX(-50%)
+scale(.92);
+}
+
+50%{
+opacity:1;
+transform:
+translateX(-50%)
+scale(1.08);
+}
+
+100%{
+opacity:.55;
+transform:
+translateX(-50%)
+scale(.92);
+}
+
 }
 
 .login-logo {
