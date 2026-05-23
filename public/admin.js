@@ -3,7 +3,9 @@ const BASE = window.location.origin;
 // AUTH
 // =========================
 
-let authToken = localStorage.getItem("mul_nexus_token");
+let authToken =
+  sessionStorage.getItem("mul_nexus_token") ||
+  localStorage.getItem("mul_nexus_token");
 let currentAgent = null;
 
 function authHeaders(extraHeaders = {}) {
@@ -44,7 +46,8 @@ async function loginAgent() {
     authToken = data.token;
     currentAgent = data.agent;
 
-    localStorage.setItem("mul_nexus_token", authToken);
+    sessionStorage.setItem("mul_nexus_token", authToken);
+localStorage.removeItem("mul_nexus_token");
 
     document.getElementById("loginOverlay").style.display = "none";
 
@@ -69,12 +72,16 @@ async function checkAuth() {
 
     const data = await response.json();
 
-    if (!data.success) {
-      localStorage.removeItem("mul_nexus_token");
-      authToken = null;
-      document.getElementById("loginOverlay").style.display = "flex";
-      return;
-    }
+if (!data.success) {
+  localStorage.removeItem("mul_nexus_token");
+  sessionStorage.removeItem("mul_nexus_token");
+
+  authToken = null;
+
+  document.getElementById("loginOverlay").style.display = "flex";
+
+  return;
+}
 
    currentAgent = data.agent;
 document.getElementById("loginOverlay").style.display = "none";
