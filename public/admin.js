@@ -1333,9 +1333,12 @@ function exportDashboardData() {
 
 function logoutAgent() {
   localStorage.removeItem("mul_nexus_token");
+  sessionStorage.removeItem("mul_nexus_token");
 
   authToken = null;
   currentAgent = null;
+
+  document.getElementById("loginOverlay").style.display = "flex";
 
   location.reload();
 }
