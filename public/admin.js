@@ -305,7 +305,10 @@ async function loadDashboard(range = "24h") {
         <div class="value">${stats.activeWithAgent}</div>
         <div class="meta">Users active in last 10 minutes</div>
       </div>
-            <div class="stat-card">
+    `;
+
+        document.getElementById("callbackStats").innerHTML = `
+      <div class="stat-card">
         <div class="label">Callback Requests</div>
         <div class="value">${callback.totalRequests || 0}</div>
         <div class="meta">Total callback requests received</div>
