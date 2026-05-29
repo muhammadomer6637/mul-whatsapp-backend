@@ -1715,51 +1715,6 @@ rgba(86,165,255,.18);
 
 }
 
-.login-card::before {
-  content: "";
-
-  position: absolute;
-
-  inset: 0;
-
-  padding: 2px;
-
-  border-radius: 24px;
-
-  background:
-    conic-gradient(
-      from 0deg,
-      transparent 0deg,
-      transparent 260deg,
-      rgba(86,165,255,0.15) 300deg,
-      rgba(86,165,255,1) 330deg,
-      rgba(47,125,246,1) 350deg,
-      transparent 360deg
-    );
-
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-
-  -webkit-mask-composite: xor;
-
-  mask-composite: exclude;
-
-  animation: neonBorderMove 3s linear infinite;
-
-  pointer-events: none;
-}
-
-@keyframes neonBorderMove {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .login-logo {
   width: 130px;
   margin-bottom: 20px;
