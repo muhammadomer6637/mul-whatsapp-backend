@@ -883,7 +883,7 @@ async function loadCallbacks() {
         <td>${escapeHtml(item.phone || "-")}</td>
 
         <td>${escapeHtml(prettyProgramName(item.program || "-"))}</td>
-        <td>${formatDateTime(item.created_at)}</td>
+       <td>${formatDateTime(item.updated_at)}</td>
 
         <td>
           <select
