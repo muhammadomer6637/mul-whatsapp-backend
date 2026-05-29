@@ -306,6 +306,8 @@ async function createCallbackRequest(phone) {
       [phone]
     );
 
+    let callbackRequestId = null;
+
     if (existingCallback.rows.length > 0) {
       const existing = existingCallback.rows[0];
 
@@ -327,8 +329,10 @@ async function createCallbackRequest(phone) {
           user.program || null
         ]
       );
+
+      callbackRequestId = existing.id;
     } else {
-      await pool.query(
+      const insertResult = await pool.query(
         `
         INSERT INTO callback_requests (
           phone,
@@ -341,6 +345,7 @@ async function createCallbackRequest(phone) {
           updated_at
         )
         VALUES ($1, $2, $3, 'pending', 1, false, NOW(), NOW())
+        RETURNING id
         `,
         [
           phone,
@@ -348,7 +353,27 @@ async function createCallbackRequest(phone) {
           user.program || null
         ]
       );
+
+      callbackRequestId = insertResult.rows[0].id;
     }
+
+    await pool.query(
+      `
+      INSERT INTO callback_request_logs (
+        callback_request_id,
+        phone,
+        name,
+        program
+      )
+      VALUES ($1, $2, $3, $4)
+      `,
+      [
+        callbackRequestId,
+        phone,
+        user.name || null,
+        user.program || null
+      ]
+    );
 
     await pool.query(
       `
