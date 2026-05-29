@@ -88,6 +88,22 @@ await pool.query(`
     updated_at TIMESTAMP DEFAULT NOW()
   );
 `);
+
+// CALLBACK REQUEST LOGS TABLE
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS callback_request_logs (
+    id SERIAL PRIMARY KEY,
+
+    callback_request_id INTEGER,
+
+    phone VARCHAR(30) NOT NULL,
+
+    name TEXT,
+    program TEXT,
+
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+`);
     
     // Safe ALTERs for existing DB
     await pool.query(`
