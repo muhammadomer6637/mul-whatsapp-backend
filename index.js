@@ -1641,7 +1641,7 @@ app.put(
 );
 
 app.get("/", (req, res) => {
-  res.send("MUL WhatsApp Backend Running 🚀");
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 
 // TEMP HASH GENERATOR
