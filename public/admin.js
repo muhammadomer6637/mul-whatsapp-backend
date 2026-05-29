@@ -1373,7 +1373,18 @@ function applyCustomRange() {
     return;
   }
 
-  alert(`Custom reporting applied:\n${start} → ${end}`);
+  if (new Date(start) > new Date(end)) {
+    alert("Start date cannot be greater than end date.");
+    return;
+  }
+
+  currentRange = `custom&start=${start}&end=${end}`;
+
+  document
+    .querySelectorAll(".range-btn")
+    .forEach(btn => btn.classList.remove("active"));
+
+  loadDashboard(currentRange);
 }
 
 function exportDashboardData() {
