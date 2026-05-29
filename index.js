@@ -2746,16 +2746,25 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
     if (range === "30d") intervalSql = "INTERVAL '30 days'";
 
     let whereCreated = `created_at >= NOW() - ${intervalSql}`;
+    let queryParams = [];
 
     if (range === "custom" && start && end) {
-      whereCreated = `created_at BETWEEN '${start}'::timestamp AND '${end}'::timestamp`;
+      whereCreated = `
+        created_at >= $1::timestamp
+        AND created_at < ($2::date + INTERVAL '1 day')
+      `;
+
+      queryParams = [start, end];
     }
 
-    const conversationsStarted = await pool.query(`
+    const conversationsStarted = await pool.query(
+      `
       SELECT COUNT(*)::int AS count
       FROM users
       WHERE ${whereCreated}
-    `);
+      `,
+      queryParams
+    );
 
     const unreadConversations = await pool.query(`
       SELECT COUNT(*)::int AS count
@@ -2796,7 +2805,8 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       AND c.last_incoming_at >= NOW() - INTERVAL '10 minutes'
     `);
 
-    const topPrograms = await pool.query(`
+    const topPrograms = await pool.query(
+      `
       SELECT
         program,
         COUNT(*)::int AS inquiries
@@ -2807,7 +2817,9 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       GROUP BY program
       ORDER BY inquiries DESC, program ASC
       LIMIT 10
-    `);
+      `,
+      queryParams
+    );
 
     const recentLeads = await pool.query(`
       SELECT
@@ -2824,9 +2836,61 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       LIMIT 10
     `);
 
+    const callbackTotals = await pool.query(
+      `
+      SELECT
+        COUNT(*)::int AS total_requests,
+        COUNT(DISTINCT phone)::int AS unique_numbers
+      FROM callback_request_logs
+      WHERE ${whereCreated}
+      `,
+      queryParams
+    );
+
+    const callbackRepeat = await pool.query(
+      `
+      SELECT COUNT(*)::int AS repeat_numbers
+      FROM (
+        SELECT phone
+        FROM callback_request_logs
+        WHERE ${whereCreated}
+        GROUP BY phone
+        HAVING COUNT(*) > 1
+      ) repeated
+      `,
+      queryParams
+    );
+
+    const callbackStatuses = await pool.query(
+      `
+      WITH scoped_callbacks AS (
+        SELECT DISTINCT callback_request_id
+        FROM callback_request_logs
+        WHERE ${whereCreated}
+          AND callback_request_id IS NOT NULL
+      )
+      SELECT
+        COUNT(*) FILTER (WHERE cb.status = 'pending')::int AS pending,
+        COUNT(*) FILTER (WHERE cb.status = 'called')::int AS called,
+        COUNT(*) FILTER (WHERE cb.status = 'not_responded')::int AS not_responded,
+        COUNT(*) FILTER (WHERE cb.status = 'follow_up_required')::int AS follow_up_required,
+        COUNT(*) FILTER (WHERE cb.status = 'converted')::int AS converted
+      FROM callback_requests cb
+      JOIN scoped_callbacks sc
+        ON sc.callback_request_id = cb.id
+      `,
+      queryParams
+    );
+
     return res.json({
       success: true,
-      filters: { range, start: start || null, end: end || null },
+
+      filters: {
+        range,
+        start: start || null,
+        end: end || null
+      },
+
       stats: {
         conversationsStarted: conversationsStarted.rows[0].count,
         unreadConversations: unreadConversations.rows[0].count,
@@ -2836,11 +2900,25 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         activeWithBot: activeWithBot.rows[0].count,
         activeWithAgent: activeWithAgent.rows[0].count
       },
+
+      callbackStats: {
+        totalRequests: callbackTotals.rows[0].total_requests,
+        uniqueNumbers: callbackTotals.rows[0].unique_numbers,
+        repeatRequests: callbackRepeat.rows[0].repeat_numbers,
+        pending: callbackStatuses.rows[0].pending || 0,
+        called: callbackStatuses.rows[0].called || 0,
+        notResponded: callbackStatuses.rows[0].not_responded || 0,
+        followupRequired: callbackStatuses.rows[0].follow_up_required || 0,
+        converted: callbackStatuses.rows[0].converted || 0
+      },
+
       topPrograms: topPrograms.rows,
       recentLeads: recentLeads.rows
     });
+
   } catch (error) {
     console.error("GET /api/dashboard error:", error.message);
+
     return res.status(500).json({
       success: false,
       error: "Failed to fetch dashboard data"
