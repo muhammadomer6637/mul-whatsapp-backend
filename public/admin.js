@@ -277,6 +277,7 @@ async function loadDashboard(range = "24h") {
     if (!data.success) return;
 
     const stats = data.stats;
+    const callback = data.callbackStats || {};
 
     document.getElementById("stats").innerHTML = `
       <div class="stat-card">
@@ -303,6 +304,53 @@ async function loadDashboard(range = "24h") {
         <div class="label">Active with Agent</div>
         <div class="value">${stats.activeWithAgent}</div>
         <div class="meta">Users active in last 10 minutes</div>
+      </div>
+            <div class="stat-card">
+        <div class="label">Callback Requests</div>
+        <div class="value">${callback.totalRequests || 0}</div>
+        <div class="meta">Total callback requests received</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label">Unique Callbacks</div>
+        <div class="value">${callback.uniqueNumbers || 0}</div>
+        <div class="meta">Unique student phone numbers</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label">Repeat Requests</div>
+        <div class="value">${callback.repeatRequests || 0}</div>
+        <div class="meta">Students requesting callback again</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label">Pending Calls</div>
+        <div class="value">${callback.pending || 0}</div>
+        <div class="meta">Awaiting representative action</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label">Called</div>
+        <div class="value">${callback.called || 0}</div>
+        <div class="meta">Successfully contacted</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label">Not Responded</div>
+        <div class="value">${callback.notResponded || 0}</div>
+        <div class="meta">No response from student</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label">Follow-Up Required</div>
+        <div class="value">${callback.followupRequired || 0}</div>
+        <div class="meta">Need another call attempt</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="label">Converted</div>
+        <div class="value">${callback.converted || 0}</div>
+        <div class="meta">Successfully converted leads</div>
       </div>
     `;
 
