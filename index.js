@@ -653,10 +653,17 @@ Send 7 to connect with an Admissions Advisor
 function programsMenu() {
   return `📚 Programs Categories
 
+Please reply with the exact option code:
+
 1a. Associate Degree Programs (ADP)
 1b. BS Programs
 1c. M.Phil./MS Programs
-1d. Ph.D. Programs`;
+1d. Ph.D. Programs
+
+Example:
+Send 1b for BS Programs
+
+📌 Note: 1a means number 1 + letter a.`;
 }
 
 function howToApplyMenu() {
