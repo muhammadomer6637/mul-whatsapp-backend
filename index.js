@@ -3035,6 +3035,90 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
   }
 });
 
+app.get("/api/export-leads", authenticateAgent, async (req, res) => {
+  try {
+    const range = req.query.range || "24h";
+    const start = req.query.start;
+    const end = req.query.end;
+
+    let intervalSql = "INTERVAL '24 hours'";
+    if (range === "7d") intervalSql = "INTERVAL '7 days'";
+    if (range === "30d") intervalSql = "INTERVAL '30 days'";
+
+    let whereCreated = `u.created_at >= NOW() - ${intervalSql}`;
+    let queryParams = [];
+
+    if (range === "custom" && start && end) {
+      whereCreated = `
+        u.created_at >= $1::timestamp
+        AND u.created_at < ($2::date + INTERVAL '1 day')
+      `;
+      queryParams = [start, end];
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        u.created_at,
+        u.name,
+        u.phone,
+        u.program,
+        c.status AS current_status,
+        COALESCE(cb.status, 'no_callback') AS callback_status
+      FROM users u
+      LEFT JOIN chats c ON c.phone = u.phone
+      LEFT JOIN callback_requests cb ON cb.phone = u.phone
+      WHERE ${whereCreated}
+      ORDER BY u.created_at DESC
+      `,
+      queryParams
+    );
+
+    const headers = [
+      "Sr #",
+      "Date",
+      "Name",
+      "WhatsApp Number",
+      "Program",
+      "Current Status",
+      "Callback Status"
+    ];
+
+    const rows = result.rows.map((row, index) => [
+      index + 1,
+      row.created_at ? new Date(row.created_at).toLocaleString("en-GB") : "",
+      row.name || "",
+      row.phone || "",
+      row.program || "",
+      row.current_status || "",
+      row.callback_status === "no_callback"
+        ? "No Callback"
+        : row.callback_status.replaceAll("_", " ")
+    ]);
+
+    const csv = [
+      headers.join(","),
+      ...rows.map(r =>
+        r.map(value => `"${String(value).replaceAll('"', '""')}"`).join(",")
+      )
+    ].join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="mul-nexus-leads-export.csv"`
+    );
+
+    return res.send(csv);
+  } catch (error) {
+    console.error("GET /api/export-leads error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to export leads"
+    });
+  }
+});
+
 app.listen(3000, async () => {
   console.log("Server running on port 3000");
 
