@@ -1802,7 +1802,72 @@ app.post("/webhook", async (req, res) => {
     if (type === "interactive" && msg.interactive?.type === "button_reply") {
       text = msg.interactive.button_reply.id || "";
     }
-    const lowerText = text?.toLowerCase();
+    let lowerText = text?.toLowerCase();
+
+    // =========================
+// SMART KEYWORD DETECTION
+// =========================
+
+if (
+  lowerText &&
+  (
+    lowerText.includes("fee") ||
+    lowerText.includes("fees") ||
+    lowerText.includes("fee structure") ||
+    lowerText.includes("tuition fee") ||
+    lowerText.includes("semester fee") ||
+    lowerText.includes("charges") ||
+    lowerText.includes("cost")
+  )
+) {
+  text = "2";
+}
+
+if (
+  lowerText &&
+  (
+    lowerText.includes("scholarship") ||
+    lowerText.includes("scholarships") ||
+    lowerText.includes("financial aid") ||
+    lowerText.includes("discount") ||
+    lowerText.includes("fee concession") ||
+    lowerText.includes("merit scholarship") ||
+    lowerText.includes("need based")
+  )
+) {
+  text = "3";
+}
+
+if (
+  lowerText &&
+  (
+    lowerText.includes("admission") ||
+    lowerText.includes("apply") ||
+    lowerText.includes("apply online") ||
+    lowerText.includes("registration") ||
+    lowerText.includes("how to apply") ||
+    lowerText.includes("documents") ||
+    lowerText.includes("requirements")
+  )
+) {
+  text = "4";
+}
+
+if (
+  lowerText &&
+  (
+    lowerText.includes("agent") ||
+    lowerText.includes("representative") ||
+    lowerText.includes("advisor") ||
+    lowerText.includes("counselor") ||
+    lowerText.includes("human") ||
+    lowerText.includes("call me") ||
+  )
+) {
+  text = "7";
+}
+
+lowerText = text?.toLowerCase();
 
     const currentChatForCallback = await pool.query(
   `
