@@ -628,17 +628,26 @@ function splitIntoChunks(items, size = 12) {
 function welcomeMessage() {
   return `Assalamu Alaikum 👋
 
-Welcome to Minhaj University Lahore.
+Welcome to Minhaj University Lahore Admissions Assistant
 
-Please choose an option:
+How may we assist you today?
 
-1. Programs
-2. Fee Structure
-3. Scholarships
-4. How to Apply
-5. Why Choose MUL?
-6. Other Support
-7. Chat with Agent`;
+1️⃣ Programs Offered
+2️⃣ Fee Structure
+3️⃣ Scholarships & Financial Assistance
+4️⃣ Admission Process
+5️⃣ Why Choose MUL?
+6️⃣ Other Support Offices
+7️⃣ Chat with Admissions Advisor
+
+📌 Please reply with the number of your choice.
+
+Example:
+Send 1 for Programs
+Send 2 for Fee Structure
+Send 7 to connect with an Admissions Advisor
+
+💡 Type MENU anytime to see these options again.`;
 }
 
 function programsMenu() {
