@@ -2551,19 +2551,26 @@ Please choose:
   return res.sendStatus(200);
 }
 
-    await sendTextMessage(
-      from,
-      `Sorry, I did not understand your message.
+await sendTextMessage(
+  from,
+  `Assalamu Alaikum 👋
 
-Please choose:
-1 Programs
-2 Fee Structure
-3 Scholarships
-4 How to Apply
-5 Why Choose MUL?
-6 Other Support
-7 Chat with Agent`
-    );
+I couldn't understand your selection.
+
+Please choose one of the following options:
+
+1️⃣ Programs Offered
+2️⃣ Fee Structure
+3️⃣ Scholarships & Financial Assistance
+4️⃣ Admission Process
+5️⃣ Why Choose MUL?
+6️⃣ Other Support Offices
+7️⃣ Chat with Admissions Advisor
+
+📌 Please reply with the number of your choice.
+
+💡 Type MENU anytime to see these options again.`
+);
 
     return res.sendStatus(200);
   } catch (error) {
