@@ -2321,7 +2321,7 @@ Please wait, our admission representative will message you shortly.`,
 
       await sendReplyButtons(
         from,
-        `💰 Fee Structure – Spring 2026
+        `💰 Fee Structure – Fall 2026
 
 Please find attached the complete fee structure.`,
         [{ id: "main_menu", title: "Main Menu" }]
@@ -2331,7 +2331,7 @@ Please find attached the complete fee structure.`,
         from,
         pdfUrl,
         "Fee Structure Spring 2026.pdf",
-        "MUL Fee Structure Spring 2026"
+        "MUL Fee Structure Fall 2026"
       );
 
       return res.sendStatus(200);
