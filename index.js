@@ -699,7 +699,9 @@ Send 5c for Robotic Library
 }
 
 function otherSupportMenu() {
-  return `📞 Other Support
+  return `📞 Other Support Offices
+
+Please reply with the exact option code:
 
 6a. Admission Office
 6b. Students Affairs Office
@@ -712,7 +714,12 @@ function otherSupportMenu() {
 6i. ORIC
 6j. Vice Chancellor Secretariat
 6k. Office of the Registrar
-6l. Directorate of Administration`;
+6l. Directorate of Administration
+
+Example:
+Send 6a for Admission Office
+
+📌 Note: 6a means number 6 + letter a.`;
 }
 
 function formatProgramChunk(title, items, currentIndex, totalChunks, nextCode = null) {
