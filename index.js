@@ -1861,7 +1861,7 @@ if (
     lowerText.includes("advisor") ||
     lowerText.includes("counselor") ||
     lowerText.includes("human") ||
-    lowerText.includes("call me") ||
+    lowerText.includes("call me")
   )
 ) {
   text = "7";
