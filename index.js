@@ -667,11 +667,18 @@ Send 1b for BS Programs
 }
 
 function howToApplyMenu() {
-  return `📝 How to Apply
+  return `📝 Admission Process
 
-4a. On Campus
-4b. Online
-4c. Documents Requirements`;
+Please reply with the exact option code:
+
+4a. On Campus Admission
+4b. Online Admission
+4c. Documents Requirements
+
+Example:
+Send 4b for Online Admission
+
+📌 Note: 4b means number 4 + letter b.`;
 }
 
 function whyChooseMenu() {
