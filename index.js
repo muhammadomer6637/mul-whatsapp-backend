@@ -684,11 +684,18 @@ Send 4b for Online Admission
 function whyChooseMenu() {
   return `🌟 Why Choose MUL?
 
+Please reply with the exact option code:
+
 5a. Accreditation & Recognition
 5b. International Rankings
-5c. Asia’s First Robotic Library
+5c. Asia's First Robotic Library
 5d. Vibrant Student Life & Societies
-5e. Research Excellence & Innovation`;
+5e. Research Excellence & Innovation
+
+Example:
+Send 5c for Robotic Library
+
+📌 Note: 5c means number 5 + letter c.`;
 }
 
 function otherSupportMenu() {
