@@ -1388,7 +1388,36 @@ function applyCustomRange() {
 }
 
 function exportDashboardData() {
-  alert("Export started...");
+  const url = `${BASE}/api/export-leads?range=${currentRange}`;
+
+  fetch(url, {
+    headers: authHeaders()
+  })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error("Export failed");
+      }
+      return response.blob();
+    })
+    .then(blob => {
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      link.href = downloadUrl;
+      link.download = `mul-nexus-leads-export-${today}.csv`;
+
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    })
+    .catch(error => {
+      console.error("Export error:", error);
+      alert("Export failed. Please try again.");
+    });
 }
 
 // =========================
