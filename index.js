@@ -2524,8 +2524,7 @@ if (lowerText === "7") {
       from,
       `Thank you for contacting Minhaj University Lahore.
 
-Currently no agent available due to non office hours, Please send your query. 
-Our representative will get back to you during working hours.
+Currently no agent available due to non office hours.
 
 For urgent information, you may continue exploring the menu options.
 
