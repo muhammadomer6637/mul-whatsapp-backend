@@ -2330,7 +2330,7 @@ Please find attached the complete fee structure.`,
       await sendDocumentMessage(
         from,
         pdfUrl,
-        "Fee Structure Spring 2026.pdf",
+        "Fee Structure Fall 2026.pdf",
         "MUL Fee Structure Fall 2026"
       );
 
