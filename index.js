@@ -2598,8 +2598,14 @@ app.get("/api/agent-status", authenticateAgent, async (req, res) => {
 });
 
 // Toggle agent status
-app.post("/api/toggle-agent", authenticateAgent, requireAdmin, async (req, res) => {
+app.post("/api/toggle-agent", authenticateAgent, async (req, res) => {
   const { status } = req.body;
+  if (!["admin", "chat_agent"].includes(req.agent.role)) {
+  return res.status(403).json({
+    success: false,
+    error: "Only admin or chat agent can change live admissions status"
+  });
+}
 
   await pool.query(
     "UPDATE system_settings SET value = $1 WHERE key = 'agent_available'",
