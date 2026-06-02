@@ -33,6 +33,25 @@ async function loadChats() {
           : "Active";
 
       wrap.innerHTML += `
+
+      data.chats.forEach(chat => {
+
+  const statusClass =
+    chat.status === "agent_waiting"
+      ? "waiting"
+      : "active-badge";
+
+  const statusText =
+    chat.status === "agent_waiting"
+      ? "Waiting"
+      : "Active";
+
+  const preview =
+    (chat.last_message || "")
+      .replace(/\n/g, " ")
+      .substring(0, 60) + "...";
+
+  wrap.innerHTML += `
         <div class="chat-card">
 
           <div class="chat-top">
@@ -50,7 +69,7 @@ async function loadChats() {
           </div>
 
           <div class="last-msg">
-            ${chat.last_message || ""}
+            ${preview}
           </div>
 
           <div style="
