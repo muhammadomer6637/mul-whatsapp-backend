@@ -37,7 +37,7 @@ async function loadChats() {
           : "No message yet";
 
       wrap.innerHTML += `
-        <div class="chat-card">
+       <div class="chat-card" onclick="openChat('${chat.phone}')">
 
           <div class="chat-top">
             <strong>${chat.name || "Unknown Student"}</strong>
@@ -79,3 +79,7 @@ async function loadChats() {
 }
 
 loadChats();
+
+function openChat(phone) {
+  alert("Open Chat: " + phone);
+}
