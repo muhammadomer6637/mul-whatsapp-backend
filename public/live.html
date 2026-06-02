@@ -1,33 +1,59 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  />
-  <title>MUL Nexus Live</title>
+<div class="app">
 
-  <link rel="stylesheet" href="live.css" />
-</head>
+  <div class="header">
+    <div class="logo">MUL Nexus Live</div>
 
-<body>
+    <div class="status">
+      🟢 Live
+    </div>
+  </div>
 
-  <div class="mobile-wrap">
+  <div class="tabs">
+    <button class="tab active">Waiting</button>
+    <button class="tab">Active</button>
+    <button class="tab">All</button>
+  </div>
 
-    <div class="topbar">
-      <div class="title">
-        MUL Nexus Live
+  <div class="search-wrap">
+    <input
+      type="text"
+      placeholder="Search student..."
+      class="search"
+    />
+  </div>
+
+  <div class="chat-list">
+
+    <div class="chat-card">
+      <div class="chat-top">
+        <strong>Ahmed Ali</strong>
+        <span class="badge waiting">Waiting</span>
+      </div>
+
+      <div class="program">
+        BS Computer Science
+      </div>
+
+      <div class="last-msg">
+        Assalamu Alaikum
       </div>
     </div>
 
-    <div class="coming-soon">
-      Mobile Agent Panel Loading...
+    <div class="chat-card">
+      <div class="chat-top">
+        <strong>Sara Khan</strong>
+        <span class="badge active-badge">Active</span>
+      </div>
+
+      <div class="program">
+        PharmD
+      </div>
+
+      <div class="last-msg">
+        Fee structure please
+      </div>
     </div>
 
   </div>
 
-  <script src="live.js"></script>
-
-</body>
-</html>
+</div>
