@@ -3124,6 +3124,10 @@ app.get("/api/export-leads", authenticateAgent, async (req, res) => {
   }
 });
 
+app.get("/live", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "live.html"));
+});
+
 app.listen(3000, async () => {
   console.log("Server running on port 3000");
 
