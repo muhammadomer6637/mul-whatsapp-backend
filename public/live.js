@@ -12,7 +12,7 @@ async function loadChats() {
 
     const chats = await res.json();
 
-    console.log("Chats:", chats);
+    console.log("Chats JSON:", JSON.stringify(chats, null, 2));
 
   } catch (err) {
     console.error(err);
