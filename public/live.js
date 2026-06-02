@@ -81,5 +81,7 @@ async function loadChats() {
 loadChats();
 
 function openChat(phone) {
-  alert("Open Chat: " + phone);
+  localStorage.setItem("selected_chat_phone", phone);
+
+  alert("Chat selected: " + phone);
 }
