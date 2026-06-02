@@ -1,6 +1,8 @@
 async function loadChats() {
   try {
-   const token = localStorage.getItem("mul_nexus_token");
+  const token =
+  sessionStorage.getItem("mul_nexus_token") ||
+  localStorage.getItem("mul_nexus_token");
 
     const res = await fetch("/api/chats", {
       headers: {
