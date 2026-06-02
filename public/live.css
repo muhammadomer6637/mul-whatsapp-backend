@@ -5,26 +5,104 @@
 }
 
 body{
-  background:#0f172a;
-  color:#fff;
+  background:#0b1220;
+  color:white;
   font-family:Arial,sans-serif;
 }
 
-.mobile-wrap{
+.app{
   min-height:100vh;
 }
 
-.topbar{
+.header{
   background:#111827;
   padding:16px;
-  font-size:20px;
-  font-weight:700;
-  text-align:center;
-  border-bottom:1px solid #1f2937;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  position:sticky;
+  top:0;
 }
 
-.coming-soon{
-  padding:40px;
-  text-align:center;
-  opacity:.8;
+.logo{
+  font-size:18px;
+  font-weight:700;
+}
+
+.status{
+  color:#22c55e;
+  font-size:14px;
+}
+
+.tabs{
+  display:flex;
+  gap:8px;
+  padding:12px;
+}
+
+.tab{
+  flex:1;
+  border:none;
+  border-radius:10px;
+  padding:10px;
+  background:#1f2937;
+  color:white;
+}
+
+.tab.active{
+  background:#2563eb;
+}
+
+.search-wrap{
+  padding:0 12px 12px;
+}
+
+.search{
+  width:100%;
+  padding:12px;
+  border:none;
+  border-radius:10px;
+}
+
+.chat-list{
+  padding:12px;
+}
+
+.chat-card{
+  background:#111827;
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:10px;
+}
+
+.chat-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.program{
+  margin-top:8px;
+  color:#9ca3af;
+  font-size:13px;
+}
+
+.last-msg{
+  margin-top:8px;
+  color:#d1d5db;
+  font-size:14px;
+}
+
+.badge{
+  font-size:12px;
+  padding:4px 8px;
+  border-radius:999px;
+}
+
+.waiting{
+  background:#f59e0b;
+}
+
+.active-badge{
+  background:#10b981;
 }
