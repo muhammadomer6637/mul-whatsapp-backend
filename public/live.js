@@ -82,6 +82,5 @@ loadChats();
 
 function openChat(phone) {
   localStorage.setItem("selected_chat_phone", phone);
-
-  alert("Chat selected: " + phone);
+  window.location.href = "/live-chat";
 }
