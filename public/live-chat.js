@@ -189,6 +189,7 @@ async function switchBackToBot() {
 document.addEventListener("DOMContentLoaded", () => {
   loadChatInfo();
   loadMessages();
+  setInterval(loadMessages, 5000);
 
   const input = document.getElementById("messageInput");
 
