@@ -1,4 +1,5 @@
 let currentFilter = "all";
+let searchTerm = "";
 async function loadChats() {
   try {
     const token =
@@ -21,8 +22,32 @@ async function loadChats() {
     const wrap = document.getElementById("chatList");
     wrap.innerHTML = "";
 
-  data.chats
+ data.chats
   .filter(chat => {
+
+    const searchableText = `
+      ${chat.name || ""}
+      ${chat.phone || ""}
+      ${chat.program || ""}
+    `.toLowerCase();
+
+    if (
+      searchTerm &&
+      !searchableText.includes(searchTerm.toLowerCase())
+    ) {
+      return false;
+    }
+
+    if (currentFilter === "waiting") {
+      return chat.status === "agent_waiting";
+    }
+
+    if (currentFilter === "active") {
+      return chat.status === "active";
+    }
+
+    return true;
+  })
 
     if (currentFilter === "waiting") {
       return chat.status === "agent_waiting";
@@ -141,6 +166,15 @@ document
     document
       .getElementById("allTab")
       .classList.add("active");
+
+    loadChats();
+  });
+
+document
+  .getElementById("searchInput")
+  .addEventListener("input", (e) => {
+
+    searchTerm = e.target.value;
 
     loadChats();
   });
