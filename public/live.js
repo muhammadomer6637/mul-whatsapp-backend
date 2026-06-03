@@ -1,3 +1,4 @@
+let currentFilter = "all";
 async function loadChats() {
   try {
     const token =
@@ -20,7 +21,20 @@ async function loadChats() {
     const wrap = document.getElementById("chatList");
     wrap.innerHTML = "";
 
-    data.chats.forEach(chat => {
+  data.chats
+  .filter(chat => {
+
+    if (currentFilter === "waiting") {
+      return chat.status === "agent_waiting";
+    }
+
+    if (currentFilter === "active") {
+      return chat.status === "active";
+    }
+
+    return true;
+  })
+  .forEach(chat => {
       const statusClass =
         chat.status === "agent_waiting"
           ? "waiting"
