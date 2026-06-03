@@ -94,6 +94,57 @@ async function loadChats() {
 
 loadChats();
 
+document
+  .getElementById("waitingTab")
+  .addEventListener("click", () => {
+
+    currentFilter = "waiting";
+
+    document
+      .querySelectorAll(".tab")
+      .forEach(btn => btn.classList.remove("active"));
+
+    document
+      .getElementById("waitingTab")
+      .classList.add("active");
+
+    loadChats();
+  });
+
+document
+  .getElementById("activeTab")
+  .addEventListener("click", () => {
+
+    currentFilter = "active";
+
+    document
+      .querySelectorAll(".tab")
+      .forEach(btn => btn.classList.remove("active"));
+
+    document
+      .getElementById("activeTab")
+      .classList.add("active");
+
+    loadChats();
+  });
+
+document
+  .getElementById("allTab")
+  .addEventListener("click", () => {
+
+    currentFilter = "all";
+
+    document
+      .querySelectorAll(".tab")
+      .forEach(btn => btn.classList.remove("active"));
+
+    document
+      .getElementById("allTab")
+      .classList.add("active");
+
+    loadChats();
+  });
+
 function openChat(phone) {
   localStorage.setItem("selected_chat_phone", phone);
   window.location.href = "/live-chat";
