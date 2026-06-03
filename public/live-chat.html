@@ -34,15 +34,23 @@
       <button onclick="insertQuickReply('docs')">Docs</button>
     </div>
 
-    <div class="composer">
-      <input
-        id="messageInput"
-        type="text"
-        placeholder="Type your reply..."
-      />
+<div class="composer">
 
-      <button onclick="sendMessage()">Send</button>
-    </div>
+  <input
+    id="messageInput"
+    type="text"
+    placeholder="Type your reply..."
+  />
+
+  <button class="send-btn" onclick="sendMessage()">
+    Send
+  </button>
+
+  <button class="bot-mini-btn" onclick="switchBackToBot()">
+    🤖
+  </button>
+
+</div>
 
     <button class="bot-btn" onclick="switchBackToBot()">
       Back to Bot
