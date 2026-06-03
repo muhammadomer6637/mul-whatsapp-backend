@@ -81,11 +81,19 @@ body{
 
 .bubble{
   max-width:78%;
+  width:fit-content;
   padding:10px 12px;
   border-radius:14px;
   font-size:14px;
   line-height:1.4;
   white-space:pre-wrap;
+  word-break:break-word;
+}
+
+@media (min-width: 768px){
+  .bubble{
+    max-width:420px;
+  }
 }
 
 .message-row.user .bubble{
