@@ -4,6 +4,12 @@
   box-sizing:border-box;
 }
 
+html,
+body{
+  height:100%;
+  overflow:hidden;
+}
+
 body{
   background:#0b1220;
   color:white;
@@ -11,9 +17,10 @@ body{
 }
 
 .chat-app{
-  min-height:100vh;
+  height:100vh;
   display:flex;
   flex-direction:column;
+  overflow:hidden;
 }
 
 .chat-header{
@@ -52,6 +59,7 @@ body{
 
 .messages-box{
   flex:1;
+  min-height:0;
   padding:14px;
   overflow-y:auto;
   background:
@@ -111,6 +119,10 @@ body{
   font-size:10px;
   opacity:.65;
   margin-top:5px;
+}
+
+.bottom-area{
+  flex-shrink:0;
 }
 
 .quick-replies{
