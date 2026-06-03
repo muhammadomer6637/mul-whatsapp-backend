@@ -185,3 +185,17 @@ body{
   padding:12px;
   font-weight:700;
 }
+
+.chat-actions{
+  margin-top:6px;
+}
+
+.take-btn{
+  border:none;
+  border-radius:999px;
+  padding:6px 12px;
+  background:#22c55e;
+  color:white;
+  font-size:12px;
+  font-weight:700;
+}
