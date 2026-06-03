@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>MUL Nexus Chat</title>
+
+  <link rel="stylesheet" href="/live-chat.css" />
+</head>
+
+<body>
+  <div class="chat-app">
+
+    <div class="chat-header">
+      <button class="back-btn" onclick="goBack()">←</button>
+
+      <div>
+        <div id="chatName" class="chat-name">Loading...</div>
+        <div id="chatMeta" class="chat-meta">Please wait</div>
+      </div>
+    </div>
+
+    <div id="messagesBox" class="messages-box">
+      <div class="loading">Loading messages...</div>
+    </div>
+
+    <div class="quick-replies">
+      <button onclick="insertQuickReply('fee')">Fee</button>
+      <button onclick="insertQuickReply('apply')">Apply</button>
+      <button onclick="insertQuickReply('scholarship')">Scholarship</button>
+      <button onclick="insertQuickReply('docs')">Docs</button>
+    </div>
+
+    <div class="composer">
+      <input
+        id="messageInput"
+        type="text"
+        placeholder="Type your reply..."
+      />
+
+      <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <button class="bot-btn" onclick="switchBackToBot()">
+      Back to Bot
+    </button>
+
+  </div>
+
+  <script src="/live-chat.js"></script>
+</body>
+</html>
