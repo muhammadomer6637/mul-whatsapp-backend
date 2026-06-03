@@ -2045,12 +2045,16 @@ if (userStates[from]?.currentMenu === "agent_category") {
 
       await sendTextMessage(
         from,
-        `Please send your details:
+        `Please share your details in this format:
 
-Name, Program
+Your Name, Interested Program
+
+⚠️ Please add comma ( , ) between your name and program.
 
 Example:
-Ali, BS Computer Science`
+Ali, BS Computer Science
+
+If comma is missing, your request may not be forwarded correctly.`
       );
     }
 
