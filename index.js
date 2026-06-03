@@ -3128,6 +3128,10 @@ app.get("/live", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "live.html"));
 });
 
+app.get("/live-chat", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "live-chat.html"));
+});
+
 app.listen(3000, async () => {
   console.log("Server running on port 3000");
 
