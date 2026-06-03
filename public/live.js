@@ -1,5 +1,6 @@
 let currentFilter = "all";
 let searchTerm = "";
+
 async function loadChats() {
   try {
     const token =
@@ -22,44 +23,43 @@ async function loadChats() {
     const wrap = document.getElementById("chatList");
     wrap.innerHTML = "";
 
- data.chats
-  .filter(chat => {
+    const filteredChats = data.chats.filter(chat => {
+      const searchableText = `
+        ${chat.name || ""}
+        ${chat.phone || ""}
+        ${chat.program || ""}
+      `.toLowerCase();
 
-    const searchableText = `
-      ${chat.name || ""}
-      ${chat.phone || ""}
-      ${chat.program || ""}
-    `.toLowerCase();
+      if (
+        searchTerm &&
+        !searchableText.includes(searchTerm.toLowerCase())
+      ) {
+        return false;
+      }
 
-    if (
-      searchTerm &&
-      !searchableText.includes(searchTerm.toLowerCase())
-    ) {
-      return false;
+      if (currentFilter === "waiting") {
+        return chat.status === "agent_waiting";
+      }
+
+      if (currentFilter === "active") {
+        return chat.status === "active";
+      }
+
+      return true;
+    });
+
+    if (!filteredChats.length) {
+      wrap.innerHTML = `
+        <div class="chat-card">
+          <div class="last-msg">
+            No chats found.
+          </div>
+        </div>
+      `;
+      return;
     }
 
-    if (currentFilter === "waiting") {
-      return chat.status === "agent_waiting";
-    }
-
-    if (currentFilter === "active") {
-      return chat.status === "active";
-    }
-
-    return true;
-  })
-
-    if (currentFilter === "waiting") {
-      return chat.status === "agent_waiting";
-    }
-
-    if (currentFilter === "active") {
-      return chat.status === "active";
-    }
-
-    return true;
-  })
-  .forEach(chat => {
+    filteredChats.forEach(chat => {
       const statusClass =
         chat.status === "agent_waiting"
           ? "waiting"
@@ -76,7 +76,7 @@ async function loadChats() {
           : "No message yet";
 
       wrap.innerHTML += `
-       <div class="chat-card" onclick="openChat('${chat.phone}')">
+        <div class="chat-card" onclick="openChat('${chat.phone}')">
 
           <div class="chat-top">
             <strong>${chat.name || "Unknown Student"}</strong>
@@ -117,12 +117,16 @@ async function loadChats() {
   }
 }
 
+function openChat(phone) {
+  localStorage.setItem("selected_chat_phone", phone);
+  window.location.href = "/live-chat";
+}
+
 loadChats();
 
 document
   .getElementById("waitingTab")
   .addEventListener("click", () => {
-
     currentFilter = "waiting";
 
     document
@@ -139,7 +143,6 @@ document
 document
   .getElementById("activeTab")
   .addEventListener("click", () => {
-
     currentFilter = "active";
 
     document
@@ -156,7 +159,6 @@ document
 document
   .getElementById("allTab")
   .addEventListener("click", () => {
-
     currentFilter = "all";
 
     document
@@ -173,13 +175,6 @@ document
 document
   .getElementById("searchInput")
   .addEventListener("input", (e) => {
-
     searchTerm = e.target.value;
-
     loadChats();
   });
-
-function openChat(phone) {
-  localStorage.setItem("selected_chat_phone", phone);
-  window.location.href = "/live-chat";
-}
