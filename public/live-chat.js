@@ -39,6 +39,10 @@ async function loadChatInfo() {
 
     document.getElementById("chatMeta").textContent =
       `${chat?.program || "Program Not Selected"} · ${selectedPhone}`;
+    document.getElementById("chatActions").innerHTML =
+  chat?.status === "agent_waiting"
+    ? `<button class="take-btn" onclick="takeChat()">Take Chat</button>`
+    : "";
 
   } catch (error) {
     console.error("loadChatInfo error:", error);
@@ -199,3 +203,37 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+async function takeChat() {
+  try {
+    await fetch("/api/assign-chat", {
+      method: "POST",
+      headers: authHeaders({
+        "Content-Type": "application/json"
+      }),
+      body: JSON.stringify({
+        phone: selectedPhone,
+        agent: "assign"
+      })
+    });
+
+    await fetch("/api/switch-mode", {
+      method: "POST",
+      headers: authHeaders({
+        "Content-Type": "application/json"
+      }),
+      body: JSON.stringify({
+        phone: selectedPhone,
+        mode: "agent"
+      })
+    });
+
+    await loadChatInfo();
+    await loadMessages();
+
+    alert("Chat assigned successfully.");
+  } catch (error) {
+    console.error("takeChat error:", error);
+    alert("Failed to take chat.");
+  }
+}
