@@ -42,7 +42,7 @@ async function loadChats() {
       }
 
       if (currentFilter === "active") {
-        return chat.status === "active";
+       return chat.status === "agent_active";
       }
 
       return true;
