@@ -2101,10 +2101,21 @@ If comma is missing, your request may not be forwarded correctly.`
       mime_type
     });
 
-    const incomingChatStatus =
-      currentMode === "agent" ? "agent_waiting" : "active";
+const existingChatResult = await pool.query(
+  "SELECT status FROM chats WHERE phone = $1 LIMIT 1",
+  [from]
+);
 
-    await incrementUnreadAndSetIncoming(from, incomingText, incomingChatStatus);
+const existingChatStatus = existingChatResult.rows[0]?.status;
+
+const incomingChatStatus =
+  currentMode === "agent"
+    ? existingChatStatus === "agent_active"
+      ? "agent_active"
+      : "agent_waiting"
+    : "active";
+
+await incrementUnreadAndSetIncoming(from, incomingText, incomingChatStatus);
 
     if (currentMode === "agent") {
       console.log(`Bot stopped for ${from} because user is in agent mode.`);
