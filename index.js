@@ -2539,9 +2539,12 @@ if (lowerText === "7") {
       from,
       `Thank you for contacting Minhaj University Lahore.
 
-Currently no agent available due to non office hours.
+Our representatives are currently unavailable as this inquiry has been received outside our support hours.
 
-For urgent information, you may continue exploring the menu options.
+🕘 Support Hours:
+Monday to Friday: 09:00 AM – 04:30 PM
+
+For immediate information, you may continue exploring the available menu options.
 
 Thank you for your patience.`
     );
