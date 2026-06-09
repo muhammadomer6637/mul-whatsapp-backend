@@ -2771,11 +2771,21 @@ app.post("/api/switch-mode", authenticateAgent, async (req, res) => {
       };
     }
 
-    if (mode === "bot") {
-      userStates[phone].awaitingLead = false;
-      userStates[phone].currentMenu = "main";
-      userStates[phone].previousMenu = "main";
-    }
+   if (mode === "bot") {
+  userStates[phone].awaitingLead = false;
+  userStates[phone].currentMenu = "main";
+  userStates[phone].previousMenu = "main";
+
+  await sendTextMessage(
+    phone,
+    `Thank you for contacting Minhaj University Lahore.
+
+You have now been transferred back to our automated admissions assistant. You may continue exploring admissions information, programs, fee structure, scholarships, and other services at any time.
+
+If you require further assistance from an admissions representative, simply select "Chat with Admissions Advisor" again.`,
+    "active"
+  );
+}
 
     return res.json({
       success: true,
