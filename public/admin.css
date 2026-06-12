@@ -247,6 +247,24 @@ body {
   font-size: 13px;
 }
 
+.stat-card.performance {
+  border-color: rgba(47,125,246,0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(23,52,104,0.95),
+    rgba(12,33,70,0.95)
+  );
+}
+
+.stat-card.live {
+  border-color: rgba(24,195,126,0.28);
+  background: linear-gradient(
+    180deg,
+    rgba(10,74,54,0.95),
+    rgba(7,52,38,0.95)
+  );
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
