@@ -281,33 +281,37 @@ async function loadDashboard(range = "24h") {
     const stats = data.stats;
     const callback = data.callbackStats || {};
 
-    document.getElementById("stats").innerHTML = `
-      <div class="stat-card">
-        <div class="label">Conversations Started</div>
-        <div class="value">${stats.conversationsStarted}</div>
-        <div class="meta">New conversations in selected range</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Unread Conversations</div>
-        <div class="value">${stats.unreadConversations}</div>
-        <div class="meta">Chats currently awaiting review</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Total Unread Messages</div>
-        <div class="value">${stats.totalUnreadMessages}</div>
-        <div class="meta">Pending incoming messages across chats</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Agent Waiting</div>
-        <div class="value">${stats.agentWaiting}</div>
-        <div class="meta">Leads waiting for manual handling</div>
-      </div>
-      <div class="stat-card">
-        <div class="label">Active with Agent</div>
-        <div class="value">${stats.activeWithAgent}</div>
-        <div class="meta">Users active in last 10 minutes</div>
-      </div>
-    `;
+document.getElementById("stats").innerHTML = `
+  <div class="stat-card">
+    <div class="label">Total Conversations</div>
+    <div class="value">${stats.conversationsStarted}</div>
+    <div class="meta">Date filtered</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="label">Total Incoming Messages</div>
+    <div class="value">${stats.totalIncomingMessages}</div>
+    <div class="meta">Date filtered user messages</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="label">Active with Agent</div>
+    <div class="value">${stats.activeWithAgent}</div>
+    <div class="meta">Live now</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="label">Agent Waiting</div>
+    <div class="value">${stats.agentWaiting}</div>
+    <div class="meta">Live now</div>
+  </div>
+
+  <div class="stat-card">
+    <div class="label">Active with Bot</div>
+    <div class="value">${stats.activeWithBot}</div>
+    <div class="meta">Live now</div>
+  </div>
+`;
 
         document.getElementById("callbackStats").innerHTML = `
       <div class="stat-card">
@@ -363,7 +367,7 @@ async function loadDashboard(range = "24h") {
       <div class="mini-stat"><h4>Agent Waiting</h4><div class="mini-value">${stats.agentWaiting}</div></div>
       <div class="mini-stat"><h4>Agent Active</h4><div class="mini-value">${stats.agentActive}</div></div>
       <div class="mini-stat"><h4>Active with Bot</h4><div class="mini-value">${stats.activeWithBot}</div></div>
-      <div class="mini-stat"><h4>Total Unread</h4><div class="mini-value">${stats.totalUnreadMessages}</div></div>
+     <div class="mini-stat"><h4>Total Incoming</h4><div class="mini-value">${stats.totalIncomingMessages}</div></div>
     `;
 
     const topProgramsWrap = document.getElementById("topProgramsList");
