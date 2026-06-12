@@ -842,7 +842,7 @@ Location: Ground Floor, Omar Bin Al Khattab Block`,
     "6b": `🎓 Students Affairs Office
 
 Phone: 042-35145621-6
-Extensions: 346 & 346
+Extensions: 346 & 446
 Email: support.students@mul.edu.pk
 Location: First Floor, Omar Bin Al Khattab Block`,
 
