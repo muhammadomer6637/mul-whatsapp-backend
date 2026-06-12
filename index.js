@@ -2914,10 +2914,15 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       WHERE unread_count > 0
     `);
 
-    const totalUnreadMessages = await pool.query(`
-      SELECT COALESCE(SUM(unread_count), 0)::int AS count
-      FROM chats
-    `);
+    const totalIncomingMessages = await pool.query(
+  `
+  SELECT COUNT(*)::int AS count
+  FROM messages
+  WHERE sender = 'user'
+    AND ${whereCreated}
+  `,
+  queryParams
+);
 
     const agentWaiting = await pool.query(`
       SELECT COUNT(*)::int AS count
@@ -3036,7 +3041,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       stats: {
         conversationsStarted: conversationsStarted.rows[0].count,
         unreadConversations: unreadConversations.rows[0].count,
-        totalUnreadMessages: totalUnreadMessages.rows[0].count,
+        totalIncomingMessages: totalIncomingMessages.rows[0].count,
         agentWaiting: agentWaiting.rows[0].count,
         agentActive: agentActive.rows[0].count,
         activeWithBot: activeWithBot.rows[0].count,
