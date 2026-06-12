@@ -282,31 +282,31 @@ async function loadDashboard(range = "24h") {
     const callback = data.callbackStats || {};
 
 document.getElementById("stats").innerHTML = `
-  <div class="stat-card">
+  <div class="stat-card performance">
     <div class="label">Total Conversations</div>
     <div class="value">${stats.conversationsStarted}</div>
     <div class="meta">Date filtered</div>
   </div>
 
-  <div class="stat-card">
+  <div class="stat-card performance">
     <div class="label">Total Incoming Messages</div>
     <div class="value">${stats.totalIncomingMessages}</div>
     <div class="meta">Date filtered user messages</div>
   </div>
 
-  <div class="stat-card">
+  <div class="stat-card live">
     <div class="label">Active with Agent</div>
     <div class="value">${stats.activeWithAgent}</div>
     <div class="meta">Live now</div>
   </div>
 
-  <div class="stat-card">
+  <div class="stat-card live">
     <div class="label">Agent Waiting</div>
     <div class="value">${stats.agentWaiting}</div>
     <div class="meta">Live now</div>
   </div>
 
-  <div class="stat-card">
+  <div class="stat-card live">
     <div class="label">Active with Bot</div>
     <div class="value">${stats.activeWithBot}</div>
     <div class="meta">Live now</div>
