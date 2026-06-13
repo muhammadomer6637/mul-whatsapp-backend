@@ -3165,28 +3165,11 @@ app.get("/live-chat", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "live-chat.html"));
 });
 
-async function ensureFunnelColumns() {
-  try {
-    await pool.query(`
-      ALTER TABLE users
-      ADD COLUMN IF NOT EXISTS registered_at TIMESTAMP NULL,
-      ADD COLUMN IF NOT EXISTS processing_fee_paid_at TIMESTAMP NULL,
-      ADD COLUMN IF NOT EXISTS documents_submitted_at TIMESTAMP NULL,
-      ADD COLUMN IF NOT EXISTS admission_fee_paid_at TIMESTAMP NULL;
-    `);
-
-    console.log("Funnel columns ensured");
-  } catch (error) {
-    console.error("ensureFunnelColumns error:", error.message);
-  }
-}
-
 app.listen(3000, async () => {
   console.log("Server running on port 3000");
 
   await testConnection();
   await initDb();
-  await ensureFunnelColumns();
 
   // 🔥 MEDIA COLUMNS AUTO ADD (RUN ONCE)
   try {
