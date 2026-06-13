@@ -727,7 +727,7 @@ function formatProgramChunk(title, items, currentIndex, totalChunks, nextCode = 
   let msg = `🎓 ${title}\n\n${list}`;
 
   if (currentIndex < totalChunks - 1 && nextCode) {
-    msg += `\n\nReply ${nextCode} for more programs`;
+    msg += `\n\n📌 To view the next list, please type exactly:\n${nextCode}`;
   }
 
   return msg;
