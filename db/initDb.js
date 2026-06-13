@@ -155,6 +155,26 @@ await pool.query(`
   ADD COLUMN IF NOT EXISTS callback_offer_count INTEGER DEFAULT 0;
 `);
 
+await pool.query(`
+  ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS registered_at TIMESTAMP;
+`);
+
+await pool.query(`
+  ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS processing_fee_paid_at TIMESTAMP;
+`);
+
+await pool.query(`
+  ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS documents_submitted_at TIMESTAMP;
+`);
+
+await pool.query(`
+  ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS admission_fee_paid_at TIMESTAMP;
+`);
+    
     await pool.query(`
   ALTER TABLE callback_requests
   ADD COLUMN IF NOT EXISTS request_count INTEGER DEFAULT 1;
