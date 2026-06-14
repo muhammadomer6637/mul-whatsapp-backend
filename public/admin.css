@@ -293,6 +293,11 @@ body {
   background: rgba(255,255,255,0.08);
 }
 
+.funnel-menu-item:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
