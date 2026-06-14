@@ -741,6 +741,41 @@ You may also share your name and interested program here so our admission repres
   input.focus();
 }
 
+function toggleFunnelMenu() {
+  const existing = document.getElementById("funnelMenu");
+
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const header = document.getElementById("chatHeader");
+  if (!header) return;
+
+  const menu = document.createElement("div");
+  menu.id = "funnelMenu";
+
+  menu.innerHTML = `
+    <div class="funnel-menu-card">
+      <div>Registered</div>
+      <div>Processing Fee Paid</div>
+      <div>Documents Submitted</div>
+      <div>Admission Fee Paid</div>
+
+      <hr>
+
+      <div>Assign To Call Agent</div>
+    </div>
+  `;
+
+  menu.style.position = "absolute";
+  menu.style.right = "20px";
+  menu.style.top = "70px";
+  menu.style.zIndex = "999";
+
+  header.appendChild(menu);
+}
+
 async function sendMessage() {
   const input = document.getElementById("messageInput");
   const msg = input.value.trim();
