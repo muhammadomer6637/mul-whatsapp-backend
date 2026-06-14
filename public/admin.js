@@ -779,19 +779,31 @@ const admissionFeeIcon = funnel.admission_fee_paid_at ? "✓" : "○";
   menu.innerHTML = `
   <div class="funnel-menu-card">
   
-    <button class="funnel-menu-item" onclick="updateFunnelStage('registered')">
+    <button
+  class="funnel-menu-item"
+  ${funnel.registered_at ? "disabled" : `onclick="updateFunnelStage('registered')"`}
+>
   ${registeredIcon} Registered
 </button>
 
-<button class="funnel-menu-item" onclick="updateFunnelStage('processing_fee_paid')">
+<button
+  class="funnel-menu-item"
+  ${funnel.processing_fee_paid_at ? "disabled" : `onclick="updateFunnelStage('processing_fee_paid')"`}
+>
   ${processingIcon} Processing Fee Paid
 </button>
 
-<button class="funnel-menu-item" onclick="updateFunnelStage('documents_submitted')">
+<button
+  class="funnel-menu-item"
+  ${funnel.documents_submitted_at ? "disabled" : `onclick="updateFunnelStage('documents_submitted')"`}
+>
   ${documentsIcon} Documents Submitted
 </button>
 
-<button class="funnel-menu-item" onclick="updateFunnelStage('admission_fee_paid')">
+<button
+  class="funnel-menu-item"
+  ${funnel.admission_fee_paid_at ? "disabled" : `onclick="updateFunnelStage('admission_fee_paid')"`}
+>
   ${admissionFeeIcon} Admission Fee Paid
 </button>
 
