@@ -280,6 +280,7 @@ async function loadDashboard(range = "24h") {
 
     const stats = data.stats;
     const callback = data.callbackStats || {};
+    const funnel = data.funnelStats || {};
 
 document.getElementById("stats").innerHTML = `
   <div class="stat-card performance">
@@ -369,6 +370,11 @@ document.getElementById("stats").innerHTML = `
       <div class="mini-stat"><h4>Active with Bot</h4><div class="mini-value">${stats.activeWithBot}</div></div>
      <div class="mini-stat"><h4>Total Incoming</h4><div class="mini-value">${stats.totalIncomingMessages}</div></div>
     `;
+
+    document.getElementById("funnelRegistrations").textContent = funnel.registrations || 0;
+document.getElementById("funnelProcessingFee").textContent = funnel.processingFee || 0;
+document.getElementById("funnelDocuments").textContent = funnel.documentsSubmitted || 0;
+document.getElementById("funnelFeePaid").textContent = funnel.feePaid || 0;
 
     const topProgramsWrap = document.getElementById("topProgramsList");
 
