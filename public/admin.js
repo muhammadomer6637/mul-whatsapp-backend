@@ -581,7 +581,19 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
       <h3>${escapeHtml(selectedChat?.name || phone)}</h3>
       <p>${escapeHtml(prettyProgramName(selectedChat?.program || "No program selected"))} · ${escapeHtml(selectedChat?.phone || phone)}</p>
     </div>
-   <span class="status-chip status-${selectedChat?.status || "active"}">${formatStatus(selectedChat?.status || "active")}</span>
+  <div style="display:flex; align-items:center; gap:8px;">
+  <span class="status-chip status-${selectedChat?.status || "active"}">
+    ${formatStatus(selectedChat?.status || "active")}
+  </span>
+
+  <button
+    class="ghost-btn"
+    onclick="toggleFunnelMenu()"
+    style="padding:6px 10px;"
+  >
+    ⋮
+  </button>
+</div>
 
 <div style="display:flex; gap:8px; margin-left:10px;">
   ${
