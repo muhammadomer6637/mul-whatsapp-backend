@@ -749,7 +749,47 @@ function toggleFunnelMenu() {
     return;
   }
 
-  async function updateFunnelStage(stage) {
+  const header = document.getElementById("chatHeader");
+  if (!header) return;
+
+  const menu = document.createElement("div");
+  menu.id = "funnelMenu";
+
+  menu.innerHTML = `
+    <div class="funnel-menu-card">
+      <button class="funnel-menu-item" onclick="updateFunnelStage('registered')">
+        ○ Registered
+      </button>
+
+      <button class="funnel-menu-item" onclick="updateFunnelStage('processing_fee_paid')">
+        ○ Processing Fee Paid
+      </button>
+
+      <button class="funnel-menu-item" onclick="updateFunnelStage('documents_submitted')">
+        ○ Documents Submitted
+      </button>
+
+      <button class="funnel-menu-item" onclick="updateFunnelStage('admission_fee_paid')">
+        ○ Admission Fee Paid
+      </button>
+
+      <hr>
+
+      <button class="funnel-menu-item" onclick="alert('Assign To Call Agent will be added next.')">
+        Assign To Call Agent
+      </button>
+    </div>
+  `;
+
+  menu.style.position = "absolute";
+  menu.style.right = "20px";
+  menu.style.top = "70px";
+  menu.style.zIndex = "999";
+
+  header.appendChild(menu);
+}
+
+async function updateFunnelStage(stage) {
   if (!selectedPhone) {
     alert("Please select a chat first.");
     return;
@@ -781,48 +821,6 @@ function toggleFunnelMenu() {
     console.error("updateFunnelStage error:", error);
     alert("Funnel status update failed.");
   }
-}
-
-  const header = document.getElementById("chatHeader");
-  if (!header) return;
-
-  const menu = document.createElement("div");
-  menu.id = "funnelMenu";
-
-  menu.innerHTML = `
-  <div class="funnel-menu-card">
-    <button class="funnel-menu-item" onclick="updateFunnelStage('registered')">
-      ○ Registered
-    </button>
-
-    <button class="funnel-menu-item" onclick="updateFunnelStage('processing_fee_paid')">
-      ○ Processing Fee Paid
-    </button>
-
-    <button class="funnel-menu-item" onclick="updateFunnelStage('documents_submitted')">
-      ○ Documents Submitted
-    </button>
-
-    <button class="funnel-menu-item" onclick="updateFunnelStage('admission_fee_paid')">
-      ○ Admission Fee Paid
-    </button>
-
-    <hr>
-
-    <button class="funnel-menu-item" onclick="alert('Assign To Call Agent will be added next.')">
-      Assign To Call Agent
-    </button>
-  </div>
-`;
-
-  
-
-  menu.style.position = "absolute";
-  menu.style.right = "20px";
-  menu.style.top = "70px";
-  menu.style.zIndex = "999";
-
-  header.appendChild(menu);
 }
 
 async function sendMessage() {
