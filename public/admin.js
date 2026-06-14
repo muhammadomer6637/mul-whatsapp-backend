@@ -741,7 +741,7 @@ You may also share your name and interested program here so our admission repres
   input.focus();
 }
 
-function toggleFunnelMenu() {
+async function toggleFunnelMenu() {
   const existing = document.getElementById("funnelMenu");
 
   if (existing) {
@@ -755,23 +755,45 @@ function toggleFunnelMenu() {
   const menu = document.createElement("div");
   menu.id = "funnelMenu";
 
+  let funnel = {};
+
+try {
+  const res = await fetch(`${BASE}/api/funnel-status/${selectedPhone}`, {
+    headers: authHeaders()
+  });
+
+  const data = await res.json();
+
+  if (data.success) {
+    funnel = data.funnel || {};
+  }
+} catch (error) {
+  console.error("load funnel status error:", error);
+}
+
+const registeredIcon = funnel.registered_at ? "✓" : "○";
+const processingIcon = funnel.processing_fee_paid_at ? "✓" : "○";
+const documentsIcon = funnel.documents_submitted_at ? "✓" : "○";
+const admissionFeeIcon = funnel.admission_fee_paid_at ? "✓" : "○";
+
   menu.innerHTML = `
-    <div class="funnel-menu-card">
-      <button class="funnel-menu-item" onclick="updateFunnelStage('registered')">
-        ○ Registered
-      </button>
+  <div class="funnel-menu-card">
+  
+    <button class="funnel-menu-item" onclick="updateFunnelStage('registered')">
+  ${registeredIcon} Registered
+</button>
 
-      <button class="funnel-menu-item" onclick="updateFunnelStage('processing_fee_paid')">
-        ○ Processing Fee Paid
-      </button>
+<button class="funnel-menu-item" onclick="updateFunnelStage('processing_fee_paid')">
+  ${processingIcon} Processing Fee Paid
+</button>
 
-      <button class="funnel-menu-item" onclick="updateFunnelStage('documents_submitted')">
-        ○ Documents Submitted
-      </button>
+<button class="funnel-menu-item" onclick="updateFunnelStage('documents_submitted')">
+  ${documentsIcon} Documents Submitted
+</button>
 
-      <button class="funnel-menu-item" onclick="updateFunnelStage('admission_fee_paid')">
-        ○ Admission Fee Paid
-      </button>
+<button class="funnel-menu-item" onclick="updateFunnelStage('admission_fee_paid')">
+  ${admissionFeeIcon} Admission Fee Paid
+</button>
 
       <hr>
 
