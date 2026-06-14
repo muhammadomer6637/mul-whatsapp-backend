@@ -2726,6 +2726,46 @@ app.post("/api/funnel-status", authenticateAgent, async (req, res) => {
   }
 });
 
+app.get("/api/funnel-status/:phone", authenticateAgent, async (req, res) => {
+  try {
+    const { phone } = req.params;
+
+    const result = await pool.query(
+      `
+      SELECT
+        phone,
+        registered_at,
+        processing_fee_paid_at,
+        documents_submitted_at,
+        admission_fee_paid_at
+      FROM users
+      WHERE phone = $1
+      `,
+      [phone]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      funnel: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error("GET /api/funnel-status error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch funnel status"
+    });
+  }
+});
+
 app.get("/api/chats", authenticateAgent, async (req, res) => {
   try {
     const result = await pool.query(`
