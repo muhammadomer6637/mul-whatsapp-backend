@@ -277,6 +277,22 @@ body {
   box-shadow: 0 10px 25px rgba(0,0,0,.35);
 }
 
+.funnel-menu-item {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  text-align: left;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 8px 6px;
+  border-radius: 8px;
+}
+
+.funnel-menu-item:hover {
+  background: rgba(255,255,255,0.08);
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
