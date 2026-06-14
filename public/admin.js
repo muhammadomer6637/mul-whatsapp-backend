@@ -837,7 +837,7 @@ async function updateFunnelStage(stage) {
     const menu = document.getElementById("funnelMenu");
     if (menu) menu.remove();
 
-    alert("Funnel status updated.");
+   await openChat(selectedPhone, false);
 
   } catch (error) {
     console.error("updateFunnelStage error:", error);
