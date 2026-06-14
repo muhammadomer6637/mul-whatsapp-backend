@@ -749,6 +749,40 @@ function toggleFunnelMenu() {
     return;
   }
 
+  async function updateFunnelStage(stage) {
+  if (!selectedPhone) {
+    alert("Please select a chat first.");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${BASE}/api/funnel-status`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        phone: selectedPhone,
+        stage
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "Failed to update funnel status");
+      return;
+    }
+
+    const menu = document.getElementById("funnelMenu");
+    if (menu) menu.remove();
+
+    alert("Funnel status updated.");
+
+  } catch (error) {
+    console.error("updateFunnelStage error:", error);
+    alert("Funnel status update failed.");
+  }
+}
+
   const header = document.getElementById("chatHeader");
   if (!header) return;
 
@@ -756,17 +790,32 @@ function toggleFunnelMenu() {
   menu.id = "funnelMenu";
 
   menu.innerHTML = `
-    <div class="funnel-menu-card">
-      <div>Registered</div>
-      <div>Processing Fee Paid</div>
-      <div>Documents Submitted</div>
-      <div>Admission Fee Paid</div>
+  <div class="funnel-menu-card">
+    <button class="funnel-menu-item" onclick="updateFunnelStage('registered')">
+      ○ Registered
+    </button>
 
-      <hr>
+    <button class="funnel-menu-item" onclick="updateFunnelStage('processing_fee_paid')">
+      ○ Processing Fee Paid
+    </button>
 
-      <div>Assign To Call Agent</div>
-    </div>
-  `;
+    <button class="funnel-menu-item" onclick="updateFunnelStage('documents_submitted')">
+      ○ Documents Submitted
+    </button>
+
+    <button class="funnel-menu-item" onclick="updateFunnelStage('admission_fee_paid')">
+      ○ Admission Fee Paid
+    </button>
+
+    <hr>
+
+    <button class="funnel-menu-item" onclick="alert('Assign To Call Agent will be added next.')">
+      Assign To Call Agent
+    </button>
+  </div>
+`;
+
+  
 
   menu.style.position = "absolute";
   menu.style.right = "20px";
