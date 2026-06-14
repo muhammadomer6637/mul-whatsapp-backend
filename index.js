@@ -2633,6 +2633,99 @@ app.post("/api/toggle-agent", authenticateAgent, async (req, res) => {
   res.json({ success: true });
 });
 
+app.post("/api/funnel-status", authenticateAgent, async (req, res) => {
+  try {
+    const { phone, stage } = req.body;
+
+    if (!phone || !stage) {
+      return res.status(400).json({
+        success: false,
+        error: "phone and stage are required"
+      });
+    }
+
+    const allowedStages = [
+      "registered",
+      "processing_fee_paid",
+      "documents_submitted",
+      "admission_fee_paid"
+    ];
+
+    if (!allowedStages.includes(stage)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid funnel stage"
+      });
+    }
+
+    let updateSql = "";
+
+    if (stage === "registered") {
+      updateSql = `
+        registered_at = COALESCE(registered_at, NOW())
+      `;
+    }
+
+    if (stage === "processing_fee_paid") {
+      updateSql = `
+        registered_at = COALESCE(registered_at, NOW()),
+        processing_fee_paid_at = COALESCE(processing_fee_paid_at, NOW())
+      `;
+    }
+
+    if (stage === "documents_submitted") {
+      updateSql = `
+        registered_at = COALESCE(registered_at, NOW()),
+        processing_fee_paid_at = COALESCE(processing_fee_paid_at, NOW()),
+        documents_submitted_at = COALESCE(documents_submitted_at, NOW())
+      `;
+    }
+
+    if (stage === "admission_fee_paid") {
+      updateSql = `
+        registered_at = COALESCE(registered_at, NOW()),
+        processing_fee_paid_at = COALESCE(processing_fee_paid_at, NOW()),
+        documents_submitted_at = COALESCE(documents_submitted_at, NOW()),
+        admission_fee_paid_at = COALESCE(admission_fee_paid_at, NOW())
+      `;
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE users
+      SET ${updateSql}
+      WHERE phone = $1
+      RETURNING
+        phone,
+        registered_at,
+        processing_fee_paid_at,
+        documents_submitted_at,
+        admission_fee_paid_at
+      `,
+      [phone]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      funnel: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error("POST /api/funnel-status error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update funnel status"
+    });
+  }
+});
+
 app.get("/api/chats", authenticateAgent, async (req, res) => {
   try {
     const result = await pool.query(`
