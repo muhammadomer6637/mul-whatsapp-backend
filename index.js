@@ -3116,6 +3116,45 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       LIMIT 10
     `);
 
+    const funnelStats = await pool.query(
+      `
+      SELECT
+        COUNT(*) FILTER (
+          WHERE registered_at IS NOT NULL
+          AND ${range === "custom" && start && end
+            ? "registered_at >= $1::timestamp AND registered_at < ($2::date + INTERVAL '1 day')"
+            : `registered_at >= NOW() - ${intervalSql}`
+          }
+        )::int AS registrations,
+
+        COUNT(*) FILTER (
+          WHERE processing_fee_paid_at IS NOT NULL
+          AND ${range === "custom" && start && end
+            ? "processing_fee_paid_at >= $1::timestamp AND processing_fee_paid_at < ($2::date + INTERVAL '1 day')"
+            : `processing_fee_paid_at >= NOW() - ${intervalSql}`
+          }
+        )::int AS processing_fee,
+
+        COUNT(*) FILTER (
+          WHERE documents_submitted_at IS NOT NULL
+          AND ${range === "custom" && start && end
+            ? "documents_submitted_at >= $1::timestamp AND documents_submitted_at < ($2::date + INTERVAL '1 day')"
+            : `documents_submitted_at >= NOW() - ${intervalSql}`
+          }
+        )::int AS documents_submitted,
+
+        COUNT(*) FILTER (
+          WHERE admission_fee_paid_at IS NOT NULL
+          AND ${range === "custom" && start && end
+            ? "admission_fee_paid_at >= $1::timestamp AND admission_fee_paid_at < ($2::date + INTERVAL '1 day')"
+            : `admission_fee_paid_at >= NOW() - ${intervalSql}`
+          }
+        )::int AS fee_paid
+      FROM users
+      `,
+      queryParams
+    );
+    
     const callbackTotals = await pool.query(
       `
       SELECT
@@ -3181,6 +3220,13 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         activeWithAgent: activeWithAgent.rows[0].count
       },
 
+      funnelStats: {
+        registrations: funnelStats.rows[0].registrations || 0,
+        processingFee: funnelStats.rows[0].processing_fee || 0,
+        documentsSubmitted: funnelStats.rows[0].documents_submitted || 0,
+        feePaid: funnelStats.rows[0].fee_paid || 0
+      },
+      
       callbackStats: {
         totalRequests: callbackTotals.rows[0].total_requests,
         uniqueNumbers: callbackTotals.rows[0].unique_numbers,
