@@ -1453,10 +1453,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const input = document.getElementById("messageInput");
 
   if (input) {
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") sendMessage();
-    });
-  }
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+}
 
   checkAuth();
 
