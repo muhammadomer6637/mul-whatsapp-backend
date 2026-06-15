@@ -679,7 +679,7 @@ body {
   flex-shrink: 0;
 }
 
-.composer input {
+.composer textarea {
   width: 100%;
   background: rgba(255,255,255,0.05);
   border: 1px solid var(--line);
@@ -688,6 +688,10 @@ body {
   border-radius: 16px;
   padding: 13px 15px;
   font-size: 15px;
+    min-height: 50px;
+  max-height: 120px;
+  resize: vertical;
+  font-family: inherit;
 }
 
 .primary-btn {
