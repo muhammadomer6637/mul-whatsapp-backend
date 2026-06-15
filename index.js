@@ -256,7 +256,7 @@ async function updateUserDetails(
       `
       UPDATE users
       SET
-        name = COALESCE($2, name),
+        name = COALESCE(NULLIF($2, ''), name),
         program = COALESCE($3, program),
         mode = COALESCE($4, mode)
       WHERE phone = $1
@@ -2247,6 +2247,16 @@ await incrementUnreadAndSetIncoming(from, incomingText, incomingChatStatus);
         mode: "agent"
       });
 
+await pool.query(
+  `
+  UPDATE users
+  SET name = $2,
+      program = $3
+  WHERE phone = $1
+  `,
+  [from, cleanName, program]
+);
+      
       await upsertChat(from, `Lead: ${cleanName} - ${program}`, "agent_waiting");
 
       await sendTextMessage(
