@@ -1096,6 +1096,13 @@ async function updateCallback(id) {
 
     const data = await res.json();
 
+    console.log("Callback Update Response:", data);
+
+if (!data.success) {
+  alert(data.error || "Failed to update callback");
+  return;
+}
+
     if (!data.success) {
       alert(data.error || "Failed to update callback");
       return;
