@@ -1096,13 +1096,6 @@ async function updateCallback(id) {
 
     const data = await res.json();
 
-    console.log("Callback Update Response:", data);
-
-if (!data.success) {
-  alert(data.error || "Failed to update callback");
-  return;
-}
-
     if (!data.success) {
       alert(data.error || "Failed to update callback");
       return;
@@ -1460,13 +1453,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const input = document.getElementById("messageInput");
 
   if (input) {
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-}
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+  }
 
   checkAuth();
 
