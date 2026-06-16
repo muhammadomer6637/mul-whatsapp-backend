@@ -156,6 +156,21 @@ await pool.query(`
 `);
 
 await pool.query(`
+  ALTER TABLE chats
+  ADD COLUMN IF NOT EXISTS agent_waiting_started_at TIMESTAMP;
+`);
+
+await pool.query(`
+  ALTER TABLE chats
+  ADD COLUMN IF NOT EXISTS agent_taken_at TIMESTAMP;
+`);
+
+await pool.query(`
+  ALTER TABLE chats
+  ADD COLUMN IF NOT EXISTS agent_response_seconds INTEGER;
+`);
+
+await pool.query(`
   ALTER TABLE users
   ADD COLUMN IF NOT EXISTS registered_at TIMESTAMP;
 `);
@@ -203,6 +218,26 @@ await pool.query(`
 await pool.query(`
   ALTER TABLE callback_requests
   ADD COLUMN IF NOT EXISTS callback_notes TEXT;
+`);
+
+await pool.query(`
+  ALTER TABLE callback_requests
+  ADD COLUMN IF NOT EXISTS first_response_at TIMESTAMP;
+`);
+
+await pool.query(`
+  ALTER TABLE callback_requests
+  ADD COLUMN IF NOT EXISTS first_response_seconds INTEGER;
+`);
+
+await pool.query(`
+  ALTER TABLE callback_requests
+  ADD COLUMN IF NOT EXISTS first_response_status VARCHAR(30);
+`);
+
+await pool.query(`
+  ALTER TABLE callback_requests
+  ADD COLUMN IF NOT EXISTS first_response_agent_id INTEGER;
 `);
     
     // Safe foreign key for assigned agent
