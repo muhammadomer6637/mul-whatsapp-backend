@@ -1082,6 +1082,13 @@ async function updateCallback(id) {
     const next_followup_at =
       document.getElementById(`callbackFollowup_${id}`)?.value || null;
 
+    console.log("Saving callback", {
+  id,
+  status,
+  notes,
+  next_followup_at
+});
+
     const res = await fetch(`${BASE}/api/callbacks/${id}`, {
       method: "PUT",
       headers: authHeaders({
