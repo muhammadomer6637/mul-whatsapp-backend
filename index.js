@@ -3442,6 +3442,10 @@ app.get("/api/export-leads", authenticateAgent, async (req, res) => {
   }
 });
 
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
 app.get("/live", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "live.html"));
 });
