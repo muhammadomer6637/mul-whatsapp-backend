@@ -3222,44 +3222,63 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       LIMIT 10
     `);
 
-    const funnelStats = await pool.query(
-      `
-      SELECT
-        COUNT(*) FILTER (
-          WHERE registered_at IS NOT NULL
-          AND ${range === "custom" && start && end
-            ? "registered_at >= $1::timestamp AND registered_at < ($2::date + INTERVAL '1 day')"
-            : `registered_at >= NOW() - ${intervalSql}`
-          }
-        )::int AS registrations,
+    const funnelDateFilter = range === "custom" && start && end
+  ? `
+    >= $1::timestamp
+    AND < ($2::date + INTERVAL '1 day')
+  `
+  : `>= NOW() - ${intervalSql}`;
 
-        COUNT(*) FILTER (
-          WHERE processing_fee_paid_at IS NOT NULL
-          AND ${range === "custom" && start && end
-            ? "processing_fee_paid_at >= $1::timestamp AND processing_fee_paid_at < ($2::date + INTERVAL '1 day')"
-            : `processing_fee_paid_at >= NOW() - ${intervalSql}`
-          }
-        )::int AS processing_fee,
+const funnelStats = await pool.query(
+  `
+  SELECT
+    COUNT(*) FILTER (
+      WHERE (
+        registered_at IS NOT NULL
+        OR processing_fee_paid_at IS NOT NULL
+        OR documents_submitted_at IS NOT NULL
+        OR admission_fee_paid_at IS NOT NULL
+      )
+      AND COALESCE(
+        registered_at,
+        processing_fee_paid_at,
+        documents_submitted_at,
+        admission_fee_paid_at
+      ) ${funnelDateFilter}
+    )::int AS registrations,
 
-        COUNT(*) FILTER (
-          WHERE documents_submitted_at IS NOT NULL
-          AND ${range === "custom" && start && end
-            ? "documents_submitted_at >= $1::timestamp AND documents_submitted_at < ($2::date + INTERVAL '1 day')"
-            : `documents_submitted_at >= NOW() - ${intervalSql}`
-          }
-        )::int AS documents_submitted,
+    COUNT(*) FILTER (
+      WHERE (
+        processing_fee_paid_at IS NOT NULL
+        OR documents_submitted_at IS NOT NULL
+        OR admission_fee_paid_at IS NOT NULL
+      )
+      AND COALESCE(
+        processing_fee_paid_at,
+        documents_submitted_at,
+        admission_fee_paid_at
+      ) ${funnelDateFilter}
+    )::int AS processing_fee,
 
-        COUNT(*) FILTER (
-          WHERE admission_fee_paid_at IS NOT NULL
-          AND ${range === "custom" && start && end
-            ? "admission_fee_paid_at >= $1::timestamp AND admission_fee_paid_at < ($2::date + INTERVAL '1 day')"
-            : `admission_fee_paid_at >= NOW() - ${intervalSql}`
-          }
-        )::int AS fee_paid
-      FROM users
-      `,
-      queryParams
-    );
+    COUNT(*) FILTER (
+      WHERE (
+        documents_submitted_at IS NOT NULL
+        OR admission_fee_paid_at IS NOT NULL
+      )
+      AND COALESCE(
+        documents_submitted_at,
+        admission_fee_paid_at
+      ) ${funnelDateFilter}
+    )::int AS documents_submitted,
+
+    COUNT(*) FILTER (
+      WHERE admission_fee_paid_at IS NOT NULL
+      AND admission_fee_paid_at ${funnelDateFilter}
+    )::int AS fee_paid
+  FROM users
+  `,
+  queryParams
+);
     
     const callbackTotals = await pool.query(
       `
