@@ -1579,6 +1579,10 @@ app.get(
           cb.updated_at,
           cb.request_count,
           cb.is_repeat,
+          cb.first_response_at,
+          cb.first_response_seconds,
+          cb.first_response_status,
+          cb.first_response_agent_id,
           a.name AS assigned_call_agent
         FROM callback_requests cb
         LEFT JOIN agents a
@@ -1599,6 +1603,7 @@ app.get(
         success: true,
         callbacks: result.rows
       });
+
     } catch (error) {
       console.error("GET /api/callbacks error:", error.message);
 
@@ -1643,6 +1648,39 @@ app.put(
           notes = COALESCE($2, notes),
           next_followup_at = COALESCE($3, next_followup_at),
           assigned_call_agent_id = COALESCE(assigned_call_agent_id, $4),
+
+          first_response_at = CASE
+            WHEN first_response_at IS NULL
+              AND $1 IS NOT NULL
+              AND $1 <> 'pending'
+            THEN NOW()
+            ELSE first_response_at
+          END,
+
+          first_response_seconds = CASE
+            WHEN first_response_seconds IS NULL
+              AND $1 IS NOT NULL
+              AND $1 <> 'pending'
+            THEN EXTRACT(EPOCH FROM (NOW() - created_at))::int
+            ELSE first_response_seconds
+          END,
+
+          first_response_status = CASE
+            WHEN first_response_status IS NULL
+              AND $1 IS NOT NULL
+              AND $1 <> 'pending'
+            THEN $1
+            ELSE first_response_status
+          END,
+
+          first_response_agent_id = CASE
+            WHEN first_response_agent_id IS NULL
+              AND $1 IS NOT NULL
+              AND $1 <> 'pending'
+            THEN $4
+            ELSE first_response_agent_id
+          END,
+
           updated_at = NOW()
         WHERE id = $5
         RETURNING *
@@ -1676,10 +1714,6 @@ app.put(
     }
   }
 );
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "admin.html"));
-});
 
 // TEMP HASH GENERATOR
 app.get("/generate-hash/:password", async (req, res) => {
