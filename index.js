@@ -2035,6 +2035,18 @@ if (userStates[from]?.currentMenu === "agent_category") {
       await upsertChat(from, "Admissions query forwarded to agent", "agent_waiting");
 
       await pool.query(
+  `
+  UPDATE chats
+  SET
+    agent_waiting_started_at = NOW(),
+    agent_taken_at = NULL,
+    agent_response_seconds = NULL
+  WHERE phone = $1
+  `,
+  [from]
+);
+
+      await pool.query(
   "UPDATE chats SET followup_sent = false, followup_sent_at = NULL WHERE phone = $1",
   [from]
 );
@@ -2074,6 +2086,18 @@ If comma is missing, your request may not be forwarded correctly.`
     await updateUserDetails(from, { mode: "agent" });
     
     await upsertChat(from, "General query forwarded to agent", "agent_waiting");
+
+    await pool.query(
+  `
+  UPDATE chats
+  SET
+    agent_waiting_started_at = NOW(),
+    agent_taken_at = NULL,
+    agent_response_seconds = NULL
+  WHERE phone = $1
+  `,
+  [from]
+);
 
     await pool.query(
   "UPDATE chats SET followup_sent = false, followup_sent_at = NULL WHERE phone = $1",
@@ -2258,6 +2282,18 @@ await pool.query(
 );
       
       await upsertChat(from, `Lead: ${cleanName} - ${program}`, "agent_waiting");
+
+      await pool.query(
+  `
+  UPDATE chats
+  SET
+    agent_waiting_started_at = NOW(),
+    agent_taken_at = NULL,
+    agent_response_seconds = NULL
+  WHERE phone = $1
+  `,
+  [from]
+);
 
       await sendTextMessage(
         from,
@@ -2976,11 +3012,31 @@ const result = await pool.query(
   UPDATE chats
   SET
     assigned_agent_id = $1::integer,
-  assigned_at = CASE WHEN $1::integer IS NULL THEN NULL ELSE NOW() END,
-   status = CASE WHEN $1::integer IS NULL THEN status ELSE 'agent_active' END,
+    assigned_at = CASE WHEN $1::integer IS NULL THEN NULL ELSE NOW() END,
+    status = CASE WHEN $1::integer IS NULL THEN status ELSE 'agent_active' END,
+
+    agent_taken_at = CASE
+      WHEN $1::integer IS NULL THEN agent_taken_at
+      ELSE NOW()
+    END,
+
+    agent_response_seconds = CASE
+      WHEN $1::integer IS NULL THEN agent_response_seconds
+      WHEN agent_waiting_started_at IS NOT NULL
+      THEN EXTRACT(EPOCH FROM (NOW() - agent_waiting_started_at))::int
+      ELSE NULL
+    END,
+
     updated_at = NOW()
   WHERE phone = $2
-  RETURNING phone, assigned_agent_id, assigned_at, status
+  RETURNING
+    phone,
+    assigned_agent_id,
+    assigned_at,
+    status,
+    agent_waiting_started_at,
+    agent_taken_at,
+    agent_response_seconds
   `,
   [shouldAssign ? req.agent.id : null, phone]
 );
