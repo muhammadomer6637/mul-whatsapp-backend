@@ -386,10 +386,32 @@ document.getElementById("stats").innerHTML = `
      <div class="mini-stat"><h4>Total Incoming</h4><div class="mini-value">${stats.totalIncomingMessages}</div></div>
     `;
 
-    document.getElementById("funnelRegistrations").textContent = funnel.registrations || 0;
-document.getElementById("funnelProcessingFee").textContent = funnel.processingFee || 0;
-document.getElementById("funnelDocuments").textContent = funnel.documentsSubmitted || 0;
-document.getElementById("funnelFeePaid").textContent = funnel.feePaid || 0;
+    const funnelRegistrations = Number(funnel.registrations || 0);
+const funnelProcessingFee = Number(funnel.processingFee || 0);
+const funnelDocuments = Number(funnel.documentsSubmitted || 0);
+const funnelFeePaid = Number(funnel.feePaid || 0);
+
+document.getElementById("funnelRegistrations").textContent = funnelRegistrations;
+document.getElementById("funnelProcessingFee").textContent = funnelProcessingFee;
+document.getElementById("funnelDocuments").textContent = funnelDocuments;
+document.getElementById("funnelFeePaid").textContent = funnelFeePaid;
+
+const processingWidth = funnelRegistrations > 0
+  ? Math.round((funnelProcessingFee / funnelRegistrations) * 100)
+  : 0;
+
+const documentsWidth = funnelRegistrations > 0
+  ? Math.round((funnelDocuments / funnelRegistrations) * 100)
+  : 0;
+
+const feePaidWidth = funnelRegistrations > 0
+  ? Math.round((funnelFeePaid / funnelRegistrations) * 100)
+  : 0;
+
+document.querySelector(".fill-1").style.width = funnelRegistrations > 0 ? "100%" : "0%";
+document.querySelector(".fill-2").style.width = `${Math.min(processingWidth, 100)}%`;
+document.querySelector(".fill-3").style.width = `${Math.min(documentsWidth, 100)}%`;
+document.querySelector(".fill-4").style.width = `${Math.min(feePaidWidth, 100)}%`;
 
     const topProgramsWrap = document.getElementById("topProgramsList");
 
