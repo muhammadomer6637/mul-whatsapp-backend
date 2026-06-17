@@ -1566,8 +1566,8 @@ CALLBACK CENTER
 }
 
 .funnel-step-2{
-  background:linear-gradient(180deg,rgba(37,99,235,0.34),rgba(29,78,216,0.18));
-  border-color:rgba(37,99,235,0.36);
+  background:linear-gradient(180deg,rgba(59,130,246,0.30),rgba(37,99,235,0.14));
+  border-color:rgba(59,130,246,0.32);
 }
 
 .funnel-step-3{
