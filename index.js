@@ -3229,8 +3229,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
   `
   : `>= NOW() - ${intervalSql}`;
 
-const funnelStats = await pool.query(
-  `
+const funnelStats = await pool.query(`
   SELECT
     COUNT(*) FILTER (
       WHERE (
@@ -3239,12 +3238,6 @@ const funnelStats = await pool.query(
         OR documents_submitted_at IS NOT NULL
         OR admission_fee_paid_at IS NOT NULL
       )
-      AND COALESCE(
-        registered_at,
-        processing_fee_paid_at,
-        documents_submitted_at,
-        admission_fee_paid_at
-      ) ${funnelDateFilter}
     )::int AS registrations,
 
     COUNT(*) FILTER (
@@ -3253,11 +3246,6 @@ const funnelStats = await pool.query(
         OR documents_submitted_at IS NOT NULL
         OR admission_fee_paid_at IS NOT NULL
       )
-      AND COALESCE(
-        processing_fee_paid_at,
-        documents_submitted_at,
-        admission_fee_paid_at
-      ) ${funnelDateFilter}
     )::int AS processing_fee,
 
     COUNT(*) FILTER (
@@ -3265,20 +3253,14 @@ const funnelStats = await pool.query(
         documents_submitted_at IS NOT NULL
         OR admission_fee_paid_at IS NOT NULL
       )
-      AND COALESCE(
-        documents_submitted_at,
-        admission_fee_paid_at
-      ) ${funnelDateFilter}
     )::int AS documents_submitted,
 
     COUNT(*) FILTER (
       WHERE admission_fee_paid_at IS NOT NULL
-      AND admission_fee_paid_at ${funnelDateFilter}
     )::int AS fee_paid
+
   FROM users
-  `,
-  queryParams
-);
+`);
     
     const callbackTotals = await pool.query(
       `
