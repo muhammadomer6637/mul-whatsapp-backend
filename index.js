@@ -3326,6 +3326,28 @@ const funnelStats = await pool.query(
       queryParams
     );
 
+        const responseStats = await pool.query(
+      `
+      SELECT
+        COALESCE(ROUND(AVG(agent_response_seconds))::int, 0) AS average_chat_response_seconds
+      FROM chats
+      WHERE agent_response_seconds IS NOT NULL
+        AND ${whereCreated.replaceAll("created_at", "agent_taken_at")}
+      `,
+      queryParams
+    );
+
+    const callbackResponseStats = await pool.query(
+      `
+      SELECT
+        COALESCE(ROUND(AVG(first_response_seconds))::int, 0) AS average_callback_response_seconds
+      FROM callback_requests
+      WHERE first_response_seconds IS NOT NULL
+        AND ${whereCreated.replaceAll("created_at", "first_response_at")}
+      `,
+      queryParams
+    );
+
     return res.json({
       success: true,
 
@@ -3361,6 +3383,13 @@ const funnelStats = await pool.query(
         notResponded: callbackStatuses.rows[0].not_responded || 0,
         followupRequired: callbackStatuses.rows[0].follow_up_required || 0,
         converted: callbackStatuses.rows[0].converted || 0
+      },
+
+            responseStats: {
+        averageChatResponseSeconds:
+          responseStats.rows[0].average_chat_response_seconds || 0,
+        averageCallbackResponseSeconds:
+          callbackResponseStats.rows[0].average_callback_response_seconds || 0
       },
 
       topPrograms: topPrograms.rows,
