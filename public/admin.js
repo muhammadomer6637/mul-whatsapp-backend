@@ -281,6 +281,7 @@ async function loadDashboard(range = "24h") {
     const stats = data.stats;
     const callback = data.callbackStats || {};
     const funnel = data.funnelStats || {};
+    const responseStats = data.responseStats || {};
 
 document.getElementById("stats").innerHTML = `
   <div class="stat-card performance">
@@ -363,6 +364,20 @@ document.getElementById("stats").innerHTML = `
         <div class="meta">Successfully converted leads</div>
       </div>
     `;
+
+    document.getElementById("responsePerformanceStats").innerHTML = `
+  <div class="stat-card performance">
+    <div class="label">Avg Chat Response Time</div>
+    <div class="value">${formatDuration(responseStats.averageChatResponseSeconds || 0)}</div>
+    <div class="meta">Average first response by chat agents</div>
+  </div>
+
+  <div class="stat-card performance">
+    <div class="label">Callback Avg Response Time</div>
+    <div class="value">${formatDuration(responseStats.averageCallbackResponseSeconds || 0)}</div>
+    <div class="meta">Average first action by call agents</div>
+  </div>
+`;
 
     document.getElementById("queueSnapshot").innerHTML = `
       <div class="mini-stat"><h4>Agent Waiting</h4><div class="mini-value">${stats.agentWaiting}</div></div>
@@ -1385,6 +1400,21 @@ function escapeHtml(str) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function formatDuration(seconds) {
+  seconds = Number(seconds || 0);
+
+  if (!seconds) return "0m";
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  return `${minutes}m`;
 }
 
 function formatStatus(status) {
