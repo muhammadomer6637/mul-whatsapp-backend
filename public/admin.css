@@ -1560,24 +1560,44 @@ CALLBACK CENTER
   border-radius:999px;
 }
 
+.funnel-step-1{
+  background:linear-gradient(180deg,rgba(96,165,250,0.24),rgba(59,130,246,0.11));
+  border-color:rgba(96,165,250,0.28);
+}
+
+.funnel-step-2{
+  background:linear-gradient(180deg,rgba(59,130,246,0.30),rgba(37,99,235,0.14));
+  border-color:rgba(59,130,246,0.32);
+}
+
+.funnel-step-3{
+  background:linear-gradient(180deg,rgba(37,99,235,0.34),rgba(29,78,216,0.18));
+  border-color:rgba(37,99,235,0.36);
+}
+
+.funnel-step-4{
+  background:linear-gradient(180deg,rgba(15,23,42,0.96),rgba(30,64,175,0.28));
+  border-color:rgba(30,64,175,0.42);
+}
+
 .fill-1{
   width:100%;
-  background:linear-gradient(90deg,#2f7df6,#56a5ff);
+  background:linear-gradient(90deg,#93c5fd,#60a5fa);
 }
 
 .fill-2{
-  width:58%;
-  background:linear-gradient(90deg,#00c896,#12d8b3);
+  width:0%;
+  background:linear-gradient(90deg,#60a5fa,#3b82f6);
 }
 
 .fill-3{
-  width:39%;
-  background:linear-gradient(90deg,#ffb347,#ffcc33);
+  width:0%;
+  background:linear-gradient(90deg,#3b82f6,#2563eb);
 }
 
 .fill-4{
-  width:23%;
-  background:linear-gradient(90deg,#ff5f6d,#ffc371);
+  width:0%;
+  background:linear-gradient(90deg,#2563eb,#1e3a8a);
 }
 
 .funnel-step small{
