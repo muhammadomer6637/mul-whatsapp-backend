@@ -272,7 +272,7 @@ async function toggleAgent() {
 
 async function loadDashboard(range = "24h") {
   try {
-   const res = await fetch(`${BASE}/api/dashboard?range=${range}`, {
+  const res = await fetch(`${BASE}/api/dashboard?range=${range}&_=${Date.now()}`, {
   headers: authHeaders()
 });
     const data = await res.json();
