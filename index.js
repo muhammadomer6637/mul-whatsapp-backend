@@ -2034,7 +2034,6 @@ if (lowerText === "menu") {
     );
 
     await createUserIfNotExists(from, contactName);
-    await updateUserDetails(from, { name: contactName });
 
     if (!userStates[from]) {
       userStates[from] = {
