@@ -1732,6 +1732,59 @@ app.get("/generate-hash/:password", async (req, res) => {
   }
 });
 
+// =========================
+// TEMP LEAD REPAIR DRY RUN
+// =========================
+app.get("/repair-leads-dry-run", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT DISTINCT ON (m.phone)
+        m.phone,
+        m.text AS lead_message,
+        u.name AS current_name,
+        u.program AS current_program,
+        m.created_at
+      FROM messages m
+      LEFT JOIN users u ON u.phone = m.phone
+      WHERE m.sender = 'user'
+        AND m.type = 'text'
+        AND m.text LIKE '%,%'
+        AND LENGTH(TRIM(SPLIT_PART(m.text, ',', 1))) >= 2
+        AND LENGTH(TRIM(SPLIT_PART(m.text, ',', 2))) >= 2
+      ORDER BY m.phone, m.created_at DESC
+    `);
+
+    const leads = result.rows.map(row => {
+      const parts = row.lead_message.split(",");
+      const repairedName = parts[0].trim();
+      const repairedProgram = parts.slice(1).join(",").trim();
+
+      return {
+        phone: row.phone,
+        current_name: row.current_name,
+        current_program: row.current_program,
+        repaired_name: repairedName,
+        repaired_program: repairedProgram,
+        lead_message: row.lead_message,
+        message_time: row.created_at
+      };
+    });
+
+    return res.json({
+      success: true,
+      total_found: leads.length,
+      note: "Dry run only. No database changes made.",
+      leads
+    });
+  } catch (error) {
+    console.error("repair-leads-dry-run error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Lead repair dry run failed"
+    });
+  }
+});
+
 // TEMP CREATE ADMIN
 app.get("/create-admin", async (req, res) => {
   try {
