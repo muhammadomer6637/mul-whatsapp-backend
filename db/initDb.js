@@ -107,6 +107,26 @@ await pool.query(`
     
     // Safe ALTERs for existing DB
     await pool.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS email TEXT;
+    `);
+
+    await pool.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS designation TEXT;
+    `);
+
+    await pool.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS phone VARCHAR(30);
+    `);
+
+    await pool.query(`
+      ALTER TABLE agents
+      ADD COLUMN IF NOT EXISTS last_password_change_at TIMESTAMP;
+    `);
+
+    await pool.query(`
       ALTER TABLE chats
       ADD COLUMN IF NOT EXISTS unread_count INTEGER DEFAULT 0;
     `);
