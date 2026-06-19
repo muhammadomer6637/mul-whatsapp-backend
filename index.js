@@ -27,7 +27,7 @@ const PHONE_NUMBER_ID = "1065169533344109";
 const BASE_URL =
   process.env.BASE_URL ||
   "https://mul-whatsapp-backend-production.up.railway.app";
-const JWT_SECRET = process.env.JWT_SECRET || "mul_nexus_dev_secret_change_later";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 function authenticateAgent(req, res, next) {
   try {
@@ -1714,76 +1714,6 @@ app.put(
     }
   }
 );
-
-// TEMP HASH GENERATOR
-app.get("/generate-hash/:password", async (req, res) => {
-  try {
-    const hash = await bcrypt.hash(req.params.password, 10);
-
-    return res.json({
-      success: true,
-      hash
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: "Hash generation failed"
-    });
-  }
-});
-
-// =========================
-// TEMP LEAD REPAIR DRY RUN
-// =========================
-app.get("/repair-leads-dry-run", async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT DISTINCT ON (m.phone)
-        m.phone,
-        m.text AS lead_message,
-        u.name AS current_name,
-        u.program AS current_program,
-        m.created_at
-      FROM messages m
-      LEFT JOIN users u ON u.phone = m.phone
-      WHERE m.sender = 'user'
-        AND m.type = 'text'
-        AND m.text LIKE '%,%'
-        AND LENGTH(TRIM(SPLIT_PART(m.text, ',', 1))) >= 2
-        AND LENGTH(TRIM(SPLIT_PART(m.text, ',', 2))) >= 2
-      ORDER BY m.phone, m.created_at DESC
-    `);
-
-    const leads = result.rows.map(row => {
-      const parts = row.lead_message.split(",");
-      const repairedName = parts[0].trim();
-      const repairedProgram = parts.slice(1).join(",").trim();
-
-      return {
-        phone: row.phone,
-        current_name: row.current_name,
-        current_program: row.current_program,
-        repaired_name: repairedName,
-        repaired_program: repairedProgram,
-        lead_message: row.lead_message,
-        message_time: row.created_at
-      };
-    });
-
-    return res.json({
-      success: true,
-      total_found: leads.length,
-      note: "Dry run only. No database changes made.",
-      leads
-    });
-  } catch (error) {
-    console.error("repair-leads-dry-run error:", error.message);
-    return res.status(500).json({
-      success: false,
-      error: "Lead repair dry run failed"
-    });
-  }
-});
 
 // TEMP CREATE ADMIN
 app.get("/create-admin", async (req, res) => {
