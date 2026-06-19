@@ -1292,6 +1292,198 @@ app.get("/api/me", authenticateAgent, async (req, res) => {
 });
 
 // =========================
+// PROFILE APIs
+// =========================
+
+app.get("/api/profile", authenticateAgent, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        name,
+        username,
+        role,
+        active,
+        email,
+        designation,
+        phone,
+        last_password_change_at,
+        created_at
+      FROM agents
+      WHERE id = $1
+      LIMIT 1
+      `,
+      [req.agent.id]
+    );
+
+    const agent = result.rows[0];
+
+    if (!agent || agent.active !== true) {
+      return res.status(401).json({
+        success: false,
+        error: "Agent not found or inactive"
+      });
+    }
+
+    return res.json({
+      success: true,
+      profile: agent
+    });
+  } catch (error) {
+    console.error("GET /api/profile error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch profile"
+    });
+  }
+});
+
+app.put("/api/profile", authenticateAgent, async (req, res) => {
+  try {
+    const { name, email, designation, phone } = req.body;
+
+    if (name !== undefined && String(name).trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: "Name must be at least 2 characters"
+      });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE agents
+      SET
+        name = COALESCE(NULLIF($1, ''), name),
+        email = COALESCE(NULLIF($2, ''), email),
+        designation = COALESCE(NULLIF($3, ''), designation),
+        phone = COALESCE(NULLIF($4, ''), phone)
+      WHERE id = $5
+      RETURNING
+        id,
+        name,
+        username,
+        role,
+        active,
+        email,
+        designation,
+        phone,
+        last_password_change_at,
+        created_at
+      `,
+      [
+        name !== undefined ? String(name).trim() : null,
+        email !== undefined ? String(email).trim() : null,
+        designation !== undefined ? String(designation).trim() : null,
+        phone !== undefined ? String(phone).trim() : null,
+        req.agent.id
+      ]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        error: "Profile not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      profile: result.rows[0]
+    });
+  } catch (error) {
+    console.error("PUT /api/profile error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update profile"
+    });
+  }
+});
+
+app.put("/api/profile/password", authenticateAgent, async (req, res) => {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: "Current password, new password and confirm password are required"
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: "New password and confirm password do not match"
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: "New password must be at least 6 characters"
+      });
+    }
+
+    const agentResult = await pool.query(
+      `
+      SELECT id, password_hash
+      FROM agents
+      WHERE id = $1
+      AND active = true
+      LIMIT 1
+      `,
+      [req.agent.id]
+    );
+
+    const agent = agentResult.rows[0];
+
+    if (!agent) {
+      return res.status(401).json({
+        success: false,
+        error: "Agent not found or inactive"
+      });
+    }
+
+    const passwordMatch = await bcrypt.compare(
+      currentPassword,
+      agent.password_hash
+    );
+
+    if (!passwordMatch) {
+      return res.status(401).json({
+        success: false,
+        error: "Current password is incorrect"
+      });
+    }
+
+    const password_hash = await bcrypt.hash(newPassword, 10);
+
+    await pool.query(
+      `
+      UPDATE agents
+      SET
+        password_hash = $1,
+        last_password_change_at = NOW()
+      WHERE id = $2
+      `,
+      [password_hash, req.agent.id]
+    );
+
+    return res.json({
+      success: true,
+      message: "Password changed successfully"
+    });
+  } catch (error) {
+    console.error("PUT /api/profile/password error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to change password"
+    });
+  }
+});
+
+// =========================
 // AGENT MANAGEMENT APIs
 // =========================
 
