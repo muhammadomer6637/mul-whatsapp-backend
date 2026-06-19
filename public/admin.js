@@ -1638,6 +1638,174 @@ function exportDashboardData() {
 }
 
 // =========================
+// MY PROFILE
+// =========================
+
+async function openProfileModal() {
+  const modal = document.getElementById("profileModal");
+  const profileMessage = document.getElementById("profileMessage");
+  const passwordMessage = document.getElementById("passwordMessage");
+
+  if (profileMessage) {
+    profileMessage.innerText = "";
+    profileMessage.className = "profile-message";
+  }
+
+  if (passwordMessage) {
+    passwordMessage.innerText = "";
+    passwordMessage.className = "profile-message";
+  }
+
+  if (modal) {
+    modal.classList.remove("hidden");
+  }
+
+  try {
+    const response = await fetch(`${BASE}/api/profile`, {
+      headers: authHeaders()
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+      if (profileMessage) {
+        profileMessage.innerText = data.error || "Failed to load profile";
+        profileMessage.className = "profile-message error";
+      }
+      return;
+    }
+
+    const profile = data.profile;
+
+    document.getElementById("profileName").value = profile.name || "";
+    document.getElementById("profileUsername").value = profile.username || "";
+    document.getElementById("profileRole").value = profile.role || "";
+    document.getElementById("profileDesignation").value = profile.designation || "";
+    document.getElementById("profileEmail").value = profile.email || "";
+    document.getElementById("profilePhone").value = profile.phone || "";
+  } catch (error) {
+    console.error("Open profile error:", error);
+
+    if (profileMessage) {
+      profileMessage.innerText = "Failed to load profile";
+      profileMessage.className = "profile-message error";
+    }
+  }
+}
+
+function closeProfileModal() {
+  const modal = document.getElementById("profileModal");
+
+  if (modal) {
+    modal.classList.add("hidden");
+  }
+}
+
+async function saveProfile() {
+  const profileMessage = document.getElementById("profileMessage");
+
+  if (profileMessage) {
+    profileMessage.innerText = "";
+    profileMessage.className = "profile-message";
+  }
+
+  const payload = {
+    name: document.getElementById("profileName").value.trim(),
+    designation: document.getElementById("profileDesignation").value.trim(),
+    email: document.getElementById("profileEmail").value.trim(),
+    phone: document.getElementById("profilePhone").value.trim()
+  };
+
+  try {
+    const response = await fetch(`${BASE}/api/profile`, {
+      method: "PUT",
+      headers: authHeaders({
+        "Content-Type": "application/json"
+      }),
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+      if (profileMessage) {
+        profileMessage.innerText = data.error || "Failed to update profile";
+        profileMessage.className = "profile-message error";
+      }
+      return;
+    }
+
+    currentAgent = {
+      ...currentAgent,
+      name: data.profile.name
+    };
+
+    if (profileMessage) {
+      profileMessage.innerText = "Profile updated successfully";
+      profileMessage.className = "profile-message success";
+    }
+  } catch (error) {
+    console.error("Save profile error:", error);
+
+    if (profileMessage) {
+      profileMessage.innerText = "Failed to update profile";
+      profileMessage.className = "profile-message error";
+    }
+  }
+}
+
+async function changeOwnPassword() {
+  const passwordMessage = document.getElementById("passwordMessage");
+
+  if (passwordMessage) {
+    passwordMessage.innerText = "";
+    passwordMessage.className = "profile-message";
+  }
+
+  const payload = {
+    currentPassword: document.getElementById("currentPassword").value,
+    newPassword: document.getElementById("newPassword").value,
+    confirmPassword: document.getElementById("confirmPassword").value
+  };
+
+  try {
+    const response = await fetch(`${BASE}/api/profile/password`, {
+      method: "PUT",
+      headers: authHeaders({
+        "Content-Type": "application/json"
+      }),
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+      if (passwordMessage) {
+        passwordMessage.innerText = data.error || "Failed to change password";
+        passwordMessage.className = "profile-message error";
+      }
+      return;
+    }
+
+    document.getElementById("currentPassword").value = "";
+    document.getElementById("newPassword").value = "";
+    document.getElementById("confirmPassword").value = "";
+
+    if (passwordMessage) {
+      passwordMessage.innerText = "Password changed successfully";
+      passwordMessage.className = "profile-message success";
+    }
+  } catch (error) {
+    console.error("Change password error:", error);
+
+    if (passwordMessage) {
+      passwordMessage.innerText = "Failed to change password";
+      passwordMessage.className = "profile-message error";
+    }
+  }
+}
+
+// =========================
 // LOGOUT
 // =========================
 
