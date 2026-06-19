@@ -2071,3 +2071,134 @@ body {
   background: rgba(255,255,255,0.14);
   border-radius: 999px;
 }
+
+/* =========================
+   MY PROFILE MODAL
+========================= */
+
+.profile-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 10, 22, 0.78);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.profile-modal.hidden {
+  display: none;
+}
+
+.profile-modal-card {
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, rgba(9, 25, 52, 0.98), rgba(6, 18, 38, 0.98));
+  border: 1px solid rgba(86,165,255,0.22);
+  border-radius: 24px;
+  box-shadow: 0 30px 90px rgba(0,0,0,0.55);
+  padding: 26px;
+}
+
+.profile-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.profile-modal-header h2 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.profile-modal-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.profile-close-btn {
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.profile-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.profile-form-grid label {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.profile-form-grid input {
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: var(--text);
+  border-radius: 14px;
+  padding: 13px 14px;
+  outline: none;
+  font-size: 14px;
+}
+
+.profile-form-grid input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.profile-message {
+  min-height: 18px;
+  margin: 8px 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-3);
+}
+
+.profile-message.error {
+  color: var(--danger);
+}
+
+.profile-message.success {
+  color: var(--success);
+}
+
+.profile-divider {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.10);
+  margin: 24px 0;
+}
+
+.profile-modal-card h3 {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
+
+@media (max-width: 700px) {
+  .profile-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-modal-card {
+    padding: 20px;
+  }
+}
