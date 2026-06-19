@@ -110,8 +110,8 @@
           <p id="pageSubtitle">Admissions insights, unread activity, and lead intelligence</p>
         </div>
 
-      <div class="topbar-actions">
-  <button class="refresh-btn" onclick="refreshCurrentSection()">Refresh</button>
+     <div class="topbar-actions">
+  <button class="refresh-btn" onclick="openProfileModal()">My Profile</button>
 </div>
       </header>
 
@@ -495,6 +495,83 @@
     </main>
   </div>
 
+<div id="profileModal" class="profile-modal hidden">
+  <div class="profile-modal-card">
+    <div class="profile-modal-header">
+      <div>
+        <h2>My Profile</h2>
+        <p>Manage your account information and password</p>
+      </div>
+      <button class="profile-close-btn" onclick="closeProfileModal()">×</button>
+    </div>
+
+    <div class="profile-form-grid">
+      <div>
+        <label>Full Name</label>
+        <input type="text" id="profileName" />
+      </div>
+
+      <div>
+        <label>Username</label>
+        <input type="text" id="profileUsername" disabled />
+      </div>
+
+      <div>
+        <label>Role</label>
+        <input type="text" id="profileRole" disabled />
+      </div>
+
+      <div>
+        <label>Designation</label>
+        <input type="text" id="profileDesignation" />
+      </div>
+
+      <div>
+        <label>Email</label>
+        <input type="email" id="profileEmail" />
+      </div>
+
+      <div>
+        <label>Contact Number</label>
+        <input type="text" id="profilePhone" />
+      </div>
+    </div>
+
+    <div id="profileMessage" class="profile-message"></div>
+
+    <button class="primary-btn" onclick="saveProfile()">
+      Save Profile
+    </button>
+
+    <hr class="profile-divider" />
+
+    <h3>Change Password</h3>
+
+    <div class="profile-form-grid">
+      <div>
+        <label>Current Password</label>
+        <input type="password" id="currentPassword" />
+      </div>
+
+      <div>
+        <label>New Password</label>
+        <input type="password" id="newPassword" />
+      </div>
+
+      <div>
+        <label>Confirm New Password</label>
+        <input type="password" id="confirmPassword" />
+      </div>
+    </div>
+
+    <div id="passwordMessage" class="profile-message"></div>
+
+    <button class="primary-btn" onclick="changeOwnPassword()">
+      Change Password
+    </button>
+  </div>
+</div>
+  
   <script src="admin.js"></script>
 </body>
 </html>
