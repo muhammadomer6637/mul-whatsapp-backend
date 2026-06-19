@@ -905,11 +905,17 @@ function setupMessageInputShortcuts() {
   if (!input) return;
 
   input.addEventListener("keydown", function (event) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      sendMessage();
+    if (event.key !== "Enter") return;
+
+    if (event.shiftKey) {
+      event.stopImmediatePropagation();
+      return;
     }
-  });
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    sendMessage();
+  }, true);
 }
 
 document.addEventListener("DOMContentLoaded", setupMessageInputShortcuts);
