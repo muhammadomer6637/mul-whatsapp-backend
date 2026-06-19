@@ -900,6 +900,20 @@ async function updateFunnelStage(stage) {
   }
 }
 
+function setupMessageInputShortcuts() {
+  const input = document.getElementById("messageInput");
+  if (!input) return;
+
+  input.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", setupMessageInputShortcuts);
+
 async function sendMessage() {
   const input = document.getElementById("messageInput");
   const msg = input.value.trim();
