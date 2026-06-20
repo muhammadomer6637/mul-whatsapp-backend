@@ -2245,6 +2245,15 @@ if (userStates[from]?.currentMenu === "agent_category") {
       await pool.query(
   `
   UPDATE chats
+  SET agent_requested = true
+  WHERE phone = $1
+  `,
+  [from]
+);
+
+      await pool.query(
+  `
+  UPDATE chats
   SET
     agent_waiting_started_at = NOW(),
     agent_taken_at = NULL,
@@ -2294,6 +2303,15 @@ If comma is missing, your request may not be forwarded correctly.`
     await updateUserDetails(from, { mode: "agent" });
     
     await upsertChat(from, "General query forwarded to agent", "agent_waiting");
+
+    await pool.query(
+  `
+  UPDATE chats
+  SET agent_requested = true
+  WHERE phone = $1
+  `,
+  [from]
+);
 
     await pool.query(
   `
@@ -2490,6 +2508,15 @@ await pool.query(
 );
       
       await upsertChat(from, `Lead: ${cleanName} - ${program}`, "agent_waiting");
+
+      await pool.query(
+  `
+  UPDATE chats
+  SET agent_requested = true
+  WHERE phone = $1
+  `,
+  [from]
+);
 
       await pool.query(
   `
@@ -3337,6 +3364,26 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
   queryParams
 );
 
+const agentChatRequests = await pool.query(
+  `
+  SELECT COUNT(DISTINCT phone)::int AS count
+  FROM chats
+  WHERE agent_requested = true
+    AND ${whereCreated.replaceAll("created_at", "updated_at")}
+  `,
+  queryParams
+);
+
+const agentMessagesSent = await pool.query(
+  `
+  SELECT COUNT(*)::int AS count
+  FROM messages
+  WHERE sender = 'agent'
+    AND ${whereCreated}
+  `,
+  queryParams
+);
+
     const agentWaiting = await pool.query(`
       SELECT COUNT(*)::int AS count
       FROM chats
@@ -3517,6 +3564,8 @@ const funnelStats = await pool.query(`
         conversationsStarted: conversationsStarted.rows[0].count,
         unreadConversations: unreadConversations.rows[0].count,
         totalIncomingMessages: totalIncomingMessages.rows[0].count,
+        agentChatRequests: agentChatRequests.rows[0].count,
+        agentMessagesSent: agentMessagesSent.rows[0].count,
         agentWaiting: agentWaiting.rows[0].count,
         agentActive: agentActive.rows[0].count,
         activeWithBot: activeWithBot.rows[0].count,
