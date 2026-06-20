@@ -191,6 +191,11 @@ await pool.query(`
 `);
 
 await pool.query(`
+  ALTER TABLE chats
+  ADD COLUMN IF NOT EXISTS agent_requested BOOLEAN DEFAULT false;
+`);
+    
+await pool.query(`
   ALTER TABLE users
   ADD COLUMN IF NOT EXISTS registered_at TIMESTAMP;
 `);
