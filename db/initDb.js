@@ -194,6 +194,21 @@ await pool.query(`
   ALTER TABLE chats
   ADD COLUMN IF NOT EXISTS agent_requested BOOLEAN DEFAULT false;
 `);
+
+await pool.query(`
+  UPDATE chats c
+  SET agent_requested = true
+  WHERE agent_requested = false
+    AND EXISTS (
+      SELECT 1
+      FROM messages m
+      WHERE m.phone = c.phone
+        AND m.sender = 'bot'
+        AND m.text ILIKE '%Please choose:%'
+        AND m.text ILIKE '%Admissions Related%'
+        AND m.text ILIKE '%Other%'
+    );
+`);
     
 await pool.query(`
   ALTER TABLE users
