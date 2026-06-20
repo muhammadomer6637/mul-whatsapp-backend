@@ -296,6 +296,18 @@ document.getElementById("stats").innerHTML = `
     <div class="meta">Date filtered user messages</div>
   </div>
 
+  <div class="stat-card performance">
+  <div class="label">Agent Chat Requests</div>
+  <div class="value">${stats.agentChatRequests || 0}</div>
+  <div class="meta">Date filtered users requested agent</div>
+</div>
+
+<div class="stat-card performance">
+  <div class="label">Agent Messages Sent</div>
+  <div class="value">${stats.agentMessagesSent || 0}</div>
+  <div class="meta">Date filtered agent replies</div>
+</div>
+
   <div class="stat-card live">
     <div class="label">Active with Agent</div>
     <div class="value">${stats.activeWithAgent}</div>
