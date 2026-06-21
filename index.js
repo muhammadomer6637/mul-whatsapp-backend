@@ -564,6 +564,29 @@ async function resetUnreadCount(phone) {
   }
 }
 
+async function saveUserInteraction(phone, interactionType, category) {
+  try {
+    const sourceKey = `live:${phone}:${interactionType}:${category}:${Date.now()}:${crypto.randomBytes(4).toString("hex")}`;
+
+    await pool.query(
+      `
+      INSERT INTO user_interactions (
+        phone,
+        interaction_type,
+        category,
+        source_key,
+        created_at
+      )
+      VALUES ($1, $2, $3, $4, NOW())
+      ON CONFLICT (source_key) DO NOTHING
+      `,
+      [phone, interactionType, category, sourceKey]
+    );
+  } catch (err) {
+    console.error("saveUserInteraction error:", err.message);
+  }
+}
+
 // =========================
 // MEDIA HELPERS
 // =========================
@@ -2225,7 +2248,7 @@ if (lowerText === "menu") {
 if (userStates[from]?.currentMenu === "agent_category") {
   if (lowerText === "1") {
     userStates[from].agentType = "admissions";
-
+    await saveUserInteraction(from, "agent_category", "admissions_related");    
     const existingUser = await pool.query(
       "SELECT name, program FROM users WHERE phone = $1",
       [from]
@@ -2236,6 +2259,7 @@ if (userStates[from]?.currentMenu === "agent_category") {
       existingUser.rows[0].name &&
       existingUser.rows[0].program
     ) {
+      
       userStates[from].currentMenu = "agent";
 
       await updateUserDetails(from, { mode: "agent" });
@@ -2298,6 +2322,7 @@ If comma is missing, your request may not be forwarded correctly.`
 
   if (lowerText === "2") {
     userStates[from].agentType = "other";
+    await saveUserInteraction(from, "agent_category", "other");
     userStates[from].currentMenu = "agent";
 
     await updateUserDetails(from, { mode: "agent" });
@@ -2432,6 +2457,7 @@ await incrementUnreadAndSetIncoming(from, incomingText, incomingChatStatus);
       if (prev === "programs") {
         userStates[from].currentMenu = "programs";
         userStates[from].previousMenu = "main";
+        await saveUserInteraction(from, "bot_info", "programs");
         await sendReplyButtons(
           from,
           programsMenu(),
@@ -2566,7 +2592,7 @@ Please wait, our admission representative will message you shortly.`,
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "programs";
       userStates[from].hasInteracted = true;
-
+      await saveUserInteraction(from, "bot_info", "programs");
       await sendReplyButtons(
         from,
         programsMenu(),
@@ -2620,7 +2646,7 @@ Please wait, our admission representative will message you shortly.`,
       userStates[from].hasInteracted = true;
 
       const pdfUrl = `${BASE_URL}/files/Fee%20Structure%20Spring%202026.pdf`;
-
+      await saveUserInteraction(from, "bot_info", "fee_structure");
       await sendReplyButtons(
         from,
         `💰 Fee Structure – Fall 2026
@@ -2643,7 +2669,7 @@ Please find attached the complete fee structure.`,
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "scholarship";
       userStates[from].hasInteracted = true;
-
+      await saveUserInteraction(from, "bot_info", "scholarships");
       await sendReplyButtons(
         from,
         `🎓 Scholarships
@@ -2660,7 +2686,7 @@ https://www.mul.edu.pk/en/scholarships-and-fee-concession`,
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "apply";
       userStates[from].hasInteracted = true;
-
+      await saveUserInteraction(from, "bot_info", "admission_process");
       await sendReplyButtons(
         from,
         howToApplyMenu(),
@@ -2751,7 +2777,7 @@ All documents should be attested.`,
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "why_mul";
       userStates[from].hasInteracted = true;
-
+      await saveUserInteraction(from, "bot_info", "why_choose_mul");
       await sendReplyButtons(
         from,
         whyChooseMenu(),
@@ -2784,7 +2810,7 @@ All documents should be attested.`,
       userStates[from].previousMenu = "main";
       userStates[from].currentMenu = "other_support";
       userStates[from].hasInteracted = true;
-
+     await saveUserInteraction(from, "bot_info", "other_support");
       await sendReplyButtons(
         from,
         otherSupportMenu(),
@@ -3384,6 +3410,30 @@ const agentMessagesSent = await pool.query(
   queryParams
 );
 
+const botInterestStats = await pool.query(
+  `
+  SELECT category, COUNT(*)::int AS count
+  FROM user_interactions
+  WHERE interaction_type = 'bot_info'
+    AND ${whereCreated}
+  GROUP BY category
+  ORDER BY count DESC, category ASC
+  `,
+  queryParams
+);
+
+const agentCategoryStats = await pool.query(
+  `
+  SELECT category, COUNT(*)::int AS count
+  FROM user_interactions
+  WHERE interaction_type = 'agent_category'
+    AND ${whereCreated}
+  GROUP BY category
+  ORDER BY count DESC, category ASC
+  `,
+  queryParams
+);
+    
     const agentWaiting = await pool.query(`
       SELECT COUNT(*)::int AS count
       FROM chats
@@ -3597,6 +3647,8 @@ const funnelStats = await pool.query(`
           callbackResponseStats.rows[0].average_callback_response_seconds || 0
       },
 
+      botInterestStats: botInterestStats.rows,
+      agentCategoryStats: agentCategoryStats.rows,
       topPrograms: topPrograms.rows,
       recentLeads: recentLeads.rows
     });
