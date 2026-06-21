@@ -3412,7 +3412,7 @@ const agentMessagesSent = await pool.query(
 
 const botInterestStats = await pool.query(
   `
-  SELECT category, COUNT(*)::int AS count
+  SELECT category, COUNT(DISTINCT phone)::int AS count
   FROM user_interactions
   WHERE interaction_type = 'bot_info'
     AND ${whereCreated}
@@ -3424,7 +3424,7 @@ const botInterestStats = await pool.query(
 
 const agentCategoryStats = await pool.query(
   `
-  SELECT category, COUNT(*)::int AS count
+  SELECT category, COUNT(DISTINCT phone)::int AS count
   FROM user_interactions
   WHERE interaction_type = 'agent_category'
     AND ${whereCreated}
