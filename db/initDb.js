@@ -104,6 +104,17 @@ await pool.query(`
     created_at TIMESTAMP DEFAULT NOW()
   );
 `);
+
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS user_interactions (
+    id SERIAL PRIMARY KEY,
+    phone VARCHAR(30) NOT NULL,
+    interaction_type VARCHAR(50) NOT NULL,
+    category VARCHAR(80) NOT NULL,
+    source_key TEXT UNIQUE,
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+`);
     
     // Safe ALTERs for existing DB
     await pool.query(`
@@ -279,6 +290,82 @@ await pool.query(`
   ALTER TABLE callback_requests
   ADD COLUMN IF NOT EXISTS first_response_agent_id INTEGER;
 `);
+
+await pool.query(`
+  INSERT INTO user_interactions (phone, interaction_type, category, source_key, created_at)
+  SELECT phone, 'bot_info', 'programs', 'backfill:' || id || ':programs', created_at
+  FROM messages
+  WHERE sender = 'bot'
+    AND text ILIKE '%Programs Categories%'
+  ON CONFLICT (source_key) DO NOTHING;
+`);
+
+await pool.query(`
+  INSERT INTO user_interactions (phone, interaction_type, category, source_key, created_at)
+  SELECT phone, 'bot_info', 'fee_structure', 'backfill:' || id || ':fee_structure', created_at
+  FROM messages
+  WHERE sender = 'bot'
+    AND text ILIKE '%Please find attached the complete fee structure%'
+  ON CONFLICT (source_key) DO NOTHING;
+`);
+
+await pool.query(`
+  INSERT INTO user_interactions (phone, interaction_type, category, source_key, created_at)
+  SELECT phone, 'bot_info', 'scholarships', 'backfill:' || id || ':scholarships', created_at
+  FROM messages
+  WHERE sender = 'bot'
+    AND text ILIKE '%For scholarship details please visit%'
+  ON CONFLICT (source_key) DO NOTHING;
+`);
+
+await pool.query(`
+  INSERT INTO user_interactions (phone, interaction_type, category, source_key, created_at)
+  SELECT phone, 'bot_info', 'admission_process', 'backfill:' || id || ':admission_process', created_at
+  FROM messages
+  WHERE sender = 'bot'
+    AND text ILIKE '%4a. On Campus Admission%'
+  ON CONFLICT (source_key) DO NOTHING;
+`);
+
+await pool.query(`
+  INSERT INTO user_interactions (phone, interaction_type, category, source_key, created_at)
+  SELECT phone, 'bot_info', 'why_choose_mul', 'backfill:' || id || ':why_choose_mul', created_at
+  FROM messages
+  WHERE sender = 'bot'
+    AND text ILIKE '%5a. Accreditation%'
+  ON CONFLICT (source_key) DO NOTHING;
+`);
+
+await pool.query(`
+  INSERT INTO user_interactions (phone, interaction_type, category, source_key, created_at)
+  SELECT phone, 'bot_info', 'other_support', 'backfill:' || id || ':other_support', created_at
+  FROM messages
+  WHERE sender = 'bot'
+    AND text ILIKE '%6a. Admission Office%'
+  ON CONFLICT (source_key) DO NOTHING;
+`);
+
+await pool.query(`
+  INSERT INTO user_interactions (phone, interaction_type, category, source_key, created_at)
+  SELECT phone, 'agent_category', 'admissions_related', 'backfill:' || id || ':agent_admissions', created_at
+  FROM messages
+  WHERE sender = 'bot'
+    AND (
+      text ILIKE '%Connecting you with an admissions representative%'
+      OR text ILIKE '%Please share your details in this format%'
+      OR text ILIKE '%Your request has been forwarded to our support team%'
+    )
+  ON CONFLICT (source_key) DO NOTHING;
+`);
+
+await pool.query(`
+  INSERT INTO user_interactions (phone, interaction_type, category, source_key, created_at)
+  SELECT phone, 'agent_category', 'other', 'backfill:' || id || ':agent_other', created_at
+  FROM messages
+  WHERE sender = 'bot'
+    AND text ILIKE '%Your query is being forwarded to our representative%'
+  ON CONFLICT (source_key) DO NOTHING;
+`);    
     
     // Safe foreign key for assigned agent
     try {
