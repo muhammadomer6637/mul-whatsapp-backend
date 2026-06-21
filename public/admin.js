@@ -270,6 +270,34 @@ async function toggleAgent() {
   loadAgentStatus();
 }
 
+function prettyInteractionCategory(category) {
+  const labels = {
+    programs: "Programs",
+    fee_structure: "Fee Structure",
+    scholarships: "Scholarships",
+    admission_process: "Admission Process",
+    why_choose_mul: "Why Choose MUL",
+    other_support: "Other Support",
+    admissions_related: "Admissions Related",
+    other: "Other"
+  };
+
+  return labels[category] || category;
+}
+
+function renderInteractionStats(rows) {
+  if (!rows || rows.length === 0) {
+    return `<div class="mini-stat"><h4>No Data</h4><div class="mini-value">0</div></div>`;
+  }
+
+  return rows.map(row => `
+    <div class="mini-stat">
+      <h4>${prettyInteractionCategory(row.category)}</h4>
+      <div class="mini-value">${row.count || 0}</div>
+    </div>
+  `).join("");
+}
+
 async function loadDashboard(range = "24h") {
   try {
   const res = await fetch(`${BASE}/api/dashboard?range=${range}&_=${Date.now()}`, {
@@ -282,7 +310,9 @@ async function loadDashboard(range = "24h") {
     const callback = data.callbackStats || {};
     const funnel = data.funnelStats || {};
     const responseStats = data.responseStats || {};
-
+    const botInterestStats = data.botInterestStats || [];
+    const agentCategoryStats = data.agentCategoryStats || [];
+    
 document.getElementById("stats").innerHTML = `
   <div class="stat-card performance">
     <div class="label">Total Conversations</div>
@@ -398,6 +428,12 @@ document.getElementById("stats").innerHTML = `
      <div class="mini-stat"><h4>Total Incoming</h4><div class="mini-value">${stats.totalIncomingMessages}</div></div>
     `;
 
+    document.getElementById("botInterestStats").innerHTML =
+    renderInteractionStats(botInterestStats);
+
+  document.getElementById("agentCategoryStats").innerHTML =
+  renderInteractionStats(agentCategoryStats);
+    
     const funnelRegistrations = Number(funnel.registrations || 0);
 const funnelProcessingFee = Number(funnel.processingFee || 0);
 const funnelDocuments = Number(funnel.documentsSubmitted || 0);
