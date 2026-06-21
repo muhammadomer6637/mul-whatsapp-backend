@@ -226,54 +226,23 @@
 
 </div>
 
-<div class="live-feed-card">
+<div class="live-feed-card insights-card">
   <div class="live-feed-header">
     <div>
-      <h2>Live Admissions Activity</h2>
-      <p>Real-time student actions and inquiry movement</p>
+      <h2>Student Interest Insights</h2>
+      <p>Unique students by most requested information in the selected period</p>
     </div>
-    <span class="live-dot">LIVE</span>
   </div>
 
-  <div class="live-feed-list">
-    <div class="feed-item">
-      <span class="feed-icon green">●</span>
-      <div>
-        <strong>Ahmed selected BS Computer Science</strong>
-        <p>Just now</p>
-      </div>
+  <div class="insights-grid">
+    <div>
+      <h3 class="insight-section-title">Bot Information Interest</h3>
+      <div class="stats-grid" id="botInterestStats"></div>
     </div>
 
-    <div class="feed-item">
-      <span class="feed-icon blue">●</span>
-      <div>
-        <strong>Fatima connected with live agent</strong>
-        <p>2 minutes ago</p>
-      </div>
-    </div>
-
-    <div class="feed-item">
-      <span class="feed-icon yellow">●</span>
-      <div>
-        <strong>Ali submitted processing fee</strong>
-        <p>5 minutes ago</p>
-      </div>
-    </div>
-
-    <div class="feed-item">
-      <span class="feed-icon purple">●</span>
-      <div>
-        <strong>Sara uploaded required documents</strong>
-        <p>8 minutes ago</p>
-      </div>
-    </div>
-
-    <div class="feed-item">
-      <span class="feed-icon green">●</span>
-      <div>
-        <strong>New inquiry received from Lahore</strong>
-        <p>12 minutes ago</p>
-      </div>
+    <div>
+      <h3 class="insight-section-title">Agent Request Insights</h3>
+      <div class="stats-grid" id="agentCategoryStats"></div>
     </div>
   </div>
 </div>
@@ -299,28 +268,6 @@
             <div class="mini-stats" id="queueSnapshot"></div>
           </div>
         </div>
-
-        <div class="content-grid" style="margin-top: 22px;">
-  <div class="panel panel-large">
-    <div class="panel-header">
-      <div>
-        <h3>Bot Information Interest</h3>
-        <p>Most requested information from automated assistant</p>
-      </div>
-    </div>
-    <div class="mini-stats" id="botInterestStats"></div>
-  </div>
-
-  <div class="panel panel-medium">
-    <div class="panel-header">
-      <div>
-        <h3>Agent Request Type</h3>
-        <p>Admissions related vs other agent requests</p>
-      </div>
-    </div>
-    <div class="mini-stats" id="agentCategoryStats"></div>
-  </div>
-</div>
 
         <div class="panel">
           <div class="panel-header">
