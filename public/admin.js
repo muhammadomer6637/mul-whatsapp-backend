@@ -285,17 +285,32 @@ function prettyInteractionCategory(category) {
   return labels[category] || category;
 }
 
-function renderInteractionStats(rows) {
+function renderInteractionStats(rows, type = "bot") {
   if (!rows || rows.length === 0) {
-    return `<div class="mini-stat"><h4>No Data</h4><div class="mini-value">0</div></div>`;
+    return `
+      <div class="stat-card performance insight-stat-card">
+        <div class="label">No Data</div>
+        <div class="value">0</div>
+        <div class="meta">No activity found</div>
+      </div>
+    `;
   }
 
-  return rows.map(row => `
-    <div class="mini-stat">
-      <h4>${prettyInteractionCategory(row.category)}</h4>
-      <div class="mini-value">${row.count || 0}</div>
-    </div>
-  `).join("");
+  const total = rows.reduce((sum, row) => sum + Number(row.count || 0), 0);
+  const cardTypeClass = type === "agent" ? "live" : "performance";
+
+  return rows.map(row => {
+    const count = Number(row.count || 0);
+    const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+
+    return `
+      <div class="stat-card ${cardTypeClass} insight-stat-card">
+        <div class="label">${prettyInteractionCategory(row.category)}</div>
+        <div class="value">${count}</div>
+        <div class="meta">${percent}% of selected period</div>
+      </div>
+    `;
+  }).join("");
 }
 
 async function loadDashboard(range = "24h") {
@@ -428,11 +443,11 @@ document.getElementById("stats").innerHTML = `
      <div class="mini-stat"><h4>Total Incoming</h4><div class="mini-value">${stats.totalIncomingMessages}</div></div>
     `;
 
-    document.getElementById("botInterestStats").innerHTML =
-    renderInteractionStats(botInterestStats);
+   document.getElementById("botInterestStats").innerHTML =
+  renderInteractionStats(botInterestStats, "bot");
 
-  document.getElementById("agentCategoryStats").innerHTML =
-  renderInteractionStats(agentCategoryStats);
+document.getElementById("agentCategoryStats").innerHTML =
+  renderInteractionStats(agentCategoryStats, "agent");
     
     const funnelRegistrations = Number(funnel.registrations || 0);
 const funnelProcessingFee = Number(funnel.processingFee || 0);
