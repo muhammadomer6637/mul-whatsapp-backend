@@ -272,6 +272,38 @@ body {
   );
 }
 
+#callbackStats .stat-card:nth-child(1),
+#callbackStats .stat-card:nth-child(2),
+#callbackStats .stat-card:nth-child(3) {
+  border-color: rgba(47,125,246,0.28);
+  background: linear-gradient(180deg, rgba(23,52,104,0.95), rgba(12,33,70,0.95));
+}
+
+#callbackStats .stat-card:nth-child(4) {
+  border-color: rgba(243,181,68,0.35);
+  background: linear-gradient(180deg, rgba(92,62,16,0.92), rgba(62,43,13,0.92));
+}
+
+#callbackStats .stat-card:nth-child(5) {
+  border-color: rgba(47,125,246,0.35);
+  background: linear-gradient(180deg, rgba(24,70,132,0.95), rgba(13,45,92,0.95));
+}
+
+#callbackStats .stat-card:nth-child(6) {
+  border-color: rgba(255,98,118,0.35);
+  background: linear-gradient(180deg, rgba(92,28,40,0.92), rgba(58,20,30,0.92));
+}
+
+#callbackStats .stat-card:nth-child(7) {
+  border-color: rgba(243,181,68,0.35);
+  background: linear-gradient(180deg, rgba(92,62,16,0.92), rgba(62,43,13,0.92));
+}
+
+#callbackStats .stat-card:nth-child(8) {
+  border-color: rgba(24,195,126,0.35);
+  background: linear-gradient(180deg, rgba(10,74,54,0.95), rgba(7,52,38,0.95));
+}
+
 .response-performance-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
