@@ -2658,7 +2658,7 @@ Please wait, our admission representative will message you shortly.`,
       userStates[from].currentMenu = "fee";
       userStates[from].hasInteracted = true;
 
-      const pdfUrl = `${BASE_URL}/files/Fee%20Structure%20Spring%202026.pdf`;
+     const pdfUrl = `${BASE_URL}/files/Fee%20Structure%20Fall%202026.pdf`;
       await saveUserInteraction(from, "bot_info", "fee_structure");
       await sendReplyButtons(
         from,
