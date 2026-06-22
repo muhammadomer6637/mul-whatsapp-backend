@@ -160,6 +160,7 @@ let currentSection = "dashboard";
 let currentRange = "24h";
 let allChats = [];
 let currentChatFilter = "all";
+let currentCallbackFilter = "all";
 let highlightedPhone = null;
 
 
@@ -1124,7 +1125,26 @@ async function loadCallbacks() {
 
     const callbacks = data.callbacks || [];
 
-    if (!callbacks.length) {
+    const callbackCounts = callbacks.reduce((acc, item) => {
+  const status = item.status || "pending";
+  acc[status] = (acc[status] || 0) + 1;
+  acc.all = (acc.all || 0) + 1;
+  return acc;
+}, { all: 0 });
+
+document.getElementById("callbackCount_all").textContent = callbackCounts.all || 0;
+document.getElementById("callbackCount_pending").textContent = callbackCounts.pending || 0;
+document.getElementById("callbackCount_called").textContent = callbackCounts.called || 0;
+document.getElementById("callbackCount_not_responded").textContent = callbackCounts.not_responded || 0;
+document.getElementById("callbackCount_follow_up_required").textContent = callbackCounts.follow_up_required || 0;
+document.getElementById("callbackCount_converted").textContent = callbackCounts.converted || 0;
+
+const filteredCallbacks =
+  currentCallbackFilter === "all"
+    ? callbacks
+    : callbacks.filter(item => item.status === currentCallbackFilter);
+
+   if (!filteredCallbacks.length) {
       tbody.innerHTML = `
         <tr>
           <td colspan="7" style="text-align:center; color:var(--muted); padding:24px;">
@@ -1135,7 +1155,7 @@ async function loadCallbacks() {
       return;
     }
 
-    tbody.innerHTML = callbacks.map(item => `
+   tbody.innerHTML = filteredCallbacks.map(item => `
       <tr>
         <td>
           ${escapeHtml(item.name || "-")}
@@ -1186,6 +1206,20 @@ async function loadCallbacks() {
   } catch (error) {
     console.error("loadCallbacks error:", error);
   }
+}
+
+function setCallbackFilter(status, button) {
+  currentCallbackFilter = status;
+
+  document
+    .querySelectorAll(".callback-filter-btn")
+    .forEach(btn => btn.classList.remove("active-filter"));
+
+  if (button) {
+    button.classList.add("active-filter");
+  }
+
+  loadCallbacks();
 }
 
 function toDateTimeLocal(value) {
