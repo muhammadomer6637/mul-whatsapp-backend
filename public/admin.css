@@ -280,8 +280,8 @@ body {
 }
 
 #callbackStats .stat-card:nth-child(4) {
-  border-color: rgba(243,181,68,0.35);
-  background: linear-gradient(180deg, rgba(92,62,16,0.92), rgba(62,43,13,0.92));
+  border-color: rgba(255,98,118,0.35);
+  background: linear-gradient(180deg, rgba(92,28,40,0.92), rgba(58,20,30,0.92));
 }
 
 #callbackStats .stat-card:nth-child(5) {
@@ -290,8 +290,8 @@ body {
 }
 
 #callbackStats .stat-card:nth-child(6) {
-  border-color: rgba(255,98,118,0.35);
-  background: linear-gradient(180deg, rgba(92,28,40,0.92), rgba(58,20,30,0.92));
+  border-color: rgba(243,181,68,0.35);
+  background: linear-gradient(180deg, rgba(92,62,16,0.92), rgba(62,43,13,0.92));
 }
 
 #callbackStats .stat-card:nth-child(7) {
