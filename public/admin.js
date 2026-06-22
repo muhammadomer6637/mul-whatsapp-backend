@@ -820,6 +820,12 @@ function insertQuickReply(type) {
     fee: `You can view the complete fee structure here:
 https://www.mul.edu.pk/en/fee-calculator`,
 
+programs: `You can explore programs offered at Minhaj University Lahore through the official website:
+
+https://www.mul.edu.pk/en/admissions-open
+
+Please let us know your preferred program or study level so we can guide you accordingly.`,
+    
     apply: `You can apply online through the official admission portal:
 https://admission.mul.edu.pk/
 
