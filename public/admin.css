@@ -271,8 +271,42 @@ body {
   gap: 16px;
 }
 
+.insights-card {
+  margin-top: 22px;
+  margin-bottom: 28px;
+  padding: 22px;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 18px;
+}
+
+.insight-section-title {
+  margin: 0 0 14px;
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.insight-stat-card {
+  padding: 16px;
+  min-height: 130px;
+}
+
+.insight-stat-card .value {
+  font-size: 30px;
+  margin-bottom: 8px;
+}
+
+.insight-stat-card .meta {
+  font-size: 12px;
+}
+
 @media (max-width: 768px) {
-  .response-performance-grid {
+  .response-performance-grid,
+  .insights-grid {
     grid-template-columns: 1fr;
   }
 }
