@@ -498,7 +498,7 @@ body {
 }
 
 .whatsapp-shell {
-  height: 100%;
+  height: calc(100vh - 48px);
   display: grid;
   grid-template-columns: 370px 1fr;
   gap: 14px;
