@@ -534,16 +534,16 @@ body {
 
 #agentMiniStats {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  padding: 12px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--line);
   background: rgba(255,255,255,0.015);
 }
 
 #agentMiniStats .agent-mini-card {
-  padding: 11px 10px;
-  border-radius: 14px;
+  padding: 8px 6px;
+  border-radius: 12px;
   background: rgba(47, 125, 246, 0.12);
   border: 1px solid rgba(86, 165, 255, 0.22);
   text-align: center;
@@ -559,7 +559,7 @@ body {
 
 #agentMiniStats .agent-mini-card strong {
   display: block;
-  font-size: 20px;
+  font-size: 16px;
   color: #ffffff;
   font-weight: 900;
 }
