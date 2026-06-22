@@ -442,6 +442,32 @@
     </button>
   </div>
 
+   <div class="callback-filter-bar">
+    <button class="ghost-btn callback-filter-btn active-filter" onclick="setCallbackFilter('all', this)">
+      All <span id="callbackCount_all">0</span>
+    </button>
+
+    <button class="ghost-btn callback-filter-btn" onclick="setCallbackFilter('pending', this)">
+      Pending <span id="callbackCount_pending">0</span>
+    </button>
+
+    <button class="ghost-btn callback-filter-btn" onclick="setCallbackFilter('called', this)">
+      Called <span id="callbackCount_called">0</span>
+    </button>
+
+    <button class="ghost-btn callback-filter-btn" onclick="setCallbackFilter('not_responded', this)">
+      Not Responded <span id="callbackCount_not_responded">0</span>
+    </button>
+
+    <button class="ghost-btn callback-filter-btn" onclick="setCallbackFilter('follow_up_required', this)">
+      Follow-up Required <span id="callbackCount_follow_up_required">0</span>
+    </button>
+
+    <button class="ghost-btn callback-filter-btn" onclick="setCallbackFilter('converted', this)">
+      Converted <span id="callbackCount_converted">0</span>
+    </button>
+  </div>       
+
   <div class="card">
     <div class="table-wrap">
       <table class="styled-table">
