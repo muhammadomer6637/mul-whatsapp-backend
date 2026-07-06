@@ -76,6 +76,18 @@ function requireAdmin(req, res, next) {
 // Temporary in-memory user state
 const userStates = {};
 
+const USER_STATE_MAX_IDLE_MS = 48 * 60 * 60 * 1000; // 48 hours
+
+setInterval(() => {
+  const now = Date.now();
+  for (const phone in userStates) {
+    const lastSeenAt = userStates[phone]?.lastSeenAt || 0;
+    if (now - lastSeenAt > USER_STATE_MAX_IDLE_MS) {
+      delete userStates[phone];
+    }
+  }
+}, 60 * 60 * 1000); // runs every hour
+
 async function isAgentAvailable() {
   try {
     const result = await pool.query(
@@ -2177,6 +2189,7 @@ if (!userStates[from]) {
     hasInteracted: false
   };
 }
+userStates[from].lastSeenAt = Date.now();
 
 // =========================
 // FOLLOW-UP RESPONSE HANDLING
