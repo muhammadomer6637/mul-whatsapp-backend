@@ -28,6 +28,15 @@ const BASE_URL =
   process.env.BASE_URL ||
   "https://mul-whatsapp-backend-production.up.railway.app";
 const JWT_SECRET = process.env.JWT_SECRET;
+const ADMIN_RECOVERY_KEY = process.env.ADMIN_RECOVERY_KEY;
+
+function isValidRecoveryKey(providedKey) {
+  if (!ADMIN_RECOVERY_KEY || !providedKey) return false;
+  const provided = Buffer.from(String(providedKey));
+  const expected = Buffer.from(ADMIN_RECOVERY_KEY);
+  if (provided.length !== expected.length) return false;
+  return crypto.timingSafeEqual(provided, expected);
+}
 
 function authenticateAgent(req, res, next) {
   try {
@@ -1945,6 +1954,13 @@ app.put(
 
 // TEMP CREATE ADMIN
 app.get("/create-admin", async (req, res) => {
+  if (!isValidRecoveryKey(req.query.key)) {
+    return res.status(403).json({
+      success: false,
+      error: "Unauthorized"
+    });
+  }
+
   try {
     const result = await pool.query(
       `
