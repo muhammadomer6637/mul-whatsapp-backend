@@ -2362,3 +2362,27 @@ body {
     padding: 20px;
   }
 }
+
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 28px 0;
+}
+
+.loading-spinner span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-3);
+  animation: loadingDotBounce 1.2s infinite ease-in-out;
+}
+
+.loading-spinner span:nth-child(2) { animation-delay: 0.2s; }
+.loading-spinner span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes loadingDotBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}

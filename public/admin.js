@@ -314,7 +314,22 @@ function renderInteractionStats(rows, type = "bot") {
   }).join("");
 }
 
+function showLoadingState(containerId, colspan = null) {
+  const el = document.getElementById(containerId);
+  if (!el || el.dataset.loadedOnce) return;
+  const spinner = `<div class="loading-spinner"><span></span><span></span><span></span></div>`;
+  el.innerHTML = colspan
+    ? `<tr><td colspan="${colspan}">${spinner}</td></tr>`
+    : spinner;
+}
+
+function markLoaded(containerId) {
+  const el = document.getElementById(containerId);
+  if (el) el.dataset.loadedOnce = "1";
+}
+
 async function loadDashboard(range = "24h") {
+  showLoadingState("stats");
   try {
   const res = await fetch(`${BASE}/api/dashboard?range=${range}&_=${Date.now()}`, {
   headers: authHeaders()
@@ -372,6 +387,7 @@ document.getElementById("stats").innerHTML = `
     <div class="meta">Live now</div>
   </div>
 `;
+        markLoaded("stats");
 
         document.getElementById("callbackStats").innerHTML = `
       <div class="stat-card">
@@ -522,6 +538,7 @@ function setChatFilter(filter, button) {
 }
 
 async function loadChats() {
+  showLoadingState("chatList");
   try {
    const res = await fetch(`${BASE}/api/chats`, {
   headers: authHeaders()
@@ -667,6 +684,7 @@ ${
       <p>Try changing the search or filter.</p>
     </div>
   `;
+  markLoaded("chatList");
 }
 
 async function openChat(phone, markRead = true, preserveScroll = false) {
@@ -1107,6 +1125,7 @@ async function switchToBot() {
 // AGENT MANAGEMENT
 // =========================
 async function loadCallbacks() {
+  showLoadingState("callbackTableBody", 7);
   try {
     const res = await fetch(`${BASE}/api/callbacks`, {
       headers: authHeaders()
@@ -1152,6 +1171,7 @@ const filteredCallbacks =
           </td>
         </tr>
       `;
+      markLoaded("callbackTableBody");
       return;
     }
 
@@ -1202,6 +1222,7 @@ const filteredCallbacks =
         </td>
       </tr>
     `).join("");
+    markLoaded("callbackTableBody");
 
   } catch (error) {
     console.error("loadCallbacks error:", error);
@@ -1276,6 +1297,7 @@ async function updateCallback(id) {
 }
 
 async function loadAgents() {
+  showLoadingState("agentsTableBody", 6);
   try {
     const res = await fetch(`${BASE}/api/agents`, {
       headers: authHeaders()
@@ -1343,6 +1365,7 @@ async function loadAgents() {
 </td>
       </tr>
     `).join("");
+    markLoaded("agentsTableBody");
 
   } catch (error) {
     console.error("Load agents error:", error);
