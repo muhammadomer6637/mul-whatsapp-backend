@@ -45,7 +45,9 @@
   </div>
 </div>
   <div class="app-shell">
-    <aside class="sidebar">
+    <button id="sidebarToggleBtn" class="sidebar-toggle-btn" onclick="toggleSidebar()">☰</button>
+    <div id="sidebarOverlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
+    <aside class="sidebar" id="sidebar">
       <div>
         <div class="brand">
           <img src="/mul-logo-white.png" alt="MUL Logo" class="brand-logo-img" />

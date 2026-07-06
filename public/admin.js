@@ -168,8 +168,19 @@ let lastAgentMessageMap = {};
 const notificationSound = new Audio("/notification.mp3");
 notificationSound.volume = 0.6;
 
+function toggleSidebar() {
+  document.getElementById("sidebar")?.classList.toggle("sidebar-open");
+  document.getElementById("sidebarOverlay")?.classList.toggle("sidebar-open");
+}
+
+function closeSidebar() {
+  document.getElementById("sidebar")?.classList.remove("sidebar-open");
+  document.getElementById("sidebarOverlay")?.classList.remove("sidebar-open");
+}
+
 function showSection(id, btn = null) {
   currentSection = id;
+  closeSidebar();
 
   document.querySelectorAll(".section").forEach(section => section.classList.add("hidden"));
   document.getElementById(id).classList.remove("hidden");
