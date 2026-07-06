@@ -964,7 +964,7 @@ const admissionFeeIcon = funnel.admission_fee_paid_at ? "✓" : "○";
 
       <hr>
 
-      <button class="funnel-menu-item" onclick="alert('Assign To Call Agent will be added next.')">
+      <button class="funnel-menu-item" onclick="notify('Assign To Call Agent will be added next.')">
         Assign To Call Agent
       </button>
     </div>
@@ -980,7 +980,7 @@ const admissionFeeIcon = funnel.admission_fee_paid_at ? "✓" : "○";
 
 async function updateFunnelStage(stage) {
   if (!selectedPhone) {
-    alert("Please select a chat first.");
+    notify("Please select a chat first.", "warning");
     return;
   }
 
@@ -997,7 +997,7 @@ async function updateFunnelStage(stage) {
     const data = await res.json();
 
     if (!data.success) {
-      alert(data.error || "Failed to update funnel status");
+      notify(data.error || "Failed to update funnel status", "error");
       return;
     }
 
@@ -1008,7 +1008,7 @@ async function updateFunnelStage(stage) {
 
   } catch (error) {
     console.error("updateFunnelStage error:", error);
-    alert("Funnel status update failed.");
+    notify("Funnel status update failed.", "error");
   }
 }
 
@@ -1037,7 +1037,7 @@ async function sendMessage() {
   const msg = input.value.trim();
 
   if (!selectedPhone) {
-    alert("Please select a chat first.");
+    notify("Please select a chat first.", "warning");
     return;
   }
 
@@ -1053,7 +1053,7 @@ async function sendMessage() {
     const data = await res.json();
 
     if (!res.ok || !data.success) {
-      alert(data.error || "Message send failed");
+      notify(data.error || "Message send failed", "error");
       return;
     }
 
@@ -1062,7 +1062,7 @@ async function sendMessage() {
     await openChat(selectedPhone, false);
   } catch (error) {
     console.error("Frontend send error:", error);
-    alert("Message send failed. Check browser console and Railway logs.");
+    notify("Message send failed. Check browser console and Railway logs.", "error");
   }
 }
 
@@ -1130,7 +1130,7 @@ async function closeChat(phone) {
 
 async function switchToBot() {
   if (!selectedPhone) {
-    alert("Please select a chat first.");
+    notify("Please select a chat first.", "warning");
     return;
   }
 
@@ -1140,7 +1140,7 @@ async function switchToBot() {
     body: JSON.stringify({ phone: selectedPhone, mode: "bot" })
   });
 
-  alert("Chat switched back to bot mode.");
+  notify("Chat switched back to bot mode.", "success");
   await loadChats();
   await openChat(selectedPhone, false);
 }
@@ -1309,14 +1309,14 @@ async function updateCallback(id) {
     const data = await res.json();
 
     if (!data.success) {
-      alert(data.error || "Failed to update callback");
+      notify(data.error || "Failed to update callback", "error");
       return;
     }
 
     loadCallbacks();
   } catch (error) {
     console.error("updateCallback error:", error);
-    alert("Callback update failed");
+    notify("Callback update failed", "error");
   }
 }
 
@@ -1409,7 +1409,7 @@ async function createAgent() {
     document.getElementById("newAgentDashboardAccess").checked;
 
   if (!name || !username || !password) {
-    alert("Please fill all required fields");
+    notify("Please fill all required fields", "warning");
     return;
   }
 
@@ -1433,11 +1433,11 @@ async function createAgent() {
     const data = await res.json();
 
     if (!data.success) {
-      alert(data.error || "Failed to create agent");
+      notify(data.error || "Failed to create agent", "error");
       return;
     }
 
-    alert("Agent created successfully");
+    notify("Agent created successfully", "success");
 
     document.getElementById("newAgentName").value = "";
     document.getElementById("newAgentUsername").value = "";
@@ -1449,7 +1449,7 @@ async function createAgent() {
   } catch (error) {
     console.error("Create agent error:", error);
 
-    alert("Failed to create agent");
+    notify("Failed to create agent", "error");
   }
 }
 
@@ -1470,7 +1470,7 @@ async function toggleAgentStatus(id, currentStatus) {
     const data = await res.json();
 
     if (!data.success) {
-      alert(data.error || "Failed to update agent");
+      notify(data.error || "Failed to update agent", "error");
       return;
     }
 
@@ -1485,7 +1485,7 @@ async function editAgent(id) {
   const agent = (await getAgentById(id));
 
   if (!agent) {
-    alert("Agent not found");
+    notify("Agent not found", "error");
     return;
   }
 
@@ -1498,7 +1498,7 @@ async function editAgent(id) {
   );
   if (!newRole) return;
 
-  const dashboardAccess = confirm(
+  const dashboardAccess = await customConfirm(
     "Allow dashboard access for this agent?"
   );
 
@@ -1518,16 +1518,16 @@ async function editAgent(id) {
     const data = await res.json();
 
     if (!data.success) {
-      alert(data.error || "Failed to update agent");
+      notify(data.error || "Failed to update agent", "error");
       return;
     }
 
-    alert("Agent updated successfully");
+    notify("Agent updated successfully", "success");
     loadAgents();
 
   } catch (error) {
     console.error("Edit agent error:", error);
-    alert("Failed to update agent");
+    notify("Failed to update agent", "error");
   }
 }
 
@@ -1537,7 +1537,7 @@ async function resetAgentPassword(id) {
   if (!newPassword) return;
 
   if (newPassword.length < 6) {
-    alert("Password must be at least 6 characters");
+    notify("Password must be at least 6 characters", "warning");
     return;
   }
 
@@ -1555,15 +1555,15 @@ async function resetAgentPassword(id) {
     const data = await res.json();
 
     if (!data.success) {
-      alert(data.error || "Failed to reset password");
+      notify(data.error || "Failed to reset password", "error");
       return;
     }
 
-    alert("Password reset successfully");
+    notify("Password reset successfully", "success");
 
   } catch (error) {
     console.error("Password reset error:", error);
-    alert("Failed to reset password");
+    notify("Failed to reset password", "error");
   }
 }
 
@@ -1582,6 +1582,51 @@ async function getAgentById(id) {
     console.error("Get agent error:", error);
     return null;
   }
+}
+
+function notify(message, type = "info") {
+  let container = document.getElementById("toastContainer");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toastContainer";
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add("toast-out");
+    setTimeout(() => toast.remove(), 250);
+  }, 3200);
+}
+
+function customConfirm(message) {
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-modal-overlay";
+    overlay.innerHTML = `
+      <div class="confirm-modal-card">
+        <p>${escapeHtml(message)}</p>
+        <div class="confirm-modal-actions">
+          <button class="ghost-btn" data-action="cancel">Cancel</button>
+          <button class="primary-btn" data-action="ok">Yes</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener("click", (event) => {
+      const action = event.target.dataset.action;
+      if (!action) return;
+      overlay.remove();
+      resolve(action === "ok");
+    });
+  });
 }
 
 function escapeHtml(str) {
@@ -1751,12 +1796,12 @@ function applyCustomRange() {
   const end = document.getElementById("endDate")?.value;
 
   if (!start || !end) {
-    alert("Please select both dates.");
+    notify("Please select both dates.", "warning");
     return;
   }
 
   if (new Date(start) > new Date(end)) {
-    alert("Start date cannot be greater than end date.");
+    notify("Start date cannot be greater than end date.", "warning");
     return;
   }
 
@@ -1798,7 +1843,7 @@ function exportDashboardData() {
     })
     .catch(error => {
       console.error("Export error:", error);
-      alert("Export failed. Please try again.");
+      notify("Export failed. Please try again.", "error");
     });
 }
 
