@@ -240,7 +240,12 @@ await pool.query(`
   ALTER TABLE users
   ADD COLUMN IF NOT EXISTS admission_fee_paid_at TIMESTAMP;
 `);
-    
+
+await pool.query(`
+  ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS awaiting_lead BOOLEAN DEFAULT false;
+`);
+
     await pool.query(`
   ALTER TABLE callback_requests
   ADD COLUMN IF NOT EXISTS request_count INTEGER DEFAULT 1;

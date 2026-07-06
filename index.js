@@ -283,7 +283,7 @@ async function createUserIfNotExists(phone, name = null) {
 
 async function updateUserDetails(
   phone,
-  { name = null, program = null, mode = null }
+  { name = null, program = null, mode = null, awaitingLead = null }
 ) {
   try {
     await pool.query(
@@ -292,10 +292,11 @@ async function updateUserDetails(
       SET
         name = COALESCE(NULLIF($2, ''), name),
         program = COALESCE($3, program),
-        mode = COALESCE($4, mode)
+        mode = COALESCE($4, mode),
+        awaiting_lead = COALESCE($5, awaiting_lead)
       WHERE phone = $1
       `,
-      [phone, name, program, mode]
+      [phone, name, program, mode, awaitingLead]
     );
   } catch (err) {
     console.error("updateUserDetails error:", err.message);
@@ -2182,12 +2183,21 @@ ${welcomeMessage()}`,
 }
 
 if (!userStates[from]) {
-  userStates[from] = {
-    previousMenu: "main",
-    currentMenu: "main",
-    awaitingLead: false,
-    hasInteracted: false
-  };
+  if (currentUserForKeyword?.awaiting_lead) {
+    userStates[from] = {
+      previousMenu: "main",
+      currentMenu: "agent",
+      awaitingLead: true,
+      hasInteracted: true
+    };
+  } else {
+    userStates[from] = {
+      previousMenu: "main",
+      currentMenu: "main",
+      awaitingLead: false,
+      hasInteracted: false
+    };
+  }
 }
 userStates[from].lastSeenAt = Date.now();
 
@@ -2352,6 +2362,8 @@ if (userStates[from]?.currentMenu === "agent_category") {
     } else {
       userStates[from].awaitingLead = true;
       userStates[from].currentMenu = "agent";
+
+      await updateUserDetails(from, { mode: "agent", awaitingLead: true });
 
       await sendTextMessage(
         from,
@@ -2571,7 +2583,8 @@ await incrementUnreadAndSetIncoming(from, incomingText, incomingChatStatus);
       await updateUserDetails(from, {
         name: cleanName,
         program,
-        mode: "agent"
+        mode: "agent",
+        awaitingLead: false
       });
 
 await pool.query(
@@ -2634,6 +2647,8 @@ Please wait, our admission representative will message you shortly.`,
       userStates[from].previousMenu = "main";
       userStates[from].awaitingLead = false;
       userStates[from].hasInteracted = true;
+
+      await updateUserDetails(from, { awaitingLead: false });
 
       await sendTextMessage(from, welcomeMessage());
       return res.sendStatus(200);
@@ -3250,7 +3265,10 @@ app.post("/api/switch-mode", authenticateAgent, async (req, res) => {
       });
     }
 
-    await updateUserDetails(phone, { mode });
+    await updateUserDetails(phone, {
+      mode,
+      awaitingLead: mode === "bot" ? false : null
+    });
 
     let chatStatus = "active";
     let lastMessage = "Chat switched to bot mode";
