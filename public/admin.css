@@ -786,6 +786,33 @@ body {
   margin-top: 5px;
 }
 
+.sent-tick {
+  opacity: 0.85;
+}
+
+.date-divider {
+  display: flex;
+  justify-content: center;
+  margin: 14px 0;
+}
+
+.date-divider span {
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 11px;
+  padding: 4px 14px;
+  border-radius: 20px;
+}
+
+@keyframes messageSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.message-row.message-in {
+  animation: messageSlideIn 0.25s ease-out;
+}
+
 .composer {
   padding: 12px;
   border-top: 1px solid var(--line);

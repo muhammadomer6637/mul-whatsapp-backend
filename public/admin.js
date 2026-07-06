@@ -755,8 +755,9 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
 });
   const data = await res.json();
 
+  let lastDateLabel = null;
   document.getElementById("messages").innerHTML = data.messages.length
-    ? data.messages.map(message => {
+    ? data.messages.map((message, index) => {
         let content = "";
 
         if (
@@ -800,12 +801,24 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
   content = `<div>${escapeHtml(message.text || message.type || "")}</div>`;
 }
 
+        const dateLabel = formatDayLabel(message.created_at);
+        let divider = "";
+        if (dateLabel !== lastDateLabel) {
+          divider = `<div class="date-divider"><span>${dateLabel}</span></div>`;
+          lastDateLabel = dateLabel;
+        }
+
+        const isOutgoing = message.sender === "agent" || message.sender === "bot";
+        const sentTick = isOutgoing ? ` <span class="sent-tick">✓</span>` : "";
+        const isLatest = index === data.messages.length - 1;
+
         return `
-          <div class="message-row ${message.sender}">
+          ${divider}
+          <div class="message-row ${message.sender}${isLatest ? " message-in" : ""}">
             <div class="message-bubble">
               ${content}
               <div class="message-meta">
-                ${capitalize(message.sender)} · ${formatDateTime(message.created_at, true)}
+                ${capitalize(message.sender)} · ${formatDateTime(message.created_at, true)}${sentTick}
               </div>
             </div>
           </div>
@@ -1604,6 +1617,21 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString();
+}
+
+function formatDayLabel(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const today = startOfDay(new Date());
+  const target = startOfDay(date);
+  const diffDays = Math.round((today - target) / 86400000);
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
 function titleCase(str) {
