@@ -2169,6 +2169,15 @@ ${welcomeMessage()}`,
   return res.sendStatus(200);
 }
 
+if (!userStates[from]) {
+  userStates[from] = {
+    previousMenu: "main",
+    currentMenu: "main",
+    awaitingLead: false,
+    hasInteracted: false
+  };
+}
+
 // =========================
 // FOLLOW-UP RESPONSE HANDLING
 // =========================
