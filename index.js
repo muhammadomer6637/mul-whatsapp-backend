@@ -21,9 +21,9 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // CONFIG
-const VERIFY_TOKEN = "mul_token_123";
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "mul_token_123";
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const PHONE_NUMBER_ID = "1065169533344109";
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID || "1065169533344109";
 const BASE_URL =
   process.env.BASE_URL ||
   "https://mul-whatsapp-backend-production.up.railway.app";
