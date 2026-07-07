@@ -246,6 +246,11 @@ await pool.query(`
   ADD COLUMN IF NOT EXISTS awaiting_lead BOOLEAN DEFAULT false;
 `);
 
+await pool.query(`
+  ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS awaiting_callback_lead BOOLEAN DEFAULT false;
+`);
+
     await pool.query(`
   ALTER TABLE callback_requests
   ADD COLUMN IF NOT EXISTS request_count INTEGER DEFAULT 1;

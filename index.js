@@ -283,7 +283,13 @@ async function createUserIfNotExists(phone, name = null) {
 
 async function updateUserDetails(
   phone,
-  { name = null, program = null, mode = null, awaitingLead = null }
+  {
+    name = null,
+    program = null,
+    mode = null,
+    awaitingLead = null,
+    awaitingCallbackLead = null
+  }
 ) {
   try {
     await pool.query(
@@ -293,10 +299,11 @@ async function updateUserDetails(
         name = COALESCE(NULLIF($2, ''), name),
         program = COALESCE($3, program),
         mode = COALESCE($4, mode),
-        awaiting_lead = COALESCE($5, awaiting_lead)
+        awaiting_lead = COALESCE($5, awaiting_lead),
+        awaiting_callback_lead = COALESCE($6, awaiting_callback_lead)
       WHERE phone = $1
       `,
-      [phone, name, program, mode, awaitingLead]
+      [phone, name, program, mode, awaitingLead, awaitingCallbackLead]
     );
   } catch (err) {
     console.error("updateUserDetails error:", err.message);
@@ -697,6 +704,7 @@ How may we assist you today?
 5️⃣ Why Choose MUL?
 6️⃣ Other Support Offices
 7️⃣ Chat with Admissions Advisor
+8️⃣ Request a Call Back
 
 📌 Please reply with the number of your choice.
 
@@ -704,6 +712,7 @@ Example:
 Send 1 for Programs
 Send 2 for Fee Structure
 Send 7 to connect with an Admissions Advisor
+Send 8 to request a call back
 
 💡 Type MENU anytime to see these options again.`;
 }
@@ -2190,6 +2199,14 @@ if (!userStates[from]) {
       awaitingLead: true,
       hasInteracted: true
     };
+  } else if (currentUserForKeyword?.awaiting_callback_lead) {
+    userStates[from] = {
+      previousMenu: "main",
+      currentMenu: "callback_lead",
+      awaitingLead: false,
+      awaitingCallbackLead: true,
+      hasInteracted: true
+    };
   } else {
     userStates[from] = {
       previousMenu: "main",
@@ -2234,7 +2251,8 @@ if (lowerText === "menu") {
 4. How to Apply
 5. Why Choose MUL?
 6. Other Support
-7. Chat with Agent`
+7. Chat with Agent
+8. Call Me Back`
   );
 
   return res.sendStatus(200);
@@ -2646,9 +2664,10 @@ Please wait, our admission representative will message you shortly.`,
       userStates[from].currentMenu = "main";
       userStates[from].previousMenu = "main";
       userStates[from].awaitingLead = false;
+      userStates[from].awaitingCallbackLead = false;
       userStates[from].hasInteracted = true;
 
-      await updateUserDetails(from, { awaitingLead: false });
+      await updateUserDetails(from, { awaitingLead: false, awaitingCallbackLead: false });
 
       await sendTextMessage(from, welcomeMessage());
       return res.sendStatus(200);
@@ -2947,6 +2966,78 @@ Please choose:
   return res.sendStatus(200);
 }
 
+if (lowerText === "8") {
+  const existingUser = await pool.query(
+    "SELECT name, program FROM users WHERE phone = $1",
+    [from]
+  );
+
+  if (
+    existingUser.rows.length > 0 &&
+    existingUser.rows[0].name &&
+    existingUser.rows[0].program
+  ) {
+    await createCallbackRequest(from);
+
+    userStates[from].currentMenu = "main";
+    userStates[from].hasInteracted = true;
+
+    await sendTextMessage(
+      from,
+      `✅ Thank you! Your callback request has been received.
+
+Our team will contact you shortly.`
+    );
+  } else {
+    userStates[from].awaitingCallbackLead = true;
+    userStates[from].currentMenu = "callback_lead";
+
+    await updateUserDetails(from, { awaitingCallbackLead: true });
+
+    await sendTextMessage(
+      from,
+      `Please share your details in this format:
+
+Your Name, Interested Program
+
+⚠️ Please add comma ( , ) between your name and program.
+
+Example:
+Ali, BS Computer Science`
+    );
+  }
+
+  return res.sendStatus(200);
+}
+
+if (userStates[from].awaitingCallbackLead && text.includes(",")) {
+  const [name, ...rest] = text.split(",");
+  const program = rest.join(",").trim();
+  const cleanName = name.trim();
+
+  userStates[from].awaitingCallbackLead = false;
+  userStates[from].currentMenu = "main";
+  userStates[from].previousMenu = "main";
+  userStates[from].hasInteracted = true;
+
+  await updateUserDetails(from, {
+    name: cleanName,
+    program,
+    awaitingCallbackLead: false
+  });
+
+  await createCallbackRequest(from);
+
+  await sendTextMessage(
+    from,
+    `✅ Thank you! Your callback request has been received.
+
+Our team will contact you shortly.`
+  );
+
+  return res.sendStatus(200);
+}
+
 await sendTextMessage(
   from,
   `Assalamu Alaikum 👋
@@ -2962,6 +3053,7 @@ Please choose one of the following options:
 5️⃣ Why Choose MUL?
 6️⃣ Other Support Offices
 7️⃣ Chat with Admissions Advisor
+8️⃣ Request a Call Back
 
 📌 Please reply with the number of your choice.
 
@@ -3267,7 +3359,8 @@ app.post("/api/switch-mode", authenticateAgent, async (req, res) => {
 
     await updateUserDetails(phone, {
       mode,
-      awaitingLead: mode === "bot" ? false : null
+      awaitingLead: mode === "bot" ? false : null,
+      awaitingCallbackLead: mode === "bot" ? false : null
     });
 
     let chatStatus = "active";
@@ -3291,6 +3384,7 @@ app.post("/api/switch-mode", authenticateAgent, async (req, res) => {
 
    if (mode === "bot") {
   userStates[phone].awaitingLead = false;
+  userStates[phone].awaitingCallbackLead = false;
   userStates[phone].currentMenu = "main";
   userStates[phone].previousMenu = "main";
 
