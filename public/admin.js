@@ -1489,13 +1489,13 @@ async function editAgent(id) {
     return;
   }
 
-  const newName = prompt("Enter agent name:", agent.name);
+  const newName = await customPrompt("Enter agent name:", { defaultValue: agent.name });
   if (!newName) return;
 
-  const newRole = prompt(
-    "Enter role: admin, chat_agent, call_agent",
-    agent.role
-  );
+  const newRole = await customPrompt("Select role:", {
+    defaultValue: agent.role,
+    choices: ["admin", "chat_agent", "call_agent"]
+  });
   if (!newRole) return;
 
   const dashboardAccess = await customConfirm(
@@ -1532,7 +1532,7 @@ async function editAgent(id) {
 }
 
 async function resetAgentPassword(id) {
-  const newPassword = prompt("Enter new password:");
+  const newPassword = await customPrompt("Enter new password:", { inputType: "password" });
 
   if (!newPassword) return;
 
@@ -1625,6 +1625,52 @@ function customConfirm(message) {
       if (!action) return;
       overlay.remove();
       resolve(action === "ok");
+    });
+  });
+}
+
+function customPrompt(message, { defaultValue = "", inputType = "text", choices = null } = {}) {
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-modal-overlay";
+
+    const fieldHtml = choices
+      ? `<select id="promptInput" class="prompt-input">
+          ${choices.map(c => `<option value="${escapeHtml(c)}" ${c === defaultValue ? "selected" : ""}>${escapeHtml(c)}</option>`).join("")}
+        </select>`
+      : `<input id="promptInput" class="prompt-input" type="${inputType}" value="${escapeHtml(defaultValue)}" />`;
+
+    overlay.innerHTML = `
+      <div class="confirm-modal-card">
+        <p>${escapeHtml(message)}</p>
+        ${fieldHtml}
+        <div class="confirm-modal-actions">
+          <button class="ghost-btn" data-action="cancel">Cancel</button>
+          <button class="primary-btn" data-action="ok">OK</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const input = overlay.querySelector("#promptInput");
+    input.focus();
+    if (input.select) input.select();
+
+    function finish(result) {
+      overlay.remove();
+      resolve(result);
+    }
+
+    overlay.addEventListener("click", (event) => {
+      const action = event.target.dataset.action;
+      if (!action) return;
+      finish(action === "ok" ? input.value : null);
+    });
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") finish(input.value);
+      if (event.key === "Escape") finish(null);
     });
   });
 }
