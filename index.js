@@ -3430,6 +3430,7 @@ app.post("/api/assign-chat", authenticateAgent, async (req, res) => {
     }
 
 const shouldAssign = agent !== null && agent !== false && agent !== "";
+const targetAgentId = shouldAssign ? req.agent.id : null;
 
 const result = await pool.query(
   `
@@ -3453,6 +3454,11 @@ const result = await pool.query(
 
     updated_at = NOW()
   WHERE phone = $2
+    AND (
+      $1::integer IS NULL
+      OR assigned_agent_id IS NULL
+      OR assigned_agent_id = $1::integer
+    )
   RETURNING
     phone,
     assigned_agent_id,
@@ -3462,10 +3468,17 @@ const result = await pool.query(
     agent_taken_at,
     agent_response_seconds
   `,
-  [shouldAssign ? req.agent.id : null, phone]
+  [targetAgentId, phone]
 );
 
     console.log("ASSIGN RESULT:", result.rows[0]);
+
+    if (shouldAssign && result.rows.length === 0) {
+      return res.status(409).json({
+        success: false,
+        error: "This chat has already been taken by another agent."
+      });
+    }
 
     return res.json({
       success: true,

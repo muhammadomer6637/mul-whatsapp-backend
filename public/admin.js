@@ -776,36 +776,36 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
   && message.media_url
 ) {
   content = `
-    <img src="${message.media_url}" 
+    <img src="${escapeHtml(message.media_url)}"
          style="max-width:200px;border-radius:10px;cursor:pointer"
-         onclick="window.open('${message.media_url}','_blank')" />
+         onclick="window.open('${escapeHtml(message.media_url)}','_blank')" />
   `;
 } else if (
-  (message.type === "document" || message.mime_type?.includes("pdf")) 
+  (message.type === "document" || message.mime_type?.includes("pdf"))
   && message.media_url
 ) {
   content = `
-    <a href="${message.media_url}" target="_blank" 
+    <a href="${escapeHtml(message.media_url)}" target="_blank"
        style="color:#56a5ff;text-decoration:underline">
        📄 ${escapeHtml(message.file_name || "Open Document")}
     </a>
   `;
 } else if (
-  (message.type === "video" || message.mime_type?.includes("video")) 
+  (message.type === "video" || message.mime_type?.includes("video"))
   && message.media_url
 ) {
   content = `
     <video controls style="max-width:220px;border-radius:10px">
-      <source src="${message.media_url}">
+      <source src="${escapeHtml(message.media_url)}">
     </video>
   `;
 } else if (
-  (message.type === "audio" || message.mime_type?.includes("audio")) 
+  (message.type === "audio" || message.mime_type?.includes("audio"))
   && message.media_url
 ) {
   content = `
     <audio controls>
-      <source src="${message.media_url}">
+      <source src="${escapeHtml(message.media_url)}">
     </audio>
   `;
 } else {
@@ -1070,7 +1070,7 @@ async function takeChat(phone) {
   if (!phone) return;
 
   // ✅ Assign chat
-  await fetch(`${BASE}/api/assign-chat`, {
+  const assignRes = await fetch(`${BASE}/api/assign-chat`, {
     method: "POST",
    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
@@ -1078,6 +1078,14 @@ async function takeChat(phone) {
       agent: "assign"
     })
   });
+
+  const assignData = await assignRes.json();
+
+  if (!assignData.success) {
+    notify(assignData.error || "Failed to take chat", "error");
+    await loadChats();
+    return;
+  }
 
   // ✅ Switch to agent mode
   await fetch(`${BASE}/api/switch-mode`, {
