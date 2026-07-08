@@ -1187,10 +1187,9 @@ async function checkCallbackOffers() {
       SELECT phone
       FROM chats
       WHERE status = 'agent_waiting'
-        AND (
-          callback_offer_last_sent_at IS NULL
-          OR callback_offer_last_sent_at <= NOW() - INTERVAL '10 minutes'
-        )
+        AND callback_offer_last_sent_at IS NULL
+        AND agent_waiting_started_at IS NOT NULL
+        AND agent_waiting_started_at <= NOW() - INTERVAL '10 minutes'
       LIMIT 20
     `);
 
@@ -2367,7 +2366,7 @@ if (userStates[from]?.currentMenu === "agent_category") {
 );
 
       await pool.query(
-  "UPDATE chats SET followup_sent = false, followup_sent_at = NULL WHERE phone = $1",
+  "UPDATE chats SET followup_sent = false, followup_sent_at = NULL, callback_offer_last_sent_at = NULL WHERE phone = $1",
   [from]
 );
 
@@ -2432,7 +2431,7 @@ If comma is missing, your request may not be forwarded correctly.`
 );
 
     await pool.query(
-  "UPDATE chats SET followup_sent = false, followup_sent_at = NULL WHERE phone = $1",
+  "UPDATE chats SET followup_sent = false, followup_sent_at = NULL, callback_offer_last_sent_at = NULL WHERE phone = $1",
   [from]
 );
 
