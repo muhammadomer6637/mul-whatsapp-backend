@@ -398,6 +398,19 @@ body {
   .insights-grid {
     grid-template-columns: 1fr;
   }
+
+  .topbar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .topbar h1 {
+    font-size: 28px;
+  }
+
+  .topbar p {
+    font-size: 14px;
+  }
 }
 
 @media (max-width: 900px) {
@@ -544,6 +557,7 @@ body {
   padding: 15px 16px;
   border-bottom: 1px solid rgba(255,255,255,0.07);
   text-align: left;
+  white-space: nowrap;
 }
 
 .styled-table th {
