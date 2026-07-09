@@ -44,6 +44,11 @@ module.exports = async function initDb() {
       );
     `);
 
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_messages_phone_created_at
+      ON messages (phone, created_at);
+    `);
+
     // AGENTS TABLE
     await pool.query(`
       CREATE TABLE IF NOT EXISTS agents (
