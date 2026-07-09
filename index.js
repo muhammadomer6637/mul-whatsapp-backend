@@ -3549,6 +3549,20 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       queryParams
     );
 
+    const weeklyConversations = await pool.query(`
+      SELECT
+        TO_CHAR(day, 'Dy') AS label,
+        COUNT(u.id)::int AS count
+      FROM generate_series(
+        CURRENT_DATE - INTERVAL '6 days',
+        CURRENT_DATE,
+        INTERVAL '1 day'
+      ) AS day
+      LEFT JOIN users u ON u.created_at::date = day::date
+      GROUP BY day
+      ORDER BY day
+    `);
+
     const unreadConversations = await pool.query(`
       SELECT COUNT(*)::int AS count
       FROM chats
@@ -3825,7 +3839,8 @@ const funnelStats = await pool.query(`
       botInterestStats: botInterestStats.rows,
       agentCategoryStats: agentCategoryStats.rows,
       topPrograms: topPrograms.rows,
-      recentLeads: recentLeads.rows
+      recentLeads: recentLeads.rows,
+      weeklyConversations: weeklyConversations.rows
     });
 
   } catch (error) {

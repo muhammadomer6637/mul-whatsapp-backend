@@ -147,6 +147,31 @@
 
         
         <div class="stats-grid" id="stats"></div>
+
+        <div class="panel" id="weeklyOverviewPanel" style="margin-top: 22px; margin-bottom: 28px;">
+          <div class="panel-header">
+            <div>
+              <h3>Weekly Overview</h3>
+              <p>Conversations started and bot vs agent split (last 7 days)</p>
+            </div>
+          </div>
+
+          <div class="weekly-overview-grid">
+            <div class="chart-box">
+              <canvas id="weeklyConversationsChart"></canvas>
+            </div>
+            <div class="chart-box chart-box-donut">
+              <div class="donut-canvas-wrap">
+                <canvas id="botAgentDonutChart"></canvas>
+              </div>
+              <div class="donut-legend">
+                <div><span class="legend-dot" style="background:#56a5ff"></span>Bot only</div>
+                <div><span class="legend-dot" style="background:#1d9e75"></span>Agent requested</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="panel" id="callbackStatsPanel" style="margin-top: 22px; margin-bottom: 28px;">
   <div class="panel-header">
     <div>
@@ -570,6 +595,7 @@
   </div>
 </div>
   
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

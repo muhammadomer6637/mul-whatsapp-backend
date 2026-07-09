@@ -400,6 +400,8 @@ document.getElementById("stats").innerHTML = `
 `;
         markLoaded("stats");
 
+        renderWeeklyOverviewCharts(data.weeklyConversations || [], stats);
+
         document.getElementById("callbackStats").innerHTML = `
       <div class="stat-card">
         <div class="label">Callback Requests</div>
@@ -539,6 +541,65 @@ document.querySelector(".fill-4").style.width = `${Math.min(feePaidWidth, 100)}%
   } catch (error) {
     console.error("Dashboard load error:", error);
   }
+}
+
+let weeklyConversationsChartInstance = null;
+let botAgentDonutChartInstance = null;
+
+function renderWeeklyOverviewCharts(weeklyConversations, stats) {
+  if (typeof Chart === "undefined") return;
+
+  const lineCanvas = document.getElementById("weeklyConversationsChart");
+  const donutCanvas = document.getElementById("botAgentDonutChart");
+  if (!lineCanvas || !donutCanvas) return;
+
+  if (weeklyConversationsChartInstance) weeklyConversationsChartInstance.destroy();
+  if (botAgentDonutChartInstance) botAgentDonutChartInstance.destroy();
+
+  weeklyConversationsChartInstance = new Chart(lineCanvas, {
+    type: "line",
+    data: {
+      labels: weeklyConversations.map(row => row.label),
+      datasets: [{
+        data: weeklyConversations.map(row => row.count),
+        borderColor: "#56a5ff",
+        backgroundColor: "rgba(86,165,255,0.15)",
+        fill: true,
+        tension: 0.35,
+        pointBackgroundColor: "#56a5ff",
+        pointRadius: 3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#a8bbdc" }, grid: { color: "rgba(255,255,255,0.06)" } },
+        y: { ticks: { color: "#a8bbdc" }, grid: { color: "rgba(255,255,255,0.06)" }, beginAtZero: true }
+      }
+    }
+  });
+
+  const agentRequested = Number(stats.agentChatRequests || 0);
+  const botOnly = Math.max(Number(stats.conversationsStarted || 0) - agentRequested, 0);
+
+  botAgentDonutChartInstance = new Chart(donutCanvas, {
+    type: "doughnut",
+    data: {
+      labels: ["Bot only", "Agent requested"],
+      datasets: [{
+        data: [botOnly, agentRequested],
+        backgroundColor: ["#56a5ff", "#1d9e75"],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } }
+    }
+  });
 }
 
 function setChatFilter(filter, button) {

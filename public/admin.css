@@ -273,6 +273,55 @@ body {
   margin-bottom: 20px;
 }
 
+.weekly-overview-grid {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: 16px;
+}
+
+.chart-box {
+  background: var(--panel-2);
+  border-radius: 16px;
+  padding: 16px;
+  height: 260px;
+  position: relative;
+}
+
+.chart-box-donut {
+  display: flex;
+  flex-direction: column;
+}
+
+.donut-canvas-wrap {
+  position: relative;
+  height: 160px;
+  flex-shrink: 0;
+}
+
+.donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+@media (max-width: 768px) {
+  .weekly-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .stat-card,
 .panel,
 .wa-chat-list,
