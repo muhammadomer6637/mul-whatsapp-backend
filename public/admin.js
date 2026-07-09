@@ -1423,38 +1423,19 @@ async function loadAgents() {
         </td>
 
         <td>
-          <span class="${
-            agent.active
-              ? "status-active"
-              : "status-inactive"
-          }">
-            ${
-              agent.active
-                ? "Active"
-                : "Inactive"
-            }
-          </span>
+          <label class="switch" title="${agent.active ? "Active" : "Inactive"}">
+            <input
+              type="checkbox"
+              ${agent.active ? "checked" : ""}
+              onchange="toggleAgentStatus(${agent.id}, ${agent.active})"
+            />
+            <span class="slider"></span>
+          </label>
         </td>
 
-    <td>
-  <button class="ghost-btn" onclick="editAgent(${agent.id})">
-    Edit
-  </button>
-
-  <button class="ghost-btn" onclick="resetAgentPassword(${agent.id})">
-    Password
-  </button>
-
-  <button
-    class="ghost-btn"
-    onclick="toggleAgentStatus(${agent.id}, ${agent.active})"
-  >
-    ${
-      agent.active
-        ? "Disable"
-        : "Enable"
-    }
-  </button>
+    <td class="agent-action-icons">
+  <span class="icon-action" onclick="openEditAgentModal(${agent.id})" title="Edit agent">✎</span>
+  <span class="icon-action" onclick="resetAgentPassword(${agent.id})" title="Reset password">🔑</span>
 </td>
       </tr>
     `).join("");
@@ -1550,7 +1531,7 @@ async function toggleAgentStatus(id, currentStatus) {
   }
 }
 
-async function editAgent(id) {
+async function openEditAgentModal(id) {
   const agent = (await getAgentById(id));
 
   if (!agent) {
@@ -1558,18 +1539,75 @@ async function editAgent(id) {
     return;
   }
 
-  const newName = await customPrompt("Enter agent name:", { defaultValue: agent.name });
-  if (!newName) return;
+  const roles = ["admin", "chat_agent", "call_agent"];
 
-  const newRole = await customPrompt("Select role:", {
-    defaultValue: agent.role,
-    choices: ["admin", "chat_agent", "call_agent"]
+  const overlay = document.createElement("div");
+  overlay.className = "confirm-modal-overlay";
+  overlay.innerHTML = `
+    <div class="confirm-modal-card">
+      <p style="font-weight:700; font-size:16px;">Edit agent</p>
+
+      <label class="field-label">Name</label>
+      <input id="editAgentName" class="prompt-input" type="text" value="${escapeHtml(agent.name)}" />
+
+      <label class="field-label">Username</label>
+      <div class="field-readonly">${escapeHtml(agent.username)}</div>
+
+      <label class="field-label">Role</label>
+      <select id="editAgentRole" class="prompt-input">
+        ${roles.map(r => `<option value="${r}" ${r === agent.role ? "selected" : ""}>${r}</option>`).join("")}
+      </select>
+
+      <label class="field-toggle-row">
+        <span>Dashboard access</span>
+        <label class="switch">
+          <input type="checkbox" id="editAgentDashboard" ${agent.can_view_dashboard ? "checked" : ""} />
+          <span class="slider"></span>
+        </label>
+      </label>
+
+      <label class="field-label">New password</label>
+      <input id="editAgentPassword" class="prompt-input" type="password" placeholder="Leave blank to keep current" />
+
+      <div class="confirm-modal-actions">
+        <button class="ghost-btn" data-action="cancel">Cancel</button>
+        <button class="primary-btn" data-action="save">Save</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener("click", async (event) => {
+    const action = event.target.dataset.action;
+    if (!action) return;
+
+    if (action === "cancel") {
+      overlay.remove();
+      return;
+    }
+
+    if (action === "save") {
+      await saveEditedAgent(id, overlay);
+    }
   });
-  if (!newRole) return;
+}
 
-  const dashboardAccess = await customConfirm(
-    "Allow dashboard access for this agent?"
-  );
+async function saveEditedAgent(id, overlay) {
+  const newName = overlay.querySelector("#editAgentName").value.trim();
+  const newRole = overlay.querySelector("#editAgentRole").value;
+  const dashboardAccess = overlay.querySelector("#editAgentDashboard").checked;
+  const newPassword = overlay.querySelector("#editAgentPassword").value;
+
+  if (!newName) {
+    notify("Please enter a name", "warning");
+    return;
+  }
+
+  if (newPassword && newPassword.length < 6) {
+    notify("Password must be at least 6 characters", "warning");
+    return;
+  }
 
   try {
     const res = await fetch(`${BASE}/api/agents/${id}`, {
@@ -1591,7 +1629,27 @@ async function editAgent(id) {
       return;
     }
 
-    notify("Agent updated successfully", "success");
+    if (newPassword) {
+      const pwRes = await fetch(`${BASE}/api/agents/${id}/password`, {
+        method: "PUT",
+        headers: authHeaders({
+          "Content-Type": "application/json"
+        }),
+        body: JSON.stringify({ password: newPassword })
+      });
+
+      const pwData = await pwRes.json();
+
+      if (!pwData.success) {
+        notify(pwData.error || "Agent updated, but password reset failed", "error");
+        overlay.remove();
+        loadAgents();
+        return;
+      }
+    }
+
+    notify("Agent updated", "success");
+    overlay.remove();
     loadAgents();
 
   } catch (error) {
