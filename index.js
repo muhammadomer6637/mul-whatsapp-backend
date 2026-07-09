@@ -2220,7 +2220,7 @@ userStates[from].lastSeenAt = Date.now();
 // =========================
 // FOLLOW-UP RESPONSE HANDLING
 // =========================
-if (lowerText === "yes") {
+if (lowerText === "yes" && chatForCallback?.status !== "agent_active") {
   userStates[from].currentMenu = "agent";
 
   await updateUserDetails(from, { mode: "agent" });
@@ -2478,7 +2478,11 @@ const incomingChatStatus =
 
 await incrementUnreadAndSetIncoming(from, incomingText, incomingChatStatus);
 
-    if (currentMode === "agent") {
+    if (
+      currentMode === "agent" &&
+      !userStates[from].awaitingLead &&
+      !userStates[from].awaitingCallbackLead
+    ) {
       console.log(`Bot stopped for ${from} because user is in agent mode.`);
       return res.sendStatus(200);
     }
