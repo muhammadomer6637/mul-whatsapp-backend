@@ -2093,8 +2093,11 @@ app.post("/webhook", async (req, res) => {
 
 const currentUserForKeyword = await getUserByPhone(from);
 const currentModeForKeyword = currentUserForKeyword?.mode || "bot";
+const isAwaitingLeadDetails =
+  !!currentUserForKeyword?.awaiting_lead ||
+  !!currentUserForKeyword?.awaiting_callback_lead;
 
-if (currentModeForKeyword !== "agent") {
+if (currentModeForKeyword !== "agent" && !isAwaitingLeadDetails) {
   if (
     lowerText &&
     (
