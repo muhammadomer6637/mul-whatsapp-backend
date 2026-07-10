@@ -1067,7 +1067,7 @@ const admissionFeeIcon = funnel.admission_fee_paid_at ? "✓" : "○";
 
       <hr>
 
-      <button class="funnel-menu-item" onclick="notify('Assign To Call Agent will be added next.')">
+      <button class="funnel-menu-item" onclick="assignToCallAgent()">
         Assign To Call Agent
       </button>
     </div>
@@ -1112,6 +1112,44 @@ async function updateFunnelStage(stage) {
   } catch (error) {
     console.error("updateFunnelStage error:", error);
     notify("Funnel status update failed.", "error");
+  }
+}
+
+async function assignToCallAgent() {
+  if (!selectedPhone) {
+    notify("Please select a chat first.", "warning");
+    return;
+  }
+
+  const confirmed = await customConfirm(
+    "Assign this chat to the call agent team? The student will be moved back to the bot menu."
+  );
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`${BASE}/api/assign-call-agent`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ phone: selectedPhone })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to assign to call agent", "error");
+      return;
+    }
+
+    const menu = document.getElementById("funnelMenu");
+    if (menu) menu.remove();
+
+    notify("Assigned to call agent team", "success");
+    await loadChats();
+    await openChat(selectedPhone, false);
+
+  } catch (error) {
+    console.error("assignToCallAgent error:", error);
+    notify("Failed to assign to call agent", "error");
   }
 }
 

@@ -3243,6 +3243,42 @@ app.get("/api/funnel-status/:phone", authenticateAgent, async (req, res) => {
   }
 });
 
+app.post("/api/assign-call-agent", authenticateAgent, async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        error: "phone is required"
+      });
+    }
+
+    await createCallbackRequest(phone);
+
+    await sendTextMessage(
+      phone,
+      `Thank you for contacting Minhaj University Lahore.
+
+Your request has been forwarded to our call-back team, and one of our representatives will contact you shortly.
+
+Meanwhile, you may continue exploring admissions information anytime.
+
+${welcomeMessage()}`,
+      "active"
+    );
+
+    return res.json({ success: true });
+
+  } catch (error) {
+    console.error("POST /api/assign-call-agent error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to assign to call agent"
+    });
+  }
+});
+
 app.get("/api/chats", authenticateAgent, async (req, res) => {
   try {
     const result = await pool.query(`
