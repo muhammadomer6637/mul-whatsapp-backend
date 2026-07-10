@@ -957,6 +957,55 @@ body {
   font-family: inherit;
 }
 
+.quick-reply-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 12px;
+  right: 12px;
+  margin-bottom: 8px;
+  background: linear-gradient(180deg, rgba(9,25,52,0.98), rgba(6,18,38,0.98));
+  border: 1px solid rgba(86,165,255,0.22);
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 50;
+}
+
+.quick-reply-dropdown.hidden {
+  display: none;
+}
+
+.quick-reply-option {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.quick-reply-option:last-child {
+  border-bottom: none;
+}
+
+.quick-reply-option:hover,
+.quick-reply-option.active-option {
+  background: rgba(86,165,255,0.12);
+}
+
+.quick-reply-option .qr-shortcut {
+  color: var(--accent-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.quick-reply-option .qr-preview {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .quick-replies {
   padding: 10px 12px;
   display: flex;

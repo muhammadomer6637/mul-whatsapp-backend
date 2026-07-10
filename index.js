@@ -1973,6 +1973,155 @@ app.put(
   }
 );
 
+// =========================
+// QUICK REPLIES APIs
+// =========================
+
+app.get("/api/quick-replies", authenticateAgent, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, shortcut, message, created_at, updated_at
+      FROM quick_replies
+      ORDER BY shortcut ASC
+    `);
+
+    return res.json({
+      success: true,
+      quickReplies: result.rows
+    });
+  } catch (error) {
+    console.error("GET /api/quick-replies error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch quick replies"
+    });
+  }
+});
+
+app.post("/api/quick-replies", authenticateAgent, async (req, res) => {
+  try {
+    const { shortcut, message } = req.body;
+
+    if (!shortcut || !message) {
+      return res.status(400).json({
+        success: false,
+        error: "Shortcut and message are required"
+      });
+    }
+
+    const cleanShortcut = String(shortcut).trim().toLowerCase().replace(/^\/+/, "");
+
+    if (!cleanShortcut) {
+      return res.status(400).json({
+        success: false,
+        error: "Shortcut cannot be empty"
+      });
+    }
+
+    const result = await pool.query(
+      `
+      INSERT INTO quick_replies (shortcut, message)
+      VALUES ($1, $2)
+      RETURNING id, shortcut, message, created_at, updated_at
+      `,
+      [cleanShortcut, message]
+    );
+
+    return res.json({
+      success: true,
+      quickReply: result.rows[0]
+    });
+  } catch (error) {
+    if (error.code === "23505") {
+      return res.status(400).json({
+        success: false,
+        error: "A quick reply with this shortcut already exists"
+      });
+    }
+
+    console.error("POST /api/quick-replies error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to create quick reply"
+    });
+  }
+});
+
+app.put("/api/quick-replies/:id", authenticateAgent, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { shortcut, message } = req.body;
+
+    const cleanShortcut = shortcut
+      ? String(shortcut).trim().toLowerCase().replace(/^\/+/, "")
+      : null;
+
+    const result = await pool.query(
+      `
+      UPDATE quick_replies
+      SET
+        shortcut = COALESCE(NULLIF($1, ''), shortcut),
+        message = COALESCE(NULLIF($2, ''), message),
+        updated_at = NOW()
+      WHERE id = $3
+      RETURNING id, shortcut, message, created_at, updated_at
+      `,
+      [cleanShortcut, message ?? null, id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        error: "Quick reply not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      quickReply: result.rows[0]
+    });
+  } catch (error) {
+    if (error.code === "23505") {
+      return res.status(400).json({
+        success: false,
+        error: "A quick reply with this shortcut already exists"
+      });
+    }
+
+    console.error("PUT /api/quick-replies/:id error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update quick reply"
+    });
+  }
+});
+
+app.delete("/api/quick-replies/:id", authenticateAgent, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `DELETE FROM quick_replies WHERE id = $1 RETURNING id`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        error: "Quick reply not found"
+      });
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("DELETE /api/quick-replies/:id error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to delete quick reply"
+    });
+  }
+});
+
 // TEMP CREATE ADMIN
 app.get("/create-admin", async (req, res) => {
   if (!isValidRecoveryKey(req.query.key)) {

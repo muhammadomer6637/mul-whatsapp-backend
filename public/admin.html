@@ -73,6 +73,11 @@
   <span class="nav-icon">📞</span>
   <span>Callback Requests</span>
 </button>
+
+          <button class="nav-btn admin-only" data-section="settings" onclick="showSection('settings', this)">
+  <span class="nav-icon">⚙</span>
+  <span>Settings</span>
+</button>
         </nav>
       </div>
 
@@ -395,8 +400,9 @@
   <button onclick="insertQuickReply('helpline')">Helpline</button>
 </div>
             
-            <div class="composer">
-             <textarea id="messageInput" placeholder="Type your reply..."></textarea>
+            <div class="composer" style="position:relative;">
+             <div id="quickReplyDropdown" class="quick-reply-dropdown hidden"></div>
+             <textarea id="messageInput" placeholder="Type your reply... (type / for quick replies)"></textarea>
               <button class="primary-btn" onclick="sendMessage()">Send</button>
               <button class="danger-btn" onclick="switchToBot()">Bot</button>
             </div>
@@ -514,7 +520,41 @@
     </div>
   </div>
 </section>
-      
+
+      <section id="settings" class="section hidden">
+        <div class="page-header">
+          <div>
+            <h1>Settings</h1>
+            <p>Quick replies and system configuration</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Quick Replies</h3>
+              <p>Shared shortcuts every agent can use by typing "/" in the message box</p>
+            </div>
+            <button class="primary-btn" onclick="openQuickReplyModal()">
+              Add Quick Reply
+            </button>
+          </div>
+
+          <div class="table-wrap" style="margin-top:20px;">
+            <table class="styled-table">
+              <thead>
+                <tr>
+                  <th>Shortcut</th>
+                  <th>Message</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="quickRepliesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 

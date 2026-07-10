@@ -120,7 +120,17 @@ await pool.query(`
     created_at TIMESTAMP DEFAULT NOW()
   );
 `);
-    
+
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS quick_replies (
+    id SERIAL PRIMARY KEY,
+    shortcut VARCHAR(50) UNIQUE NOT NULL,
+    message TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+  );
+`);
+
     // Safe ALTERs for existing DB
     await pool.query(`
       ALTER TABLE agents

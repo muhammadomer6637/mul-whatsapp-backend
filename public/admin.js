@@ -208,6 +208,7 @@ if (id === "dashboard") {
   title.textContent = "Agent Panel";
   subtitle.textContent = "Live WhatsApp conversations and admissions support";
   loadChats();
+  if (!quickReplies.length) loadQuickReplies();
 } else if (id === "agents") {
   topbar.classList.remove("agent-mode");
   title.textContent = "Agent Management";
@@ -224,6 +225,13 @@ else if (id === "callbacks") {
     "Manage callback requests and follow-up activity";
 
   loadCallbacks();
+} else if (id === "settings") {
+  topbar.classList.remove("agent-mode");
+
+  title.textContent = "Settings";
+  subtitle.textContent = "Quick replies and system configuration";
+
+  loadQuickReplies();
 }
 }
 
@@ -1153,12 +1161,39 @@ async function assignToCallAgent() {
   }
 }
 
+let quickReplyMatches = [];
+let quickReplyActiveIndex = 0;
+
 function setupMessageInputShortcuts() {
   const input = document.getElementById("messageInput");
   if (!input) return;
 
   input.addEventListener("keydown", function (event) {
+    const dropdown = document.getElementById("quickReplyDropdown");
+    const dropdownOpen = dropdown && !dropdown.classList.contains("hidden");
+
+    if (dropdownOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+      event.preventDefault();
+      const delta = event.key === "ArrowDown" ? 1 : -1;
+      quickReplyActiveIndex =
+        (quickReplyActiveIndex + delta + quickReplyMatches.length) % quickReplyMatches.length;
+      renderQuickReplyDropdown();
+      return;
+    }
+
+    if (dropdownOpen && event.key === "Escape") {
+      hideQuickReplyDropdown();
+      return;
+    }
+
     if (event.key !== "Enter") return;
+
+    if (dropdownOpen && quickReplyMatches.length) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      selectQuickReply(quickReplyMatches[quickReplyActiveIndex]);
+      return;
+    }
 
     if (event.shiftKey) {
       event.stopImmediatePropagation();
@@ -1169,6 +1204,64 @@ function setupMessageInputShortcuts() {
     event.stopImmediatePropagation();
     sendMessage();
   }, true);
+
+  input.addEventListener("input", function () {
+    const value = input.value;
+
+    if (!value.startsWith("/") || value.includes(" ")) {
+      hideQuickReplyDropdown();
+      return;
+    }
+
+    const filterText = value.slice(1).toLowerCase();
+
+    quickReplyMatches = quickReplies.filter(qr =>
+      qr.shortcut.toLowerCase().startsWith(filterText)
+    );
+
+    if (!quickReplyMatches.length) {
+      hideQuickReplyDropdown();
+      return;
+    }
+
+    quickReplyActiveIndex = 0;
+    renderQuickReplyDropdown();
+  });
+}
+
+function renderQuickReplyDropdown() {
+  const dropdown = document.getElementById("quickReplyDropdown");
+  if (!dropdown) return;
+
+  dropdown.innerHTML = quickReplyMatches.map((qr, index) => `
+    <div class="quick-reply-option${index === quickReplyActiveIndex ? " active-option" : ""}" data-index="${index}">
+      <div class="qr-shortcut">/${escapeHtml(qr.shortcut)}</div>
+      <div class="qr-preview">${escapeHtml(qr.message)}</div>
+    </div>
+  `).join("");
+
+  dropdown.classList.remove("hidden");
+
+  dropdown.querySelectorAll(".quick-reply-option").forEach(el => {
+    el.onclick = () => selectQuickReply(quickReplyMatches[Number(el.dataset.index)]);
+  });
+}
+
+function hideQuickReplyDropdown() {
+  const dropdown = document.getElementById("quickReplyDropdown");
+  if (!dropdown) return;
+  dropdown.classList.add("hidden");
+  dropdown.innerHTML = "";
+  quickReplyMatches = [];
+}
+
+function selectQuickReply(qr) {
+  const input = document.getElementById("messageInput");
+  if (!input || !qr) return;
+
+  input.value = qr.message;
+  hideQuickReplyDropdown();
+  input.focus();
 }
 
 document.addEventListener("DOMContentLoaded", setupMessageInputShortcuts);
@@ -1466,6 +1559,150 @@ async function updateCallback(id) {
   } catch (error) {
     console.error("updateCallback error:", error);
     notify("Callback update failed", "error");
+  }
+}
+
+// =========================
+// QUICK REPLIES
+// =========================
+let quickReplies = [];
+
+async function loadQuickReplies() {
+  showLoadingState("quickRepliesTableBody", 3);
+  try {
+    const res = await fetch(`${BASE}/api/quick-replies`, {
+      headers: authHeaders()
+    });
+
+    const data = await res.json();
+    if (!data.success) return;
+
+    quickReplies = data.quickReplies || [];
+
+    const tbody = document.getElementById("quickRepliesTableBody");
+
+    tbody.innerHTML = quickReplies.length
+      ? quickReplies.map(qr => `
+        <tr>
+          <td>/${escapeHtml(qr.shortcut)}</td>
+          <td>${escapeHtml(qr.message)}</td>
+          <td class="agent-action-icons">
+            <span class="icon-action" onclick="openQuickReplyModal(${qr.id})" title="Edit">✎</span>
+            <span class="icon-action" onclick="deleteQuickReply(${qr.id})" title="Delete">🗑</span>
+          </td>
+        </tr>
+      `).join("")
+      : `
+        <tr>
+          <td colspan="3" style="text-align:center; color:var(--muted); padding:24px;">
+            No quick replies yet. Click "Add Quick Reply" to create one.
+          </td>
+        </tr>
+      `;
+
+    markLoaded("quickRepliesTableBody");
+  } catch (error) {
+    console.error("loadQuickReplies error:", error);
+  }
+}
+
+function openQuickReplyModal(id = null) {
+  const existing = id ? quickReplies.find(qr => qr.id === id) : null;
+
+  const overlay = document.createElement("div");
+  overlay.className = "confirm-modal-overlay";
+  overlay.innerHTML = `
+    <div class="confirm-modal-card">
+      <p style="font-weight:700; font-size:16px;">${existing ? "Edit quick reply" : "Add quick reply"}</p>
+
+      <label class="field-label">Shortcut (typed after "/")</label>
+      <input id="qrShortcut" class="prompt-input" type="text" placeholder="fee" value="${existing ? escapeHtml(existing.shortcut) : ""}" />
+
+      <label class="field-label">Message</label>
+      <textarea id="qrMessage" class="prompt-input" rows="4" placeholder="Type the full reply here...">${existing ? escapeHtml(existing.message) : ""}</textarea>
+
+      <div class="confirm-modal-actions">
+        <button class="ghost-btn" data-action="cancel">Cancel</button>
+        <button class="primary-btn" data-action="save">Save</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  overlay.querySelector("#qrShortcut").focus();
+
+  overlay.addEventListener("click", async (event) => {
+    const action = event.target.dataset.action;
+    if (!action) return;
+
+    if (action === "cancel") {
+      overlay.remove();
+      return;
+    }
+
+    if (action === "save") {
+      await saveQuickReply(existing?.id || null, overlay);
+    }
+  });
+}
+
+async function saveQuickReply(id, overlay) {
+  const shortcut = overlay.querySelector("#qrShortcut").value.trim();
+  const message = overlay.querySelector("#qrMessage").value.trim();
+
+  if (!shortcut || !message) {
+    notify("Please fill in both fields", "warning");
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      id ? `${BASE}/api/quick-replies/${id}` : `${BASE}/api/quick-replies`,
+      {
+        method: id ? "PUT" : "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ shortcut, message })
+      }
+    );
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to save quick reply", "error");
+      return;
+    }
+
+    notify("Quick reply saved", "success");
+    overlay.remove();
+    await loadQuickReplies();
+  } catch (error) {
+    console.error("saveQuickReply error:", error);
+    notify("Failed to save quick reply", "error");
+  }
+}
+
+async function deleteQuickReply(id) {
+  const confirmed = await customConfirm("Delete this quick reply?");
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`${BASE}/api/quick-replies/${id}`, {
+      method: "DELETE",
+      headers: authHeaders()
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to delete quick reply", "error");
+      return;
+    }
+
+    notify("Quick reply deleted", "success");
+    await loadQuickReplies();
+  } catch (error) {
+    console.error("deleteQuickReply error:", error);
+    notify("Failed to delete quick reply", "error");
   }
 }
 
