@@ -713,9 +713,60 @@ function renderChatList() {
 
   document.getElementById("chatCountBadge").textContent = filtered.length;
 
-  document.getElementById("chatList").innerHTML = filtered.map(chat => `
-  <div class="chat-item status-${chat.status} ${selectedPhone === chat.phone ? "active-chat" : ""} ${highlightedPhone === chat.phone ? "new-message-highlight" : ""}" onclick="openChat('${chat.phone}')">
-      
+  const listEl = document.getElementById("chatList");
+
+  if (!filtered.length) {
+    listEl.innerHTML = `
+      <div class="empty-chat-state" style="min-height:220px;">
+        <div class="empty-chat-icon">📭</div>
+        <h3>No conversations found</h3>
+        <p>Try changing the search or filter.</p>
+      </div>
+    `;
+    markLoaded("chatList");
+    return;
+  }
+
+  const existingEls = new Map();
+  listEl.querySelectorAll(".chat-item[data-phone]").forEach(el => {
+    existingEls.set(el.dataset.phone, el);
+  });
+
+  filtered.forEach((chat, index) => {
+    const rowHtml = buildChatRowHtml(chat, now);
+    const className = `chat-item status-${chat.status} ${selectedPhone === chat.phone ? "active-chat" : ""} ${highlightedPhone === chat.phone ? "new-message-highlight" : ""}`;
+
+    let el = existingEls.get(chat.phone);
+
+    if (el) {
+      existingEls.delete(chat.phone);
+      if (el.className !== className) el.className = className;
+      if (el.dataset.snapshot !== rowHtml) {
+        el.innerHTML = rowHtml;
+        el.dataset.snapshot = rowHtml;
+      }
+    } else {
+      el = document.createElement("div");
+      el.dataset.phone = chat.phone;
+      el.className = className;
+      el.onclick = () => openChat(chat.phone);
+      el.innerHTML = rowHtml;
+      el.dataset.snapshot = rowHtml;
+    }
+
+    const elAtIndex = listEl.children[index];
+    if (elAtIndex !== el) {
+      listEl.insertBefore(el, elAtIndex || null);
+    }
+  });
+
+  existingEls.forEach(el => el.remove());
+
+  markLoaded("chatList");
+}
+
+function buildChatRowHtml(chat, now) {
+  return `
       <div class="chat-topline">
         <div class="chat-name">${escapeHtml(chat.name || chat.phone)}</div>
         ${
@@ -734,7 +785,7 @@ ${
   chat.assigned_agent
     ? `<div class="assigned-badge">Assigned to ${escapeHtml(chat.assigned_agent)}</div>`
     : `<div class="assigned-badge unassigned">Unassigned</div>`
-} 
+}
 
 ${
   (chat.status === "agent_waiting" || chat.status === "agent_active") &&
@@ -747,16 +798,7 @@ ${
       <div class="chat-preview">
         ${escapeHtml(chat.last_message || "No messages yet")}
       </div>
-
-    </div>
-  `).join("") || `
-    <div class="empty-chat-state" style="min-height:220px;">
-      <div class="empty-chat-icon">📭</div>
-      <h3>No conversations found</h3>
-      <p>Try changing the search or filter.</p>
-    </div>
   `;
-  markLoaded("chatList");
 }
 
 async function openChat(phone, markRead = true, preserveScroll = false) {
