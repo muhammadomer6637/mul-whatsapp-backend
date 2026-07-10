@@ -529,28 +529,55 @@
           </div>
         </div>
 
-        <div class="panel">
-          <div class="panel-header">
-            <div>
-              <h3>Quick Replies</h3>
-              <p>Shared shortcuts every agent can use by typing "/" in the message box</p>
-            </div>
-            <button class="primary-btn" onclick="openQuickReplyModal()">
-              Add Quick Reply
-            </button>
-          </div>
+        <div class="settings-tab-bar">
+          <button class="ghost-btn settings-tab-btn active-filter" data-settings-tab="quickReplies" onclick="showSettingsTab('quickReplies', this)">
+            Quick Replies
+          </button>
+          <button class="ghost-btn settings-tab-btn" data-settings-tab="systemHealth" onclick="showSettingsTab('systemHealth', this)">
+            System Health
+          </button>
+        </div>
 
-          <div class="table-wrap" style="margin-top:20px;">
-            <table class="styled-table">
-              <thead>
-                <tr>
-                  <th>Shortcut</th>
-                  <th>Message</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="quickRepliesTableBody"></tbody>
-            </table>
+        <div id="quickRepliesTab" class="settings-tab-panel">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Quick Replies</h3>
+                <p>Shared shortcuts every agent can use by typing "/" in the message box</p>
+              </div>
+              <button class="primary-btn" onclick="openQuickReplyModal()">
+                Add Quick Reply
+              </button>
+            </div>
+
+            <div class="table-wrap" style="margin-top:20px;">
+              <table class="styled-table">
+                <thead>
+                  <tr>
+                    <th>Shortcut</th>
+                    <th>Message</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="quickRepliesTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="systemHealthTab" class="settings-tab-panel hidden">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>System Health</h3>
+                <p>Live status of the database, WhatsApp connection, and background jobs</p>
+              </div>
+              <button class="refresh-btn" onclick="loadSystemHealth()">
+                Refresh
+              </button>
+            </div>
+
+            <div id="systemHealthGrid" class="stats-grid"></div>
           </div>
         </div>
       </section>

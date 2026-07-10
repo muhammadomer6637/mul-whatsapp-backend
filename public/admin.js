@@ -1563,6 +1563,23 @@ async function updateCallback(id) {
 }
 
 // =========================
+// SETTINGS TABS
+// =========================
+function showSettingsTab(tab, btn) {
+  document.querySelectorAll(".settings-tab-panel").forEach(panel => panel.classList.add("hidden"));
+  document.querySelectorAll(".settings-tab-btn").forEach(b => b.classList.remove("active-filter"));
+
+  if (tab === "quickReplies") {
+    document.getElementById("quickRepliesTab").classList.remove("hidden");
+  } else if (tab === "systemHealth") {
+    document.getElementById("systemHealthTab").classList.remove("hidden");
+    loadSystemHealth();
+  }
+
+  if (btn) btn.classList.add("active-filter");
+}
+
+// =========================
 // QUICK REPLIES
 // =========================
 let quickReplies = [];
@@ -1703,6 +1720,149 @@ async function deleteQuickReply(id) {
   } catch (error) {
     console.error("deleteQuickReply error:", error);
     notify("Failed to delete quick reply", "error");
+  }
+}
+
+// =========================
+// SYSTEM HEALTH
+// =========================
+function formatRelativeTime(isoString) {
+  if (!isoString) return "Never";
+
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${minutes % 60}m ago`;
+
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function formatUptime(seconds) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function healthCard(label, valueHtml, statusClass, meta = "") {
+  return `
+    <div class="stat-card ${statusClass}">
+      <div class="label">${escapeHtml(label)}</div>
+      <div class="value" style="font-size:20px;">${valueHtml}</div>
+      ${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ""}
+    </div>
+  `;
+}
+
+async function loadSystemHealth() {
+  const grid = document.getElementById("systemHealthGrid");
+  if (!grid) return;
+
+  grid.innerHTML = `<div class="loading-spinner"><span></span><span></span><span></span></div>`;
+
+  try {
+    const res = await fetch(`${BASE}/api/system-health`, {
+      headers: authHeaders()
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      grid.innerHTML = `<p style="color:var(--muted);">Failed to load system health.</p>`;
+      return;
+    }
+
+    const h = data.health;
+    const cards = [];
+
+    cards.push(healthCard(
+      "Database",
+      h.database.ok ? `✅ Connected` : `❌ Down`,
+      h.database.ok ? "live" : "danger",
+      h.database.ok ? `${h.database.responseMs}ms response` : h.database.error
+    ));
+
+    cards.push(healthCard(
+      "WhatsApp API",
+      h.whatsappApi.ok ? `✅ Reachable` : `❌ Error`,
+      h.whatsappApi.ok ? "live" : "danger",
+      h.whatsappApi.ok ? `${h.whatsappApi.responseMs}ms response` : h.whatsappApi.error
+    ));
+
+    const lastMsgMinutes = h.lastIncomingMessageAt
+      ? (Date.now() - new Date(h.lastIncomingMessageAt).getTime()) / 60000
+      : Infinity;
+    cards.push(healthCard(
+      "Last Incoming Message",
+      lastMsgMinutes <= 120 ? `✅ ${formatRelativeTime(h.lastIncomingMessageAt)}` : `⚠️ ${formatRelativeTime(h.lastIncomingMessageAt)}`,
+      lastMsgMinutes <= 120 ? "live" : "warning",
+      "Webhook is working if this updates regularly"
+    ));
+
+    const followupOk = h.backgroundJobs.followupCheckerLastRunAt &&
+      (Date.now() - h.backgroundJobs.followupCheckerLastRunAt) < 15 * 60 * 1000;
+    const callbackOk = h.backgroundJobs.callbackOfferCheckerLastRunAt &&
+      (Date.now() - h.backgroundJobs.callbackOfferCheckerLastRunAt) < 15 * 60 * 1000;
+
+    cards.push(healthCard(
+      "Background Jobs",
+      (followupOk && callbackOk) ? "✅ Running" : "⚠️ Check",
+      (followupOk && callbackOk) ? "live" : "warning",
+      `Follow-up: ${h.backgroundJobs.followupCheckerLastRunAt ? formatRelativeTime(new Date(h.backgroundJobs.followupCheckerLastRunAt).toISOString()) : "Never"} · Callback offer: ${h.backgroundJobs.callbackOfferCheckerLastRunAt ? formatRelativeTime(new Date(h.backgroundJobs.callbackOfferCheckerLastRunAt).toISOString()) : "Never"}`
+    ));
+
+    cards.push(healthCard(
+      "Recent Send Failures",
+      h.recentSendFailures === 0 ? "✅ None" : `⚠️ ${h.recentSendFailures}`,
+      h.recentSendFailures === 0 ? "live" : "warning",
+      "In the last hour"
+    ));
+
+    const envOk = h.envVars.WHATSAPP_TOKEN && h.envVars.JWT_SECRET && h.envVars.DATABASE_URL;
+    cards.push(healthCard(
+      "Required Settings",
+      envOk ? "✅ All set" : "❌ Missing",
+      envOk ? "live" : "danger",
+      envOk
+        ? "WHATSAPP_TOKEN, JWT_SECRET, DATABASE_URL all configured"
+        : `Missing: ${Object.entries(h.envVars).filter(([, v]) => !v).map(([k]) => k).join(", ")}`
+    ));
+
+    cards.push(healthCard(
+      "Server Uptime",
+      formatUptime(h.server.uptimeSeconds),
+      "performance",
+      `Memory: ${h.server.memoryMb} MB · In-memory sessions: ${h.server.inMemoryUserStates}`
+    ));
+
+    cards.push(healthCard(
+      "Media Storage",
+      `${h.mediaStorage.mb} MB`,
+      "performance",
+      `${h.mediaStorage.fileCount} files saved`
+    ));
+
+    if (h.rowCounts) {
+      cards.push(healthCard(
+        "Database Size",
+        `${h.rowCounts.messages.toLocaleString()} messages`,
+        "performance",
+        `${h.rowCounts.users.toLocaleString()} users · ${h.rowCounts.chats.toLocaleString()} chats`
+      ));
+    }
+
+    grid.innerHTML = cards.join("");
+  } catch (error) {
+    console.error("loadSystemHealth error:", error);
+    grid.innerHTML = `<p style="color:var(--muted);">Failed to load system health.</p>`;
   }
 }
 

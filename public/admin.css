@@ -362,6 +362,16 @@ body {
   );
 }
 
+.stat-card.danger {
+  border-color: rgba(255,98,118,0.35);
+  background: linear-gradient(180deg, rgba(92,28,40,0.92), rgba(58,20,30,0.92));
+}
+
+.stat-card.warning {
+  border-color: rgba(243,181,68,0.35);
+  background: linear-gradient(180deg, rgba(92,62,16,0.92), rgba(62,43,13,0.92));
+}
+
 .stat-card.live {
   border-color: rgba(24,195,126,0.28);
   background: linear-gradient(
@@ -1217,6 +1227,17 @@ CALLBACK CENTER
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 18px;
+}
+
+.settings-tab-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.settings-tab-panel.hidden {
+  display: none;
 }
 
 .callback-filter-btn {

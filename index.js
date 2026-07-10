@@ -88,6 +88,19 @@ setInterval(() => {
   }
 }, 60 * 60 * 1000); // runs every hour
 
+// =========================
+// SYSTEM HEALTH TRACKING
+// =========================
+let lastFollowupCheckAt = null;
+let lastCallbackOfferCheckAt = null;
+let recentSendFailures = [];
+
+function recordSendFailure() {
+  const now = Date.now();
+  recentSendFailures.push(now);
+  recentSendFailures = recentSendFailures.filter(t => now - t <= 60 * 60 * 1000);
+}
+
 async function isAgentAvailable() {
   try {
     const result = await pool.query(
@@ -1018,6 +1031,7 @@ async function sendTextMessage(to, message, chatStatus = "active") {
     await setOutgoingMeta(to, message, chatStatus);
   } catch (error) {
     console.error("Send text error:", error.response?.data || error.message);
+    recordSendFailure();
   }
 }
 
@@ -1062,6 +1076,7 @@ async function sendDocumentMessage(
     await setOutgoingMeta(to, caption || filename, chatStatus);
   } catch (error) {
     console.error("Send document error:", error.response?.data || error.message);
+    recordSendFailure();
   }
 }
 
@@ -1096,6 +1111,7 @@ async function sendAgentTextMessage(to, message, chatStatus = "agent_active") {
       "Send agent text error:",
       error.response?.data || error.message
     );
+    recordSendFailure();
     throw error;
   }
 }
@@ -1153,6 +1169,7 @@ async function sendReplyButtons(to, bodyText, buttons, chatStatus = "active") {
     await setOutgoingMeta(to, bodyText, chatStatus);
   } catch (error) {
     console.error("Send reply buttons error:", error.response?.data || error.message);
+    recordSendFailure();
   }
 }
 
@@ -1160,6 +1177,7 @@ async function sendReplyButtons(to, bodyText, buttons, chatStatus = "active") {
 // 24H FOLLOW-UP CHECKER
 // =========================
 async function checkPendingFollowups() {
+  lastFollowupCheckAt = Date.now();
   try {
     const result = await pool.query(`
       SELECT phone
@@ -1180,6 +1198,7 @@ async function checkPendingFollowups() {
 }
 
 async function checkCallbackOffers() {
+  lastCallbackOfferCheckAt = Date.now();
   try {
     console.log("Running callback offer checker...");
 
@@ -2121,6 +2140,139 @@ app.delete("/api/quick-replies/:id", authenticateAgent, async (req, res) => {
     });
   }
 });
+
+// =========================
+// SYSTEM HEALTH API
+// =========================
+
+function getDirectorySizeBytes(dirPath) {
+  let total = 0;
+  let fileCount = 0;
+
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+
+      if (entry.isDirectory()) {
+        const sub = getDirectorySizeBytes(fullPath);
+        total += sub.bytes;
+        fileCount += sub.fileCount;
+      } else {
+        total += fs.statSync(fullPath).size;
+        fileCount += 1;
+      }
+    }
+  } catch (err) {
+    console.error("getDirectorySizeBytes error:", err.message);
+  }
+
+  return { bytes: total, fileCount };
+}
+
+app.get(
+  "/api/system-health",
+  authenticateAgent,
+  requireAdmin,
+  async (req, res) => {
+    const health = {};
+
+    // Database
+    try {
+      const start = Date.now();
+      await pool.query("SELECT 1");
+      health.database = {
+        ok: true,
+        responseMs: Date.now() - start
+      };
+    } catch (error) {
+      health.database = { ok: false, error: error.message };
+    }
+
+    // WhatsApp API / token
+    try {
+      const start = Date.now();
+      await axios.get(
+        `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}?fields=id`,
+        { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` } }
+      );
+      health.whatsappApi = {
+        ok: true,
+        responseMs: Date.now() - start
+      };
+    } catch (error) {
+      health.whatsappApi = {
+        ok: false,
+        error: error.response?.data?.error?.message || error.message
+      };
+    }
+
+    // Webhook - last incoming message
+    try {
+      const result = await pool.query(`
+        SELECT MAX(created_at) AS last_at
+        FROM messages
+        WHERE sender = 'user'
+      `);
+      health.lastIncomingMessageAt = result.rows[0]?.last_at || null;
+    } catch (error) {
+      health.lastIncomingMessageAt = null;
+    }
+
+    // Row counts
+    try {
+      const counts = await pool.query(`
+        SELECT
+          (SELECT COUNT(*) FROM messages)::int AS messages,
+          (SELECT COUNT(*) FROM users)::int AS users,
+          (SELECT COUNT(*) FROM chats)::int AS chats
+      `);
+      health.rowCounts = counts.rows[0];
+    } catch (error) {
+      health.rowCounts = null;
+    }
+
+    // Media storage
+    try {
+      const { bytes, fileCount } = getDirectorySizeBytes(uploadsDir);
+      health.mediaStorage = {
+        bytes,
+        fileCount,
+        mb: Math.round((bytes / (1024 * 1024)) * 10) / 10
+      };
+    } catch (error) {
+      health.mediaStorage = null;
+    }
+
+    // Env var sanity check
+    health.envVars = {
+      WHATSAPP_TOKEN: !!process.env.WHATSAPP_TOKEN,
+      JWT_SECRET: !!process.env.JWT_SECRET,
+      DATABASE_URL: !!process.env.DATABASE_URL
+    };
+
+    // Background jobs
+    health.backgroundJobs = {
+      followupCheckerLastRunAt: lastFollowupCheckAt,
+      callbackOfferCheckerLastRunAt: lastCallbackOfferCheckAt
+    };
+
+    // Recent send failures (last hour)
+    const now = Date.now();
+    recentSendFailures = recentSendFailures.filter(t => now - t <= 60 * 60 * 1000);
+    health.recentSendFailures = recentSendFailures.length;
+
+    // Server process info
+    health.server = {
+      uptimeSeconds: Math.round(process.uptime()),
+      memoryMb: Math.round((process.memoryUsage().rss / (1024 * 1024)) * 10) / 10,
+      inMemoryUserStates: Object.keys(userStates).length
+    };
+
+    return res.json({ success: true, health });
+  }
+);
 
 // TEMP CREATE ADMIN
 app.get("/create-admin", async (req, res) => {
