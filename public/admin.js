@@ -2429,14 +2429,13 @@ document.addEventListener("DOMContentLoaded", () => {
   setInterval(() => {
     if (!authToken) return;
 
-    if (currentSection === "dashboard") {
-      loadDashboard(currentRange);
-    } else if (currentSection === "agent") {
+    // Dashboard and Callback Requests are refreshed manually (tab switch,
+    // range change, or browser refresh) - not auto-polled, since neither
+    // needs second-by-second freshness and both are relatively heavy queries.
+    if (currentSection === "agent") {
       loadChats();
     } else if (currentSection === "agents") {
       loadAgents();
-    } else if (currentSection === "callbacks") {
-      loadCallbacks();
     }
   }, 15000);
 });
