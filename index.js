@@ -1242,6 +1242,50 @@ Please choose an option:
     console.error("checkCallbackOffers error:", error.message);
   }
 }
+
+const MEDIA_MAX_AGE_MS = 5 * 24 * 60 * 60 * 1000; // 5 days
+
+async function cleanupOldMedia() {
+  try {
+    const files = fs.readdirSync(uploadsDir);
+    const now = Date.now();
+    let deletedCount = 0;
+
+    for (const fileName of files) {
+      const filePath = path.join(uploadsDir, fileName);
+
+      let stats;
+      try {
+        stats = fs.statSync(filePath);
+      } catch (err) {
+        continue;
+      }
+
+      if (!stats.isFile()) continue;
+
+      if (now - stats.mtimeMs > MEDIA_MAX_AGE_MS) {
+        fs.unlinkSync(filePath);
+        deletedCount += 1;
+
+        await pool.query(
+          `
+          UPDATE messages
+          SET media_url = NULL, text = '[Media expired - older than 5 days]'
+          WHERE media_url LIKE $1
+          `,
+          [`%${fileName}%`]
+        );
+      }
+    }
+
+    if (deletedCount > 0) {
+      console.log(`cleanupOldMedia: deleted ${deletedCount} file(s) older than 5 days`);
+    }
+  } catch (error) {
+    console.error("cleanupOldMedia error:", error.message);
+  }
+}
+
 // =========================
 // ROUTES
 // =========================
@@ -3628,9 +3672,13 @@ app.get("/api/messages/:phone", authenticateAgent, async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT id, phone, sender, type, text, media_id, media_url, file_name, mime_type, created_at
-      FROM messages
-      WHERE phone = $1
+      SELECT * FROM (
+        SELECT id, phone, sender, type, text, media_id, media_url, file_name, mime_type, created_at
+        FROM messages
+        WHERE phone = $1
+        ORDER BY created_at DESC
+        LIMIT 300
+      ) recent
       ORDER BY created_at ASC
       `,
       [phone]
@@ -4355,5 +4403,9 @@ app.listen(3000, async () => {
   console.log("10m callback offer checker started");
   checkCallbackOffers();
   console.log("✅ 24h follow-up checker started");
+
+  setInterval(cleanupOldMedia, 24 * 60 * 60 * 1000); // once a day
+  cleanupOldMedia();
+  console.log("✅ Media cleanup job started (5 day retention)");
   
 });
