@@ -7,6 +7,7 @@ let chatsBootstrapped = false;
 let searchActive = false;
 let searchResults = [];
 let searchDebounceTimer = null;
+let pollIntervalId = null;
 
 function authHeadersLive() {
   const token =
@@ -18,12 +19,78 @@ function authHeadersLive() {
   };
 }
 
+function hasStoredToken() {
+  return !!(sessionStorage.getItem("mul_nexus_token") || localStorage.getItem("mul_nexus_token"));
+}
+
+function showLoginScreen() {
+  if (pollIntervalId) {
+    clearInterval(pollIntervalId);
+    pollIntervalId = null;
+  }
+  document.getElementById("loginOverlay").classList.remove("hidden");
+  document.getElementById("mainApp").classList.add("hidden");
+}
+
+function showMainApp() {
+  document.getElementById("loginOverlay").classList.add("hidden");
+  document.getElementById("mainApp").classList.remove("hidden");
+}
+
+async function loginLive() {
+  const username = document.getElementById("loginUsername").value.trim();
+  const password = document.getElementById("loginPassword").value.trim();
+  const errorBox = document.getElementById("loginError");
+  errorBox.innerText = "";
+
+  if (!username || !password) {
+    errorBox.innerText = "Please enter username and password";
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      errorBox.innerText = data.error || "Login failed";
+      return;
+    }
+
+    // Persisted deliberately (not sessionStorage) so an agent stays logged
+    // in across app/browser restarts on their phone.
+    localStorage.setItem("mul_nexus_token", data.token);
+
+    showMainApp();
+    startLive();
+  } catch (error) {
+    console.error("Login error:", error);
+    errorBox.innerText = "Server connection failed";
+  }
+}
+
+function logoutLive() {
+  localStorage.removeItem("mul_nexus_token");
+  sessionStorage.removeItem("mul_nexus_token");
+  showLoginScreen();
+}
+
 async function loadChats() {
   if (searchActive) return;
   try {
     const res = await fetch("/api/chats", {
       headers: authHeadersLive()
     });
+
+    if (res.status === 401) {
+      showLoginScreen();
+      return;
+    }
 
     const data = await res.json();
     if (!data.success) {
@@ -77,6 +144,10 @@ async function loadMoreChats() {
     const res = await fetch(`/api/chats?before=${encodeURIComponent(new Date(oldest).toISOString())}`, {
       headers: authHeadersLive()
     });
+    if (res.status === 401) {
+      showLoginScreen();
+      return;
+    }
     const data = await res.json();
     if (!data.success) return;
 
@@ -108,6 +179,10 @@ async function performChatSearch(query) {
     const res = await fetch(`/api/chats?search=${encodeURIComponent(query)}`, {
       headers: authHeadersLive()
     });
+    if (res.status === 401) {
+      showLoginScreen();
+      return;
+    }
     const data = await res.json();
     if (!data.success) return;
 
@@ -210,7 +285,19 @@ function openChat(phone) {
   window.location.href = "/live-chat";
 }
 
-loadChats();
+function startLive() {
+  loadChats();
+  if (!pollIntervalId) {
+    pollIntervalId = setInterval(loadChats, 15000);
+  }
+}
+
+if (hasStoredToken()) {
+  showMainApp();
+  startLive();
+} else {
+  showLoginScreen();
+}
 
 document
   .getElementById("waitingTab")
@@ -276,7 +363,3 @@ document
 
     searchDebounceTimer = setTimeout(() => performChatSearch(searchTerm), 300);
   });
-
-setInterval(() => {
-  loadChats();
-}, 15000);

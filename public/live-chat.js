@@ -4,11 +4,23 @@ const token =
   sessionStorage.getItem("mul_nexus_token") ||
   localStorage.getItem("mul_nexus_token");
 
+if (!token) {
+  window.location.href = "/live";
+}
+
 function authHeaders(extra = {}) {
   return {
     ...extra,
     Authorization: `Bearer ${token}`
   };
+}
+
+function handleAuthFailure(res) {
+  if (res.status === 401) {
+    window.location.href = "/live";
+    return true;
+  }
+  return false;
 }
 
 function goBack() {
@@ -27,6 +39,8 @@ async function loadChatInfo() {
     const res = await fetch(`/api/chats?search=${encodeURIComponent(selectedPhone)}`, {
       headers: authHeaders()
     });
+
+    if (handleAuthFailure(res)) return;
 
     const data = await res.json();
 
@@ -59,6 +73,8 @@ async function loadMessages() {
     const res = await fetch(`/api/messages/${selectedPhone}`, {
       headers: authHeaders()
     });
+
+    if (handleAuthFailure(res)) return;
 
     const data = await res.json();
 
@@ -143,6 +159,8 @@ async function sendMessage() {
       })
     });
 
+    if (handleAuthFailure(res)) return;
+
     const data = await res.json();
 
     if (!data.success) {
@@ -173,6 +191,8 @@ async function switchBackToBot() {
         mode: "bot"
       })
     });
+
+    if (handleAuthFailure(res)) return;
 
     const data = await res.json();
 
