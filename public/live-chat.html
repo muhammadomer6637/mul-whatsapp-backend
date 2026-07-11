@@ -14,6 +14,7 @@
 
     <div class="chat-header">
       <button class="back-btn" onclick="goBack()">←</button>
+      <div id="chatAvatar" class="chat-avatar">M</div>
 
       <div>
         <div id="chatName" class="chat-name">Loading...</div>
@@ -23,7 +24,7 @@
     </div>
 
     <div id="messagesBox" class="messages-box">
-      <div class="loading">Loading messages...</div>
+      <div class="loading-spinner"><span></span><span></span><span></span></div>
     </div>
 
     <div class="bottom-area">
@@ -53,9 +54,6 @@
 
 </div>
 
-    <button class="bot-btn" onclick="switchBackToBot()">
-      Back to Bot
-    </button>
       </div>
 
   </div>

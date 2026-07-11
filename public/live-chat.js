@@ -27,11 +27,96 @@ function goBack() {
   window.location.href = "/live";
 }
 
-function formatDateTime(value) {
+function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function formatTimeOnly(value) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString();
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDayLabel(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const today = startOfDay(new Date());
+  const target = startOfDay(date);
+  const diffDays = Math.round((today - target) / 86400000);
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+let renderedMessageIds = new Set();
+let lastRenderedDayLabel = null;
+
+function buildMessageRowHtml(message, isLatest) {
+  let content = "";
+
+  if ((message.type === "image" || message.mime_type?.includes("image")) && message.media_url) {
+    content = `
+      <img src="${escapeHtml(message.media_url)}"
+           style="max-width:220px;border-radius:10px;cursor:pointer;display:block"
+           onclick="window.open('${escapeHtml(message.media_url)}','_blank')" />
+    `;
+  } else if ((message.type === "document" || message.mime_type?.includes("pdf")) && message.media_url) {
+    content = `
+      <a href="${escapeHtml(message.media_url)}" target="_blank" style="color:#dbeafe;text-decoration:underline">
+        📄 ${escapeHtml(message.file_name || "Open Document")}
+      </a>
+    `;
+  } else if ((message.type === "video" || message.mime_type?.includes("video")) && message.media_url) {
+    content = `
+      <video controls style="max-width:240px;border-radius:10px;display:block">
+        <source src="${escapeHtml(message.media_url)}">
+      </video>
+    `;
+  } else if ((message.type === "audio" || message.mime_type?.includes("audio")) && message.media_url) {
+    content = `
+      <audio controls style="max-width:240px">
+        <source src="${escapeHtml(message.media_url)}">
+      </audio>
+    `;
+  } else {
+    content = escapeHtml(message.text || message.type || "");
+  }
+
+  const dayLabel = formatDayLabel(message.created_at);
+  let divider = "";
+  if (dayLabel !== lastRenderedDayLabel) {
+    divider = `<div class="date-divider"><span>${escapeHtml(dayLabel)}</span></div>`;
+    lastRenderedDayLabel = dayLabel;
+  }
+
+  const senderClass =
+    message.sender === "user" ? "user" : message.sender === "agent" ? "agent" : "bot";
+
+  const isOutgoing = senderClass !== "user";
+  const sentTick = isOutgoing ? ` <span class="sent-tick">✓</span>` : "";
+
+  return `
+    ${divider}
+    <div class="message-row ${senderClass}${isLatest ? " message-in" : ""}">
+      <div class="bubble">
+        ${content}
+        <div class="msg-time">
+          ${formatTimeOnly(message.created_at)}${sentTick}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 async function loadChatInfo() {
@@ -47,6 +132,10 @@ async function loadChatInfo() {
     if (!data.success) return;
 
     const chat = data.chats.find(item => item.phone === selectedPhone);
+    const initials = (chat?.name || "S").trim().charAt(0).toUpperCase();
+
+    const avatarEl = document.getElementById("chatAvatar");
+    if (avatarEl) avatarEl.textContent = initials;
 
     document.getElementById("chatName").textContent =
       chat?.name || selectedPhone || "Unknown Student";
@@ -81,35 +170,46 @@ async function loadMessages() {
     const box = document.getElementById("messagesBox");
 
     if (!data.success || !data.messages.length) {
-      box.innerHTML = `
-        <div class="loading">
-          No messages found.
-        </div>
-      `;
+      if (!renderedMessageIds.size) {
+        box.innerHTML = `
+          <div class="loading">
+            No messages found.
+          </div>
+        `;
+      }
       return;
     }
 
-    box.innerHTML = data.messages.map(message => {
-      const senderClass =
-        message.sender === "user"
-          ? "user"
-          : message.sender === "agent"
-            ? "agent"
-            : "bot";
+    const oldScrollHeight = box.scrollHeight;
+    const oldScrollTop = box.scrollTop;
+    const oldClientHeight = box.clientHeight;
+    const wasNearBottom = oldScrollHeight - oldScrollTop - oldClientHeight < 80;
 
-      return `
-        <div class="message-row ${senderClass}">
-          <div class="bubble">
-            ${message.text || message.type || ""}
-            <div class="msg-time">
-              ${formatDateTime(message.created_at)}
-            </div>
-          </div>
-        </div>
-      `;
-    }).join("");
+    const isFirstLoad = renderedMessageIds.size === 0;
 
-    box.scrollTop = box.scrollHeight;
+    if (isFirstLoad) {
+      lastRenderedDayLabel = null;
+      box.innerHTML = data.messages.map((message, index) => {
+        const isLatest = index === data.messages.length - 1;
+        return buildMessageRowHtml(message, isLatest);
+      }).join("");
+      data.messages.forEach(m => renderedMessageIds.add(m.id));
+      box.scrollTop = box.scrollHeight;
+    } else {
+      const newMessages = data.messages.filter(m => !renderedMessageIds.has(m.id));
+      if (newMessages.length) {
+        const appendHtml = newMessages.map((message, index) => {
+          const isLatest = index === newMessages.length - 1;
+          return buildMessageRowHtml(message, isLatest);
+        }).join("");
+        box.insertAdjacentHTML("beforeend", appendHtml);
+        newMessages.forEach(m => renderedMessageIds.add(m.id));
+
+        if (wasNearBottom) {
+          box.scrollTop = box.scrollHeight;
+        }
+      }
+    }
 
   } catch (error) {
     console.error("loadMessages error:", error);
