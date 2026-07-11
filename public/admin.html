@@ -338,8 +338,8 @@
               </div>
               
 <div class="agent-mini-stats" id="agentMiniStats">
-  <div class="agent-mini-card">
-    <span>Total</span>
+  <div class="agent-mini-card" title="Chats currently loaded in this list, not the full database total">
+    <span>Loaded</span>
     <strong id="agentTotalChats">0</strong>
   </div>
   <div class="agent-mini-card">
@@ -372,6 +372,7 @@
             </div>
 
             <div id="chatList" class="chat-list premium-scroll"></div>
+            <button id="loadMoreChatsBtn" class="ghost-btn load-more-chats-btn hidden" onclick="loadMoreChats()">Load More Chats</button>
           </div>
 
           <div class="wa-chat-window">

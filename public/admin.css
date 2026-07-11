@@ -765,6 +765,18 @@ body {
   min-height: 0;
 }
 
+.load-more-chats-btn {
+  margin: 4px 12px 12px;
+  width: calc(100% - 24px);
+  text-align: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.load-more-chats-btn.hidden {
+  display: none;
+}
+
 .chat-item {
   background: rgba(255,255,255,0.03);
   border: 1px solid transparent;

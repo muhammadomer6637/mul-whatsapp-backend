@@ -68,6 +68,17 @@ body{
   padding:12px;
 }
 
+.load-more-chats-btn{
+  display:block;
+  width:calc(100% - 24px);
+  margin:0 12px 12px;
+  cursor:pointer;
+}
+
+.load-more-chats-btn.hidden{
+  display:none;
+}
+
 .chat-card{
   background:#111827;
   border-radius:14px;

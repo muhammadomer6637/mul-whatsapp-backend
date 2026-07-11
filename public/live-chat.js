@@ -24,7 +24,7 @@ function formatDateTime(value) {
 
 async function loadChatInfo() {
   try {
-    const res = await fetch("/api/chats", {
+    const res = await fetch(`/api/chats?search=${encodeURIComponent(selectedPhone)}`, {
       headers: authHeaders()
     });
 

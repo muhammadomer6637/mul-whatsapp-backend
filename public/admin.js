@@ -162,6 +162,11 @@ let allChats = [];
 let currentChatFilter = "all";
 let currentCallbackFilter = "all";
 let highlightedPhone = null;
+let hasMoreChats = false;
+let chatsBootstrapped = false;
+let searchActive = false;
+let searchResults = [];
+let searchDebounceTimer = null;
 
 
 let lastAgentMessageMap = {};
@@ -618,20 +623,115 @@ function setChatFilter(filter, button) {
 }
 
 async function loadChats() {
+  if (searchActive) return;
   showLoadingState("chatList");
   try {
-   const res = await fetch(`${BASE}/api/chats`, {
-  headers: authHeaders()
-});
+    const res = await fetch(`${BASE}/api/chats`, {
+      headers: authHeaders()
+    });
     const data = await res.json();
     if (!data.success) return;
 
-    allChats = data.chats || [];
-checkAgentSound(allChats);
-updateAgentMiniStats(allChats);
-renderChatList();
+    const fetched = data.chats || [];
+    const fetchedLive = fetched.filter(c => c.status === "agent_waiting" || c.status === "agent_active");
+    const fetchedRecent = fetched.filter(c => c.status !== "agent_waiting" && c.status !== "agent_active");
+
+    const byPhone = new Map(allChats.map(c => [c.phone, c]));
+
+    // Live chats are always returned complete by the server - drop any
+    // stale ones locally, then write in the fresh set.
+    byPhone.forEach((c, phone) => {
+      if (c.status === "agent_waiting" || c.status === "agent_active") byPhone.delete(phone);
+    });
+    fetchedLive.forEach(c => byPhone.set(c.phone, c));
+
+    // Recent (bot/active) chats: only page 1 comes back here, so merge
+    // in place - update ones we already have, add new ones - without
+    // dropping chats the agent pulled in via Load More.
+    fetchedRecent.forEach(c => byPhone.set(c.phone, c));
+
+    allChats = Array.from(byPhone.values());
+
+    if (!chatsBootstrapped) {
+      hasMoreChats = !!data.hasMore;
+      chatsBootstrapped = true;
+    }
+
+    if (searchActive) return; // a search may have started while this request was in flight
+
+    checkAgentSound(allChats);
+    updateAgentMiniStats(allChats);
+    renderChatList();
+    updateLoadMoreButton();
   } catch (error) {
     console.error("Chats load error:", error);
+  }
+}
+
+async function loadMoreChats() {
+  const recentChats = allChats.filter(c => c.status !== "agent_waiting" && c.status !== "agent_active");
+  if (!recentChats.length) return;
+
+  const oldest = recentChats.reduce((min, c) => {
+    const t = new Date(c.updated_at || 0).getTime();
+    return t < min ? t : min;
+  }, Infinity);
+
+  const btn = document.getElementById("loadMoreChatsBtn");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Loading...";
+  }
+
+  try {
+    const res = await fetch(`${BASE}/api/chats?before=${encodeURIComponent(new Date(oldest).toISOString())}`, {
+      headers: authHeaders()
+    });
+    const data = await res.json();
+    if (!data.success) return;
+
+    const byPhone = new Map(allChats.map(c => [c.phone, c]));
+    (data.chats || []).forEach(c => {
+      if (c.status !== "agent_waiting" && c.status !== "agent_active") {
+        byPhone.set(c.phone, c);
+      }
+    });
+    allChats = Array.from(byPhone.values());
+    hasMoreChats = !!data.hasMore;
+
+    updateAgentMiniStats(allChats);
+    renderChatList();
+  } catch (error) {
+    console.error("Load more chats error:", error);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Load More Chats";
+    }
+    updateLoadMoreButton();
+  }
+}
+
+function updateLoadMoreButton() {
+  const btn = document.getElementById("loadMoreChatsBtn");
+  if (!btn) return;
+  btn.classList.toggle("hidden", searchActive || !hasMoreChats);
+}
+
+async function performChatSearch(query) {
+  searchActive = true;
+  updateLoadMoreButton();
+  try {
+    const res = await fetch(`${BASE}/api/chats?search=${encodeURIComponent(query)}`, {
+      headers: authHeaders()
+    });
+    const data = await res.json();
+    if (!data.success) return;
+
+    searchResults = data.chats || [];
+    renderChatList();
+  } catch (error) {
+    console.error("Chat search error:", error);
   }
 }
 
@@ -658,7 +758,19 @@ function updateAgentMiniStats(chats) {
 }
 
 function filterChats() {
-  renderChatList();
+  const query = document.getElementById("chatSearch")?.value.trim() || "";
+
+  clearTimeout(searchDebounceTimer);
+
+  if (!query) {
+    searchActive = false;
+    searchResults = [];
+    updateLoadMoreButton();
+    renderChatList();
+    return;
+  }
+
+  searchDebounceTimer = setTimeout(() => performChatSearch(query), 300);
 }
 
 function checkAgentSound(chats) {
@@ -680,21 +792,12 @@ lastAgentMessageMap[chatKey] = lastMsgKey;
 }
 
 function renderChatList() {
-  const search = document.getElementById("chatSearch")?.value.toLowerCase().trim() || "";
-  let filtered = [...allChats];
+  let filtered = searchActive ? [...searchResults] : [...allChats];
 
   const now = Date.now();
 
   if (currentChatFilter !== "all") {
     filtered = filtered.filter(chat => chat.status === currentChatFilter);
-  }
-
-  if (search) {
-    filtered = filtered.filter(chat =>
-      (chat.name || "").toLowerCase().includes(search) ||
-      (chat.phone || "").toLowerCase().includes(search) ||
-      (chat.program || "").toLowerCase().includes(search)
-    );
   }
 
   // 🔥 SORTING FIX
@@ -734,6 +837,10 @@ function renderChatList() {
     markLoaded("chatList");
     return;
   }
+
+  Array.from(listEl.children).forEach(el => {
+    if (!el.classList.contains("chat-item")) el.remove();
+  });
 
   const existingEls = new Map();
   listEl.querySelectorAll(".chat-item[data-phone]").forEach(el => {

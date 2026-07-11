@@ -3624,38 +3624,105 @@ ${welcomeMessage()}`,
   }
 });
 
-app.get("/api/chats", authenticateAgent, async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT
-        c.phone,
+const CHATS_COLUMNS = `
+  c.phone,
   c.status,
   c.last_message,
   c.unread_count,
   c.last_incoming_at,
   c.last_outgoing_at,
   c.updated_at,
- c.assigned_agent_id,
-a.name AS assigned_agent,
-c.assigned_at,
+  c.assigned_agent_id,
+  a.name AS assigned_agent,
+  c.assigned_at,
   u.name,
   u.program,
   u.mode
-      FROM chats c
-      LEFT JOIN users u ON u.phone = c.phone
-      LEFT JOIN agents a ON a.id = c.assigned_agent_id
+`;
+
+const CHATS_JOIN = `
+  FROM chats c
+  LEFT JOIN users u ON u.phone = c.phone
+  LEFT JOIN agents a ON a.id = c.assigned_agent_id
+`;
+
+app.get("/api/chats", authenticateAgent, async (req, res) => {
+  try {
+    const search = (req.query.search || "").trim();
+
+    if (search) {
+      const result = await pool.query(
+        `
+        SELECT ${CHATS_COLUMNS}
+        ${CHATS_JOIN}
+        WHERE
+          u.name ILIKE $1
+          OR c.phone ILIKE $1
+          OR u.program ILIKE $1
+        ORDER BY
+          CASE
+            WHEN c.status = 'agent_waiting' THEN 0
+            WHEN c.status = 'agent_active' THEN 1
+            ELSE 2
+          END,
+          c.updated_at DESC
+        LIMIT 150
+        `,
+        [`%${search}%`]
+      );
+
+      return res.json({
+        success: true,
+        chats: result.rows,
+        hasMore: false,
+        searchMode: true
+      });
+    }
+
+    const before = req.query.before || null;
+    const RECENT_PAGE_SIZE = 75;
+
+    const result = await pool.query(
+      `
+      SELECT * FROM (
+        (
+          SELECT ${CHATS_COLUMNS}
+          ${CHATS_JOIN}
+          WHERE c.status IN ('agent_waiting', 'agent_active')
+        )
+        UNION ALL
+        (
+          SELECT ${CHATS_COLUMNS}
+          ${CHATS_JOIN}
+          WHERE c.status NOT IN ('agent_waiting', 'agent_active')
+            AND ($1::timestamptz IS NULL OR c.updated_at < $1::timestamptz)
+          ORDER BY c.updated_at DESC
+          LIMIT ${RECENT_PAGE_SIZE + 1}
+        )
+      ) combined
       ORDER BY
         CASE
-          WHEN c.status = 'agent_waiting' THEN 0
-          WHEN c.status = 'agent_active' THEN 1
+          WHEN status = 'agent_waiting' THEN 0
+          WHEN status = 'agent_active' THEN 1
           ELSE 2
         END,
-        c.updated_at DESC
-    `);
+        updated_at DESC
+      `,
+      [before]
+    );
+
+    const rows = result.rows;
+    const liveChats = rows.filter(r => r.status === "agent_waiting" || r.status === "agent_active");
+    const recentChats = rows.filter(r => r.status !== "agent_waiting" && r.status !== "agent_active");
+    const hasMore = recentChats.length > RECENT_PAGE_SIZE;
+
+    if (hasMore) recentChats.pop();
 
     return res.json({
       success: true,
-      chats: result.rows
+      chats: [...liveChats, ...recentChats],
+      hasMore,
+      searchMode: false
     });
   } catch (error) {
     console.error("GET /api/chats error:", error.message);

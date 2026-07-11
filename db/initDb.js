@@ -49,6 +49,11 @@ module.exports = async function initDb() {
       ON messages (phone, created_at);
     `);
 
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_chats_status_updated_at
+      ON chats (status, updated_at DESC);
+    `);
+
     // AGENTS TABLE
     await pool.query(`
       CREATE TABLE IF NOT EXISTS agents (
