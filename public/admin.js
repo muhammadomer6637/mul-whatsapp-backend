@@ -164,6 +164,9 @@ let currentCallbackFilter = "all";
 let highlightedPhone = null;
 let hasMoreChats = false;
 let chatsBootstrapped = false;
+let renderedMessagesPhone = null;
+let renderedMessageIds = new Set();
+let lastRenderedDateLabel = null;
 let searchActive = false;
 let searchResults = [];
 let searchDebounceTimer = null;
@@ -916,6 +919,73 @@ ${
   `;
 }
 
+function buildMessageRowHtml(message, isLatest) {
+  let content = "";
+
+  if (
+    (message.type === "image" || message.mime_type?.includes("image"))
+    && message.media_url
+  ) {
+    content = `
+      <img src="${escapeHtml(message.media_url)}"
+           style="max-width:200px;border-radius:10px;cursor:pointer"
+           onclick="window.open('${escapeHtml(message.media_url)}','_blank')" />
+    `;
+  } else if (
+    (message.type === "document" || message.mime_type?.includes("pdf"))
+    && message.media_url
+  ) {
+    content = `
+      <a href="${escapeHtml(message.media_url)}" target="_blank"
+         style="color:#56a5ff;text-decoration:underline">
+         📄 ${escapeHtml(message.file_name || "Open Document")}
+      </a>
+    `;
+  } else if (
+    (message.type === "video" || message.mime_type?.includes("video"))
+    && message.media_url
+  ) {
+    content = `
+      <video controls style="max-width:220px;border-radius:10px">
+        <source src="${escapeHtml(message.media_url)}">
+      </video>
+    `;
+  } else if (
+    (message.type === "audio" || message.mime_type?.includes("audio"))
+    && message.media_url
+  ) {
+    content = `
+      <audio controls>
+        <source src="${escapeHtml(message.media_url)}">
+      </audio>
+    `;
+  } else {
+    content = `<div>${escapeHtml(message.text || message.type || "")}</div>`;
+  }
+
+  const dateLabel = formatDayLabel(message.created_at);
+  let divider = "";
+  if (dateLabel !== lastRenderedDateLabel) {
+    divider = `<div class="date-divider"><span>${dateLabel}</span></div>`;
+    lastRenderedDateLabel = dateLabel;
+  }
+
+  const isOutgoing = message.sender === "agent" || message.sender === "bot";
+  const sentTick = isOutgoing ? ` <span class="sent-tick">✓</span>` : "";
+
+  return `
+    ${divider}
+    <div class="message-row ${message.sender}${isLatest ? " message-in" : ""}">
+      <div class="message-bubble">
+        ${content}
+        <div class="message-meta">
+          ${capitalize(message.sender)} · ${formatDateTime(message.created_at, true)}${sentTick}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 async function openChat(phone, markRead = true, preserveScroll = false) {
   selectedPhone = phone;
   highlightedPhone = null;
@@ -984,82 +1054,44 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
 });
   const data = await res.json();
 
-  let lastDateLabel = null;
-  document.getElementById("messages").innerHTML = data.messages.length
-    ? data.messages.map((message, index) => {
-        let content = "";
+  // A live SSE update for the chat already open on screen only needs to
+  // append the truly new message(s) - re-rendering the whole thread would
+  // recreate every media element (images/video/audio) and force the
+  // browser to re-request all of it again, even though only one message
+  // changed.
+  const isLiveAppend =
+    preserveScroll &&
+    renderedMessagesPhone === phone &&
+    messagesBox.children.length > 0;
 
-        if (
-  (message.type === "image" || message.mime_type?.includes("image")) 
-  && message.media_url
-) {
-  content = `
-    <img src="${escapeHtml(message.media_url)}"
-         style="max-width:200px;border-radius:10px;cursor:pointer"
-         onclick="window.open('${escapeHtml(message.media_url)}','_blank')" />
-  `;
-} else if (
-  (message.type === "document" || message.mime_type?.includes("pdf"))
-  && message.media_url
-) {
-  content = `
-    <a href="${escapeHtml(message.media_url)}" target="_blank"
-       style="color:#56a5ff;text-decoration:underline">
-       📄 ${escapeHtml(message.file_name || "Open Document")}
-    </a>
-  `;
-} else if (
-  (message.type === "video" || message.mime_type?.includes("video"))
-  && message.media_url
-) {
-  content = `
-    <video controls style="max-width:220px;border-radius:10px">
-      <source src="${escapeHtml(message.media_url)}">
-    </video>
-  `;
-} else if (
-  (message.type === "audio" || message.mime_type?.includes("audio"))
-  && message.media_url
-) {
-  content = `
-    <audio controls>
-      <source src="${escapeHtml(message.media_url)}">
-    </audio>
-  `;
-} else {
-  content = `<div>${escapeHtml(message.text || message.type || "")}</div>`;
-}
+  if (isLiveAppend) {
+    const newMessages = data.messages.filter(m => !renderedMessageIds.has(m.id));
+    if (newMessages.length) {
+      const appendHtml = newMessages.map((message, index) => {
+        const isLatest = index === newMessages.length - 1;
+        return buildMessageRowHtml(message, isLatest);
+      }).join("");
+      messagesBox.insertAdjacentHTML("beforeend", appendHtml);
+      newMessages.forEach(m => renderedMessageIds.add(m.id));
+    }
+  } else {
+    lastRenderedDateLabel = null;
+    document.getElementById("messages").innerHTML = data.messages.length
+      ? data.messages.map((message, index) => {
+          const isLatest = index === data.messages.length - 1;
+          return buildMessageRowHtml(message, isLatest);
+        }).join("")
+      : `
+        <div class="empty-chat-state">
+          <div class="empty-chat-icon">💬</div>
+          <h3>No messages found</h3>
+          <p>This conversation does not contain any saved messages yet.</p>
+        </div>
+      `;
 
-        const dateLabel = formatDayLabel(message.created_at);
-        let divider = "";
-        if (dateLabel !== lastDateLabel) {
-          divider = `<div class="date-divider"><span>${dateLabel}</span></div>`;
-          lastDateLabel = dateLabel;
-        }
-
-        const isOutgoing = message.sender === "agent" || message.sender === "bot";
-        const sentTick = isOutgoing ? ` <span class="sent-tick">✓</span>` : "";
-        const isLatest = index === data.messages.length - 1;
-
-        return `
-          ${divider}
-          <div class="message-row ${message.sender}${isLatest ? " message-in" : ""}">
-            <div class="message-bubble">
-              ${content}
-              <div class="message-meta">
-                ${capitalize(message.sender)} · ${formatDateTime(message.created_at, true)}${sentTick}
-              </div>
-            </div>
-          </div>
-        `;
-      }).join("")
-    : `
-      <div class="empty-chat-state">
-        <div class="empty-chat-icon">💬</div>
-        <h3>No messages found</h3>
-        <p>This conversation does not contain any saved messages yet.</p>
-      </div>
-    `;
+    renderedMessagesPhone = phone;
+    renderedMessageIds = new Set(data.messages.map(m => m.id));
+  }
 
 
 setTimeout(() => {
