@@ -2836,6 +2836,21 @@ await incrementUnreadAndSetIncoming(from, incomingText, incomingChatStatus);
     }
 
     if (!text && type !== "text" && type !== "interactive") {
+      if (type === "audio") {
+        await sendTextMessage(
+          from,
+          `We received your voice message, but we're currently unable to understand voice notes. 🎙️
+
+Please type your question, or type MENU and choose option 7️⃣ (Chat with Admissions Advisor) to speak with our team directly.`
+        );
+      } else {
+        await sendTextMessage(
+          from,
+          `Sorry, we're unable to process this type of message right now. 😔
+
+To get help, please type MENU and choose option 7️⃣ (Chat with Admissions Advisor) to speak with our team directly.`
+        );
+      }
       return res.sendStatus(200);
     }
 
