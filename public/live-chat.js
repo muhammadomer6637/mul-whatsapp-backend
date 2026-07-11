@@ -216,6 +216,122 @@ async function loadMessages() {
   }
 }
 
+let quickReplies = [];
+let quickReplyMatches = [];
+let quickReplyActiveIndex = 0;
+
+async function loadQuickReplies() {
+  try {
+    const res = await fetch("/api/quick-replies", {
+      headers: authHeaders()
+    });
+
+    if (handleAuthFailure(res)) return;
+
+    const data = await res.json();
+    if (!data.success) return;
+
+    quickReplies = data.quickReplies || [];
+  } catch (error) {
+    console.error("loadQuickReplies error:", error);
+  }
+}
+
+function renderQuickReplyDropdown() {
+  const dropdown = document.getElementById("quickReplyDropdown");
+  if (!dropdown) return;
+
+  dropdown.innerHTML = quickReplyMatches.map((qr, index) => `
+    <div class="quick-reply-option${index === quickReplyActiveIndex ? " active-option" : ""}" data-index="${index}">
+      <div class="qr-shortcut">/${escapeHtml(qr.shortcut)}</div>
+      <div class="qr-preview">${escapeHtml(qr.message)}</div>
+    </div>
+  `).join("");
+
+  dropdown.classList.remove("hidden");
+
+  dropdown.querySelectorAll(".quick-reply-option").forEach(el => {
+    el.onclick = () => selectQuickReply(quickReplyMatches[Number(el.dataset.index)]);
+  });
+}
+
+function hideQuickReplyDropdown() {
+  const dropdown = document.getElementById("quickReplyDropdown");
+  if (!dropdown) return;
+  dropdown.classList.add("hidden");
+  dropdown.innerHTML = "";
+  quickReplyMatches = [];
+}
+
+function selectQuickReply(qr) {
+  const input = document.getElementById("messageInput");
+  if (!input || !qr) return;
+
+  input.value = qr.message;
+  hideQuickReplyDropdown();
+  input.focus();
+}
+
+function setupMessageInputShortcuts() {
+  const input = document.getElementById("messageInput");
+  if (!input) return;
+
+  input.addEventListener("keydown", function (event) {
+    const dropdown = document.getElementById("quickReplyDropdown");
+    const dropdownOpen = dropdown && !dropdown.classList.contains("hidden");
+
+    if (dropdownOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+      event.preventDefault();
+      const delta = event.key === "ArrowDown" ? 1 : -1;
+      quickReplyActiveIndex =
+        (quickReplyActiveIndex + delta + quickReplyMatches.length) % quickReplyMatches.length;
+      renderQuickReplyDropdown();
+      return;
+    }
+
+    if (dropdownOpen && event.key === "Escape") {
+      hideQuickReplyDropdown();
+      return;
+    }
+
+    if (event.key !== "Enter") return;
+
+    if (dropdownOpen && quickReplyMatches.length) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      selectQuickReply(quickReplyMatches[quickReplyActiveIndex]);
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    sendMessage();
+  }, true);
+
+  input.addEventListener("input", function () {
+    const value = input.value;
+
+    if (!value.startsWith("/") || value.includes(" ")) {
+      hideQuickReplyDropdown();
+      return;
+    }
+
+    const filterText = value.slice(1).toLowerCase();
+
+    quickReplyMatches = quickReplies.filter(qr =>
+      qr.shortcut.toLowerCase().startsWith(filterText)
+    );
+
+    if (!quickReplyMatches.length) {
+      hideQuickReplyDropdown();
+      return;
+    }
+
+    quickReplyActiveIndex = 0;
+    renderQuickReplyDropdown();
+  });
+}
+
 function insertQuickReply(type) {
   const input = document.getElementById("messageInput");
 
@@ -313,15 +429,10 @@ async function switchBackToBot() {
 document.addEventListener("DOMContentLoaded", () => {
   loadChatInfo();
   loadMessages();
+  loadQuickReplies();
   setInterval(loadMessages, 5000);
 
-  const input = document.getElementById("messageInput");
-
-  input.addEventListener("keydown", event => {
-    if (event.key === "Enter") {
-      sendMessage();
-    }
-  });
+  setupMessageInputShortcuts();
 });
 
 async function takeChat() {

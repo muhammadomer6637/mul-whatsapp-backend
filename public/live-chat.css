@@ -216,6 +216,55 @@ body{
   box-shadow:0 -2px 12px rgba(0,0,0,.25);
 }
 
+.quick-reply-dropdown{
+  position:absolute;
+  bottom:100%;
+  left:10px;
+  right:10px;
+  margin-bottom:8px;
+  background:#111827;
+  border:1px solid rgba(86,165,255,0.22);
+  border-radius:14px;
+  box-shadow:0 12px 30px rgba(0,0,0,.45);
+  max-height:220px;
+  overflow-y:auto;
+  z-index:50;
+}
+
+.quick-reply-dropdown.hidden{
+  display:none;
+}
+
+.quick-reply-option{
+  padding:10px 14px;
+  cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+
+.quick-reply-option:last-child{
+  border-bottom:none;
+}
+
+.quick-reply-option:hover,
+.quick-reply-option.active-option{
+  background:rgba(86,165,255,0.12);
+}
+
+.quick-reply-option .qr-shortcut{
+  color:#56a5ff;
+  font-size:13px;
+  font-weight:700;
+}
+
+.quick-reply-option .qr-preview{
+  color:#9ca3af;
+  font-size:12px;
+  margin-top:2px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
 .composer input{
   flex:1;
   border:1px solid rgba(255,255,255,0.08);

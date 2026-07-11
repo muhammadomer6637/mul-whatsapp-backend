@@ -36,12 +36,14 @@
       <button onclick="insertQuickReply('docs')">Docs</button>
     </div>
 
-<div class="composer">
+<div class="composer" style="position:relative;">
+
+  <div id="quickReplyDropdown" class="quick-reply-dropdown hidden"></div>
 
   <input
     id="messageInput"
     type="text"
-    placeholder="Type your reply..."
+    placeholder="Type your reply... (type / for quick replies)"
   />
 
   <button class="send-btn" onclick="sendMessage()">
