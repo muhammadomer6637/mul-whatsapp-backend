@@ -4222,255 +4222,285 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       queryParams = [start, end];
     }
 
-    const conversationsStarted = await pool.query(
-      `
-      SELECT COUNT(*)::int AS count
-      FROM users
-      WHERE ${whereCreated}
-      `,
-      queryParams
-    );
-
-    const weeklyConversations = await pool.query(`
-      SELECT
-        TO_CHAR(day, 'Dy') AS label,
-        COUNT(u.id)::int AS count
-      FROM generate_series(
-        CURRENT_DATE - INTERVAL '6 days',
-        CURRENT_DATE,
-        INTERVAL '1 day'
-      ) AS day
-      LEFT JOIN users u ON u.created_at::date = day::date
-      GROUP BY day
-      ORDER BY day
-    `);
-
-    const unreadConversations = await pool.query(`
-      SELECT COUNT(*)::int AS count
-      FROM chats
-      WHERE unread_count > 0
-    `);
-
-    const totalIncomingMessages = await pool.query(
-  `
-  SELECT COUNT(*)::int AS count
-  FROM messages
-  WHERE sender = 'user'
-    AND ${whereCreated}
-  `,
-  queryParams
-);
-
-const agentChatRequests = await pool.query(
-  `
-  SELECT COUNT(DISTINCT phone)::int AS count
-  FROM chats
-  WHERE agent_requested = true
-    AND ${whereCreated.replaceAll("created_at", "updated_at")}
-  `,
-  queryParams
-);
-
-const agentMessagesSent = await pool.query(
-  `
-  SELECT COUNT(*)::int AS count
-  FROM messages
-  WHERE sender = 'agent'
-    AND ${whereCreated}
-  `,
-  queryParams
-);
-
-const botInterestStats = await pool.query(
-  `
-  SELECT category, COUNT(DISTINCT phone)::int AS count
-  FROM user_interactions
-  WHERE interaction_type = 'bot_info'
-    AND ${whereCreated}
-  GROUP BY category
-  ORDER BY count DESC, category ASC
-  `,
-  queryParams
-);
-
-const agentCategoryStats = await pool.query(
-  `
-  SELECT category, COUNT(DISTINCT phone)::int AS count
-  FROM user_interactions
-  WHERE interaction_type = 'agent_category'
-    AND ${whereCreated}
-  GROUP BY category
-  ORDER BY count DESC, category ASC
-  `,
-  queryParams
-);
-    
-    const agentWaiting = await pool.query(`
-      SELECT COUNT(*)::int AS count
-      FROM chats
-      WHERE status = 'agent_waiting'
-    `);
-
-    const agentActive = await pool.query(`
-      SELECT COUNT(*)::int AS count
-      FROM chats
-      WHERE status = 'agent_active'
-    `);
-
-    const activeWithBot = await pool.query(`
-      SELECT COUNT(*)::int AS count
-      FROM users u
-      JOIN chats c ON c.phone = u.phone
-      WHERE u.mode = 'bot'
-      AND c.last_incoming_at >= NOW() - INTERVAL '10 minutes'
-    `);
-
-    const activeWithAgent = await pool.query(`
-      SELECT COUNT(*)::int AS count
-      FROM users u
-      JOIN chats c ON c.phone = u.phone
-      WHERE u.mode = 'agent'
-      AND c.last_incoming_at >= NOW() - INTERVAL '10 minutes'
-    `);
-
-    const topPrograms = await pool.query(
-      `
-      SELECT
-        program,
-        COUNT(*)::int AS inquiries
-      FROM users
-      WHERE program IS NOT NULL
-        AND TRIM(program) <> ''
-        AND ${whereCreated}
-      GROUP BY program
-      ORDER BY inquiries DESC, program ASC
-      LIMIT 10
-      `,
-      queryParams
-    );
-
-    const recentLeads = await pool.query(`
-      SELECT
-        u.name,
-        u.program,
-        u.phone,
-        c.status,
-        c.updated_at
-      FROM users u
-      LEFT JOIN chats c ON c.phone = u.phone
-      WHERE u.program IS NOT NULL
-        AND TRIM(u.program) <> ''
-      ORDER BY c.updated_at DESC NULLS LAST
-      LIMIT 10
-    `);
-
+    // All of the below are independent of each other (none use another
+    // query's result), so they run concurrently instead of one-at-a-time -
+    // this was previously ~20 sequential round-trips to Postgres on every
+    // dashboard load.
     const funnelDateFilter = range === "custom" && start && end
-  ? `
-    >= $1::timestamp
-    AND < ($2::date + INTERVAL '1 day')
-  `
-  : `>= NOW() - ${intervalSql}`;
-
-const funnelStats = await pool.query(`
-  SELECT
-    COUNT(*) FILTER (
-      WHERE (
-        registered_at IS NOT NULL
-        OR processing_fee_paid_at IS NOT NULL
-        OR documents_submitted_at IS NOT NULL
-        OR admission_fee_paid_at IS NOT NULL
-      )
-    )::int AS registrations,
-
-    COUNT(*) FILTER (
-      WHERE (
-        processing_fee_paid_at IS NOT NULL
-        OR documents_submitted_at IS NOT NULL
-        OR admission_fee_paid_at IS NOT NULL
-      )
-    )::int AS processing_fee,
-
-    COUNT(*) FILTER (
-      WHERE (
-        documents_submitted_at IS NOT NULL
-        OR admission_fee_paid_at IS NOT NULL
-      )
-    )::int AS documents_submitted,
-
-    COUNT(*) FILTER (
-      WHERE admission_fee_paid_at IS NOT NULL
-    )::int AS fee_paid
-
-  FROM users
-`);
-    
-    const callbackTotals = await pool.query(
+      ? `
+        >= $1::timestamp
+        AND < ($2::date + INTERVAL '1 day')
       `
-      SELECT
-        COUNT(*)::int AS total_requests,
-        COUNT(DISTINCT phone)::int AS unique_numbers
-      FROM callback_request_logs
-      WHERE ${whereCreated}
-      `,
-      queryParams
-    );
+      : `>= NOW() - ${intervalSql}`;
 
-    const callbackRepeat = await pool.query(
-      `
-      SELECT COUNT(*)::int AS repeat_numbers
-      FROM (
-        SELECT phone
+    const [
+      conversationsStarted,
+      weeklyConversations,
+      unreadConversations,
+      totalIncomingMessages,
+      agentChatRequests,
+      agentMessagesSent,
+      botInterestStats,
+      agentCategoryStats,
+      agentWaiting,
+      agentActive,
+      activeWithBot,
+      activeWithAgent,
+      topPrograms,
+      recentLeads,
+      funnelStats,
+      callbackTotals,
+      callbackRepeat,
+      callbackStatuses,
+      responseStats,
+      callbackResponseStats
+    ] = await Promise.all([
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS count
+        FROM users
+        WHERE ${whereCreated}
+        `,
+        queryParams
+      ),
+
+      pool.query(`
+        SELECT
+          TO_CHAR(day, 'Dy') AS label,
+          COUNT(u.id)::int AS count
+        FROM generate_series(
+          CURRENT_DATE - INTERVAL '6 days',
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        ) AS day
+        LEFT JOIN users u ON u.created_at::date = day::date
+        GROUP BY day
+        ORDER BY day
+      `),
+
+      pool.query(`
+        SELECT COUNT(*)::int AS count
+        FROM chats
+        WHERE unread_count > 0
+      `),
+
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS count
+        FROM messages
+        WHERE sender = 'user'
+          AND ${whereCreated}
+        `,
+        queryParams
+      ),
+
+      pool.query(
+        `
+        SELECT COUNT(DISTINCT phone)::int AS count
+        FROM chats
+        WHERE agent_requested = true
+          AND ${whereCreated.replaceAll("created_at", "updated_at")}
+        `,
+        queryParams
+      ),
+
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS count
+        FROM messages
+        WHERE sender = 'agent'
+          AND ${whereCreated}
+        `,
+        queryParams
+      ),
+
+      pool.query(
+        `
+        SELECT category, COUNT(DISTINCT phone)::int AS count
+        FROM user_interactions
+        WHERE interaction_type = 'bot_info'
+          AND ${whereCreated}
+        GROUP BY category
+        ORDER BY count DESC, category ASC
+        `,
+        queryParams
+      ),
+
+      pool.query(
+        `
+        SELECT category, COUNT(DISTINCT phone)::int AS count
+        FROM user_interactions
+        WHERE interaction_type = 'agent_category'
+          AND ${whereCreated}
+        GROUP BY category
+        ORDER BY count DESC, category ASC
+        `,
+        queryParams
+      ),
+
+      pool.query(`
+        SELECT COUNT(*)::int AS count
+        FROM chats
+        WHERE status = 'agent_waiting'
+      `),
+
+      pool.query(`
+        SELECT COUNT(*)::int AS count
+        FROM chats
+        WHERE status = 'agent_active'
+      `),
+
+      pool.query(`
+        SELECT COUNT(*)::int AS count
+        FROM users u
+        JOIN chats c ON c.phone = u.phone
+        WHERE u.mode = 'bot'
+        AND c.last_incoming_at >= NOW() - INTERVAL '10 minutes'
+      `),
+
+      pool.query(`
+        SELECT COUNT(*)::int AS count
+        FROM users u
+        JOIN chats c ON c.phone = u.phone
+        WHERE u.mode = 'agent'
+        AND c.last_incoming_at >= NOW() - INTERVAL '10 minutes'
+      `),
+
+      pool.query(
+        `
+        SELECT
+          program,
+          COUNT(*)::int AS inquiries
+        FROM users
+        WHERE program IS NOT NULL
+          AND TRIM(program) <> ''
+          AND ${whereCreated}
+        GROUP BY program
+        ORDER BY inquiries DESC, program ASC
+        LIMIT 10
+        `,
+        queryParams
+      ),
+
+      pool.query(`
+        SELECT
+          u.name,
+          u.program,
+          u.phone,
+          c.status,
+          c.updated_at
+        FROM users u
+        LEFT JOIN chats c ON c.phone = u.phone
+        WHERE u.program IS NOT NULL
+          AND TRIM(u.program) <> ''
+        ORDER BY c.updated_at DESC NULLS LAST
+        LIMIT 10
+      `),
+
+      // Deliberately NOT scoped to the date range - this must always show
+      // the true overall funnel, not just students who first messaged in
+      // the selected window (per explicit user instruction).
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (
+            WHERE (
+              registered_at IS NOT NULL
+              OR processing_fee_paid_at IS NOT NULL
+              OR documents_submitted_at IS NOT NULL
+              OR admission_fee_paid_at IS NOT NULL
+            )
+          )::int AS registrations,
+
+          COUNT(*) FILTER (
+            WHERE (
+              processing_fee_paid_at IS NOT NULL
+              OR documents_submitted_at IS NOT NULL
+              OR admission_fee_paid_at IS NOT NULL
+            )
+          )::int AS processing_fee,
+
+          COUNT(*) FILTER (
+            WHERE (
+              documents_submitted_at IS NOT NULL
+              OR admission_fee_paid_at IS NOT NULL
+            )
+          )::int AS documents_submitted,
+
+          COUNT(*) FILTER (
+            WHERE admission_fee_paid_at IS NOT NULL
+          )::int AS fee_paid
+
+        FROM users
+      `),
+
+      pool.query(
+        `
+        SELECT
+          COUNT(*)::int AS total_requests,
+          COUNT(DISTINCT phone)::int AS unique_numbers
         FROM callback_request_logs
         WHERE ${whereCreated}
-        GROUP BY phone
-        HAVING COUNT(*) > 1
-      ) repeated
-      `,
-      queryParams
-    );
+        `,
+        queryParams
+      ),
 
-    const callbackStatuses = await pool.query(
-      `
-      WITH scoped_callbacks AS (
-        SELECT DISTINCT callback_request_id
-        FROM callback_request_logs
-        WHERE ${whereCreated}
-          AND callback_request_id IS NOT NULL
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS repeat_numbers
+        FROM (
+          SELECT phone
+          FROM callback_request_logs
+          WHERE ${whereCreated}
+          GROUP BY phone
+          HAVING COUNT(*) > 1
+        ) repeated
+        `,
+        queryParams
+      ),
+
+      pool.query(
+        `
+        WITH scoped_callbacks AS (
+          SELECT DISTINCT callback_request_id
+          FROM callback_request_logs
+          WHERE ${whereCreated}
+            AND callback_request_id IS NOT NULL
+        )
+        SELECT
+          COUNT(*) FILTER (WHERE cb.status = 'pending')::int AS pending,
+          COUNT(*) FILTER (WHERE cb.status = 'called')::int AS called,
+          COUNT(*) FILTER (WHERE cb.status = 'not_responded')::int AS not_responded,
+          COUNT(*) FILTER (WHERE cb.status = 'follow_up_required')::int AS follow_up_required,
+          COUNT(*) FILTER (WHERE cb.status = 'converted')::int AS converted
+        FROM callback_requests cb
+        JOIN scoped_callbacks sc
+          ON sc.callback_request_id = cb.id
+        `,
+        queryParams
+      ),
+
+      pool.query(
+        `
+        SELECT
+          COALESCE(ROUND(AVG(agent_response_seconds))::int, 0) AS average_chat_response_seconds
+        FROM chats
+        WHERE agent_response_seconds IS NOT NULL
+          AND ${whereCreated.replaceAll("created_at", "agent_taken_at")}
+        `,
+        queryParams
+      ),
+
+      pool.query(
+        `
+        SELECT
+          COALESCE(ROUND(AVG(first_response_seconds))::int, 0) AS average_callback_response_seconds
+        FROM callback_requests
+        WHERE first_response_seconds IS NOT NULL
+          AND ${whereCreated.replaceAll("created_at", "first_response_at")}
+        `,
+        queryParams
       )
-      SELECT
-        COUNT(*) FILTER (WHERE cb.status = 'pending')::int AS pending,
-        COUNT(*) FILTER (WHERE cb.status = 'called')::int AS called,
-        COUNT(*) FILTER (WHERE cb.status = 'not_responded')::int AS not_responded,
-        COUNT(*) FILTER (WHERE cb.status = 'follow_up_required')::int AS follow_up_required,
-        COUNT(*) FILTER (WHERE cb.status = 'converted')::int AS converted
-      FROM callback_requests cb
-      JOIN scoped_callbacks sc
-        ON sc.callback_request_id = cb.id
-      `,
-      queryParams
-    );
-
-        const responseStats = await pool.query(
-      `
-      SELECT
-        COALESCE(ROUND(AVG(agent_response_seconds))::int, 0) AS average_chat_response_seconds
-      FROM chats
-      WHERE agent_response_seconds IS NOT NULL
-        AND ${whereCreated.replaceAll("created_at", "agent_taken_at")}
-      `,
-      queryParams
-    );
-
-    const callbackResponseStats = await pool.query(
-      `
-      SELECT
-        COALESCE(ROUND(AVG(first_response_seconds))::int, 0) AS average_callback_response_seconds
-      FROM callback_requests
-      WHERE first_response_seconds IS NOT NULL
-        AND ${whereCreated.replaceAll("created_at", "first_response_at")}
-      `,
-      queryParams
-    );
+    ]);
 
     return res.json({
       success: true,

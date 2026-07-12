@@ -285,6 +285,18 @@ await pool.query(`
   CREATE INDEX IF NOT EXISTS idx_messages_wamid ON messages (wamid);
 `);
 
+await pool.query(`
+  CREATE INDEX IF NOT EXISTS idx_messages_sender_created_at ON messages (sender, created_at);
+`);
+
+await pool.query(`
+  CREATE INDEX IF NOT EXISTS idx_users_created_at ON users (created_at);
+`);
+
+await pool.query(`
+  CREATE INDEX IF NOT EXISTS idx_user_interactions_type_created_at ON user_interactions (interaction_type, created_at);
+`);
+
     await pool.query(`
   ALTER TABLE callback_requests
   ADD COLUMN IF NOT EXISTS request_count INTEGER DEFAULT 1;
