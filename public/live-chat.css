@@ -177,6 +177,11 @@ body{
   opacity:.9;
 }
 
+.sent-tick.tick-read{
+  color:#34d6ff;
+  opacity:1;
+}
+
 @keyframes messageSlideIn{
   from { opacity:0; transform:translateY(8px); }
   to { opacity:1; transform:translateY(0); }
@@ -297,6 +302,21 @@ body{
   background:#dc2626;
   color:white;
   font-size:20px;
+}
+
+.attach-btn{
+  border:none;
+  width:46px;
+  height:46px;
+  border-radius:50%;
+  background:#1f2937;
+  color:white;
+  font-size:18px;
+  flex-shrink:0;
+}
+
+.attach-btn:disabled{
+  opacity:.5;
 }
 
 .chat-actions{

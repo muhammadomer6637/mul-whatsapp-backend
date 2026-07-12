@@ -5,6 +5,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const multer = require("multer");
 const pool = require("./db/db");
 const { testConnection } = require("./db/db");
 const initDb = require("./db/initDb");
@@ -470,7 +471,9 @@ async function saveMessage({
   media_id = null,
   media_url = null,
   file_name = null,
-  mime_type = null
+  mime_type = null,
+  wamid = null,
+  status = null
 }) {
   try {
     await pool.query(
@@ -485,10 +488,12 @@ async function saveMessage({
         media_url,
         file_name,
         mime_type,
+        wamid,
+        status,
         created_at
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,NOW()
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()
       )
       `,
       [
@@ -499,7 +504,9 @@ async function saveMessage({
         media_id,
         media_url,
         file_name,
-        mime_type
+        mime_type,
+        wamid,
+        status
       ]
     );
 
@@ -510,6 +517,34 @@ async function saveMessage({
       "saveMessage error:",
       err.message
     );
+  }
+}
+
+const MESSAGE_STATUS_RANK = { sent: 1, delivered: 2, read: 3, failed: 4 };
+
+async function updateMessageStatus(wamid, newStatus) {
+  try {
+    if (!wamid || !MESSAGE_STATUS_RANK[newStatus]) return;
+
+    const result = await pool.query(
+      "SELECT phone, status FROM messages WHERE wamid = $1 LIMIT 1",
+      [wamid]
+    );
+    if (!result.rows.length) return;
+
+    const { phone, status: currentStatus } = result.rows[0];
+    const currentRank = MESSAGE_STATUS_RANK[currentStatus] || 0;
+
+    if (MESSAGE_STATUS_RANK[newStatus] <= currentRank) return;
+
+    await pool.query(
+      "UPDATE messages SET status = $1 WHERE wamid = $2",
+      [newStatus, wamid]
+    );
+
+    notifyChatUpdated(phone);
+  } catch (err) {
+    console.error("updateMessageStatus error:", err.message);
   }
 }
 
@@ -650,6 +685,8 @@ function getExtensionFromMime(mimeType = "") {
   if (mimeType.includes("image/png")) return "png";
   if (mimeType.includes("image/webp")) return "webp";
   if (mimeType.includes("application/pdf")) return "pdf";
+  if (mimeType.includes("msword")) return "doc";
+  if (mimeType.includes("wordprocessingml.document")) return "docx";
   if (mimeType.includes("video/mp4")) return "mp4";
   if (mimeType.includes("audio/ogg")) return "ogg";
   if (mimeType.includes("audio/mpeg")) return "mp3";
@@ -1040,10 +1077,12 @@ async function sendDocumentMessage(
   documentUrl,
   filename,
   caption = "",
-  chatStatus = "active"
+  chatStatus = "active",
+  sender = "bot",
+  mimeType = "application/pdf"
 ) {
   try {
-    await axios.post(
+    const response = await axios.post(
       `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
       {
         messaging_product: "whatsapp",
@@ -1063,14 +1102,20 @@ async function sendDocumentMessage(
       }
     );
 
+    // Read-receipt tracking is only wired up for agent-sent messages -
+    // bot messages stay untouched (wamid/status left null).
+    const wamid = sender === "agent" ? (response?.data?.messages?.[0]?.id || null) : null;
+
     await saveMessage({
       phone: to,
-      sender: "bot",
+      sender,
       type: "document",
       text: caption || filename,
       media_url: documentUrl,
       file_name: filename,
-      mime_type: "application/pdf"
+      mime_type: mimeType,
+      wamid,
+      status: wamid ? "sent" : null
     });
 
     await setOutgoingMeta(to, caption || filename, chatStatus);
@@ -1080,9 +1125,56 @@ async function sendDocumentMessage(
   }
 }
 
+async function sendImageMessage(
+  to,
+  imageUrl,
+  caption = "",
+  chatStatus = "active",
+  sender = "agent"
+) {
+  try {
+    const response = await axios.post(
+      `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to,
+        type: "image",
+        image: {
+          link: imageUrl,
+          caption
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const wamid = sender === "agent" ? (response?.data?.messages?.[0]?.id || null) : null;
+
+    await saveMessage({
+      phone: to,
+      sender,
+      type: "image",
+      text: caption || "",
+      media_url: imageUrl,
+      mime_type: "image/jpeg",
+      wamid,
+      status: wamid ? "sent" : null
+    });
+
+    await setOutgoingMeta(to, caption || "[Image]", chatStatus);
+  } catch (error) {
+    console.error("Send image error:", error.response?.data || error.message);
+    recordSendFailure();
+  }
+}
+
 async function sendAgentTextMessage(to, message, chatStatus = "agent_active") {
   try {
-    await axios.post(
+    const response = await axios.post(
       `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
       {
         messaging_product: "whatsapp",
@@ -1098,11 +1190,15 @@ async function sendAgentTextMessage(to, message, chatStatus = "agent_active") {
       }
     );
 
+    const wamid = response?.data?.messages?.[0]?.id || null;
+
     await saveMessage({
       phone: to,
       sender: "agent",
       type: "text",
-      text: message
+      text: message,
+      wamid,
+      status: wamid ? "sent" : null
     });
 
     await setOutgoingMeta(to, message, chatStatus);
@@ -2414,8 +2510,22 @@ app.get("/webhook", (req, res) => {
 
 app.post("/webhook", async (req, res) => {
   try {
-    const msg = req.body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-    const contact = req.body.entry?.[0]?.changes?.[0]?.value?.contacts?.[0];
+    const value = req.body.entry?.[0]?.changes?.[0]?.value;
+
+    // Delivery/read receipts for messages we sent arrive as a separate
+    // "statuses" payload (no "messages" array). Handled here in complete
+    // isolation from the message-processing logic below, then we return
+    // immediately - this must never fall through into the bot state machine.
+    const statusUpdates = value?.statuses;
+    if (statusUpdates && statusUpdates.length) {
+      for (const statusUpdate of statusUpdates) {
+        await updateMessageStatus(statusUpdate.id, statusUpdate.status);
+      }
+      return res.sendStatus(200);
+    }
+
+    const msg = value?.messages?.[0];
+    const contact = value?.contacts?.[0];
 
     if (!msg) {
       return res.sendStatus(200);
@@ -3755,7 +3865,7 @@ app.get("/api/messages/:phone", authenticateAgent, async (req, res) => {
     const result = await pool.query(
       `
       SELECT * FROM (
-        SELECT id, phone, sender, type, text, media_id, media_url, file_name, mime_type, created_at
+        SELECT id, phone, sender, type, text, media_id, media_url, file_name, mime_type, status, created_at
         FROM messages
         WHERE phone = $1
         ORDER BY created_at DESC
@@ -3808,6 +3918,83 @@ app.post("/api/send", authenticateAgent, async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error.response?.data?.error?.message || "Failed to send agent message"
+    });
+  }
+});
+
+const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 } // 20MB cap
+});
+
+function handleMediaUpload(req, res, next) {
+  mediaUpload.single("file")(req, res, (err) => {
+    if (err) {
+      const message = err.code === "LIMIT_FILE_SIZE"
+        ? "File is too large. Maximum size is 20MB."
+        : "Failed to upload file";
+      return res.status(400).json({ success: false, error: message });
+    }
+    next();
+  });
+}
+
+app.post("/api/send-media", authenticateAgent, handleMediaUpload, async (req, res) => {
+  try {
+    const { phone, caption } = req.body;
+    const file = req.file;
+
+    if (!phone || !file) {
+      return res.status(400).json({
+        success: false,
+        error: "phone and file are required"
+      });
+    }
+
+    const mimeType = file.mimetype || "application/octet-stream";
+    const isImage = mimeType.startsWith("image/");
+    const isDocument =
+      mimeType === "application/pdf" ||
+      mimeType === "application/msword" ||
+      mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+    if (!isImage && !isDocument) {
+      return res.status(400).json({
+        success: false,
+        error: "Unsupported file type. Please send an image, PDF, or Word document."
+      });
+    }
+
+    const ext = getExtensionFromMime(mimeType);
+    const fileName = `${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${ext}`;
+    const filePath = path.join(uploadsDir, fileName);
+
+    fs.writeFileSync(filePath, file.buffer);
+
+    const publicUrl = `${BASE_URL}/files/uploads/${fileName}`;
+
+    await updateUserDetails(phone, { mode: "agent" });
+
+    if (isImage) {
+      await sendImageMessage(phone, publicUrl, caption || "", "agent_active", "agent");
+    } else {
+      await sendDocumentMessage(
+        phone,
+        publicUrl,
+        file.originalname || fileName,
+        caption || "",
+        "agent_active",
+        "agent",
+        mimeType
+      );
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("POST /api/send-media error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to send file"
     });
   }
 });

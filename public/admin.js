@@ -919,6 +919,15 @@ ${
   `;
 }
 
+function buildTickHtml(status) {
+  // Read-receipt status is only tracked for newly-sent agent messages -
+  // bot messages and older agent messages have no status, so they fall
+  // back to the original plain single tick with no behavior change.
+  if (status === "read") return `<span class="sent-tick tick-read">✓✓</span>`;
+  if (status === "delivered") return `<span class="sent-tick">✓✓</span>`;
+  return `<span class="sent-tick">✓</span>`;
+}
+
 function buildMessageRowHtml(message, isLatest) {
   let content = "";
 
@@ -971,7 +980,7 @@ function buildMessageRowHtml(message, isLatest) {
   }
 
   const isOutgoing = message.sender === "agent" || message.sender === "bot";
-  const sentTick = isOutgoing ? ` <span class="sent-tick">✓</span>` : "";
+  const sentTick = isOutgoing ? ` ${buildTickHtml(message.status)}` : "";
 
   return `
     ${divider}
@@ -1436,6 +1445,46 @@ async function sendMessage() {
   } catch (error) {
     console.error("Frontend send error:", error);
     notify("Message send failed. Check browser console and Railway logs.", "error");
+  }
+}
+
+async function sendMediaFile(file) {
+  if (!file || !selectedPhone) return;
+
+  const fileInput = document.getElementById("mediaFileInput");
+  const maxSizeBytes = 20 * 1024 * 1024;
+
+  if (file.size > maxSizeBytes) {
+    notify("File is too large. Maximum size is 20MB.", "error");
+    if (fileInput) fileInput.value = "";
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("phone", selectedPhone);
+
+    const res = await fetch(`${BASE}/api/send-media`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: formData
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      notify(data.error || "Failed to send file", "error");
+      return;
+    }
+
+    await loadChats();
+    await openChat(selectedPhone, false);
+  } catch (error) {
+    console.error("sendMediaFile error:", error);
+    notify("Failed to send file. Check browser console and Railway logs.", "error");
+  } finally {
+    if (fileInput) fileInput.value = "";
   }
 }
 

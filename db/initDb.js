@@ -271,6 +271,20 @@ await pool.query(`
   ADD COLUMN IF NOT EXISTS awaiting_callback_lead BOOLEAN DEFAULT false;
 `);
 
+await pool.query(`
+  ALTER TABLE messages
+  ADD COLUMN IF NOT EXISTS wamid TEXT;
+`);
+
+await pool.query(`
+  ALTER TABLE messages
+  ADD COLUMN IF NOT EXISTS status TEXT;
+`);
+
+await pool.query(`
+  CREATE INDEX IF NOT EXISTS idx_messages_wamid ON messages (wamid);
+`);
+
     await pool.query(`
   ALTER TABLE callback_requests
   ADD COLUMN IF NOT EXISTS request_count INTEGER DEFAULT 1;

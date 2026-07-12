@@ -931,6 +931,11 @@ body {
   opacity: 0.85;
 }
 
+.sent-tick.tick-read {
+  color: #34d6ff;
+  opacity: 1;
+}
+
 .date-divider {
   display: flex;
   justify-content: center;
@@ -958,7 +963,7 @@ body {
   padding: 12px;
   border-top: 1px solid var(--line);
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: auto 1fr auto auto;
   gap: 10px;
   background: rgba(255,255,255,0.03);
   flex-shrink: 0;

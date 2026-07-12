@@ -62,6 +62,12 @@ function formatDayLabel(value) {
 let renderedMessageIds = new Set();
 let lastRenderedDayLabel = null;
 
+function buildTickHtml(status) {
+  if (status === "read") return `<span class="sent-tick tick-read">✓✓</span>`;
+  if (status === "delivered") return `<span class="sent-tick">✓✓</span>`;
+  return `<span class="sent-tick">✓</span>`;
+}
+
 function buildMessageRowHtml(message, isLatest) {
   let content = "";
 
@@ -104,7 +110,7 @@ function buildMessageRowHtml(message, isLatest) {
     message.sender === "user" ? "user" : message.sender === "agent" ? "agent" : "bot";
 
   const isOutgoing = senderClass !== "user";
-  const sentTick = isOutgoing ? ` <span class="sent-tick">✓</span>` : "";
+  const sentTick = isOutgoing ? ` ${buildTickHtml(message.status)}` : "";
 
   return `
     ${divider}
@@ -390,6 +396,52 @@ async function sendMessage() {
   } catch (error) {
     console.error("sendMessage error:", error);
     alert("Message send failed");
+  }
+}
+
+async function sendMediaFile(file) {
+  if (!file) return;
+
+  const fileInput = document.getElementById("mediaFileInput");
+  const attachBtn = document.querySelector(".attach-btn");
+  const maxSizeBytes = 20 * 1024 * 1024;
+
+  if (file.size > maxSizeBytes) {
+    alert("File is too large. Maximum size is 20MB.");
+    if (fileInput) fileInput.value = "";
+    return;
+  }
+
+  if (attachBtn) attachBtn.disabled = true;
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("phone", selectedPhone);
+
+    const res = await fetch("/api/send-media", {
+      method: "POST",
+      headers: authHeaders(),
+      body: formData
+    });
+
+    if (handleAuthFailure(res)) return;
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "Failed to send file");
+      return;
+    }
+
+    await loadMessages();
+
+  } catch (error) {
+    console.error("sendMediaFile error:", error);
+    alert("Failed to send file");
+  } finally {
+    if (attachBtn) attachBtn.disabled = false;
+    if (fileInput) fileInput.value = "";
   }
 }
 
