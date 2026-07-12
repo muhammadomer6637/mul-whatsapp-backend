@@ -2385,6 +2385,27 @@ app.get(
       health.mediaStorage = null;
     }
 
+    // WhatsApp Business Profile - fields relevant to Meta's business
+    // verification checklist (address, description, email, etc.)
+    try {
+      const profileRes = await axios.get(
+        `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/whatsapp_business_profile`,
+        {
+          params: { fields: "about,address,description,email,profile_picture_url,websites,vertical" },
+          headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` }
+        }
+      );
+      health.businessProfile = {
+        ok: true,
+        data: profileRes.data?.data?.[0] || {}
+      };
+    } catch (error) {
+      health.businessProfile = {
+        ok: false,
+        error: error.response?.data?.error?.message || error.message
+      };
+    }
+
     // Env var sanity check
     health.envVars = {
       WHATSAPP_TOKEN: !!process.env.WHATSAPP_TOKEN,

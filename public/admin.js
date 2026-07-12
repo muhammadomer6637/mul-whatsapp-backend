@@ -2014,6 +2014,41 @@ async function loadSystemHealth() {
       "In the last hour"
     ));
 
+    if (h.businessProfile?.ok) {
+      const p = h.businessProfile.data || {};
+      const fieldLabels = {
+        about: "About",
+        description: "Description",
+        address: "Address",
+        email: "Email",
+        websites: "Website",
+        vertical: "Category",
+        profile_picture_url: "Profile Photo"
+      };
+      const missing = Object.entries(fieldLabels)
+        .filter(([key]) => {
+          const value = p[key];
+          return value === undefined || value === null || (Array.isArray(value) && !value.length) || value === "";
+        })
+        .map(([, label]) => label);
+
+      cards.push(healthCard(
+        "WhatsApp Business Profile",
+        missing.length === 0 ? "✅ Complete" : `⚠️ ${missing.length} field(s) missing`,
+        missing.length === 0 ? "live" : "warning",
+        missing.length === 0
+          ? "About, Description, Address, Email, Website, Category, Profile Photo all set"
+          : `Missing: ${missing.join(", ")} - fill these in Meta Business Manager for verification eligibility`
+      ));
+    } else {
+      cards.push(healthCard(
+        "WhatsApp Business Profile",
+        "❌ Could not check",
+        "danger",
+        h.businessProfile?.error || "Unknown error"
+      ));
+    }
+
     const envOk = h.envVars.WHATSAPP_TOKEN && h.envVars.JWT_SECRET && h.envVars.DATABASE_URL;
     cards.push(healthCard(
       "Required Settings",
