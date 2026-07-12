@@ -309,6 +309,12 @@ function setupMessageInputShortcuts() {
       return;
     }
 
+    if (event.shiftKey) {
+      // Let the browser's default behavior insert a line break in the textarea.
+      event.stopImmediatePropagation();
+      return;
+    }
+
     event.preventDefault();
     event.stopImmediatePropagation();
     sendMessage();
