@@ -9,12 +9,13 @@ let searchResults = [];
 let searchDebounceTimer = null;
 let pollIntervalId = null;
 
-function authHeadersLive() {
+function authHeadersLive(extra = {}) {
   const token =
     sessionStorage.getItem("mul_nexus_token") ||
     localStorage.getItem("mul_nexus_token");
 
   return {
+    ...extra,
     Authorization: `Bearer ${token}`
   };
 }
@@ -287,8 +288,42 @@ function openChat(phone) {
 
 function startLive() {
   loadChats();
+  loadAgentAvailability();
   if (!pollIntervalId) {
     pollIntervalId = setInterval(loadChats, 15000);
+  }
+}
+
+async function loadAgentAvailability() {
+  try {
+    const res = await fetch("/api/agent-status", { headers: authHeadersLive() });
+    if (res.status === 401) {
+      showLoginScreen();
+      return;
+    }
+    const data = await res.json();
+    const toggle = document.getElementById("agentAvailabilityToggle");
+    if (toggle) toggle.checked = !!data.status;
+  } catch (error) {
+    console.error("loadAgentAvailability error:", error);
+  }
+}
+
+async function toggleAgentAvailability() {
+  try {
+    const statusRes = await fetch("/api/agent-status", { headers: authHeadersLive() });
+    const statusData = await statusRes.json();
+    const newStatus = !statusData.status;
+
+    await fetch("/api/toggle-agent", {
+      method: "POST",
+      headers: authHeadersLive({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ status: newStatus })
+    });
+
+    loadAgentAvailability();
+  } catch (error) {
+    console.error("toggleAgentAvailability error:", error);
   }
 }
 
