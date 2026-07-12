@@ -12,7 +12,7 @@
 <body>
   <div class="chat-app">
 
-    <div class="chat-header">
+    <div class="chat-header" style="position:relative;">
       <button class="back-btn" onclick="goBack()">←</button>
       <div id="chatAvatar" class="chat-avatar">M</div>
 
@@ -21,6 +21,8 @@
         <div id="chatMeta" class="chat-meta">Please wait</div>
         <div id="chatActions" class="chat-actions"></div>
       </div>
+
+      <button class="menu-btn" onclick="toggleFunnelMenu()">⋮</button>
     </div>
 
     <div id="messagesBox" class="messages-box">

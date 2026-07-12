@@ -71,6 +71,61 @@ body{
   margin-top:3px;
 }
 
+.menu-btn{
+  margin-left:auto;
+  width:36px;
+  height:36px;
+  border:none;
+  border-radius:50%;
+  background:#1f2937;
+  color:white;
+  font-size:20px;
+  flex-shrink:0;
+}
+
+.funnel-menu-card{
+  position:absolute;
+  right:12px;
+  top:70px;
+  z-index:20;
+  min-width:230px;
+  padding:12px;
+  border-radius:12px;
+  background:#111827;
+  border:1px solid rgba(86,165,255,0.22);
+  box-shadow:0 12px 30px rgba(0,0,0,.45);
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+
+.funnel-menu-item{
+  width:100%;
+  background:transparent;
+  border:none;
+  color:white;
+  text-align:left;
+  font-size:14px;
+  cursor:pointer;
+  padding:8px 6px;
+  border-radius:8px;
+}
+
+.funnel-menu-item:hover{
+  background:rgba(255,255,255,0.08);
+}
+
+.funnel-menu-item:disabled{
+  opacity:.6;
+  cursor:default;
+}
+
+.funnel-menu-card hr{
+  border:none;
+  border-top:1px solid rgba(255,255,255,0.1);
+  margin:4px 0;
+}
+
 .messages-box{
   flex:1;
   min-height:0;

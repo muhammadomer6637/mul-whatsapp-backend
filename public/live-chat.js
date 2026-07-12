@@ -445,6 +445,123 @@ async function sendMediaFile(file) {
   }
 }
 
+async function toggleFunnelMenu() {
+  const existing = document.getElementById("funnelMenu");
+  if (existing) {
+    existing.remove();
+    return;
+  }
+
+  const header = document.querySelector(".chat-header");
+  if (!header) return;
+
+  let funnel = {};
+
+  try {
+    const res = await fetch(`/api/funnel-status/${selectedPhone}`, {
+      headers: authHeaders()
+    });
+
+    if (handleAuthFailure(res)) return;
+
+    const data = await res.json();
+    if (data.success) funnel = data.funnel || {};
+  } catch (error) {
+    console.error("load funnel status error:", error);
+  }
+
+  const registeredIcon = funnel.registered_at ? "✓" : "○";
+  const processingIcon = funnel.processing_fee_paid_at ? "✓" : "○";
+  const documentsIcon = funnel.documents_submitted_at ? "✓" : "○";
+  const admissionFeeIcon = funnel.admission_fee_paid_at ? "✓" : "○";
+
+  const menu = document.createElement("div");
+  menu.id = "funnelMenu";
+  menu.className = "funnel-menu-card";
+
+  menu.innerHTML = `
+    <button class="funnel-menu-item" ${funnel.registered_at ? "disabled" : `onclick="updateFunnelStage('registered')"`}>
+      ${registeredIcon} Registered
+    </button>
+    <button class="funnel-menu-item" ${funnel.processing_fee_paid_at ? "disabled" : `onclick="updateFunnelStage('processing_fee_paid')"`}>
+      ${processingIcon} Processing Fee Paid
+    </button>
+    <button class="funnel-menu-item" ${funnel.documents_submitted_at ? "disabled" : `onclick="updateFunnelStage('documents_submitted')"`}>
+      ${documentsIcon} Documents Submitted
+    </button>
+    <button class="funnel-menu-item" ${funnel.admission_fee_paid_at ? "disabled" : `onclick="updateFunnelStage('admission_fee_paid')"`}>
+      ${admissionFeeIcon} Admission Fee Paid
+    </button>
+    <hr>
+    <button class="funnel-menu-item" onclick="assignToCallAgent()">
+      Assign To Call Agent
+    </button>
+  `;
+
+  header.appendChild(menu);
+}
+
+async function updateFunnelStage(stage) {
+  if (!selectedPhone) return;
+
+  try {
+    const res = await fetch("/api/funnel-status", {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ phone: selectedPhone, stage })
+    });
+
+    if (handleAuthFailure(res)) return;
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "Failed to update funnel status");
+      return;
+    }
+
+    const menu = document.getElementById("funnelMenu");
+    if (menu) menu.remove();
+
+    await loadChatInfo();
+  } catch (error) {
+    console.error("updateFunnelStage error:", error);
+    alert("Funnel status update failed.");
+  }
+}
+
+async function assignToCallAgent() {
+  if (!selectedPhone) return;
+
+  if (!confirm("Assign this chat to the call agent team? The student will be moved back to the bot menu.")) return;
+
+  try {
+    const res = await fetch("/api/assign-call-agent", {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ phone: selectedPhone })
+    });
+
+    if (handleAuthFailure(res)) return;
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "Failed to assign to call agent");
+      return;
+    }
+
+    const menu = document.getElementById("funnelMenu");
+    if (menu) menu.remove();
+
+    alert("Assigned to call agent team.");
+    window.location.href = "/live";
+  } catch (error) {
+    console.error("assignToCallAgent error:", error);
+    alert("Failed to assign to call agent.");
+  }
+}
+
 async function switchBackToBot() {
   if (!confirm("Shift this chat back to bot?")) return;
 
