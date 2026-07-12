@@ -8,6 +8,12 @@
   />
   <title>MUL Nexus Live</title>
 
+  <link rel="manifest" href="/manifest-live.json" />
+  <meta name="theme-color" content="#111827" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
   <link rel="stylesheet" href="live.css" />
 </head>
 
@@ -80,5 +86,14 @@
 </div>
 
 <script src="/live.js"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/sw.js").catch((err) => {
+        console.error("Service worker registration failed:", err);
+      });
+    });
+  }
+</script>
 </body>
 </html>

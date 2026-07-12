@@ -1,0 +1,15 @@
+{
+  "name": "MUL Nexus Live",
+  "short_name": "MUL Live",
+  "description": "MUL Admissions - live agent chat",
+  "start_url": "/live",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#111827",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
