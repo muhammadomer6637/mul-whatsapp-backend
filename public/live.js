@@ -213,6 +213,22 @@ function renderChats() {
     return true;
   });
 
+  // Merging a live update into an existing chat (loadChats) preserves that
+  // chat's old array position, so without re-sorting here, a chat that just
+  // got a new message wouldn't visibly move to the top until a full reload.
+  filteredChats.sort((a, b) => {
+    const priority = { agent_waiting: 3, agent_active: 2, active: 1, bot: 0 };
+    const aP = priority[a.status] || 0;
+    const bP = priority[b.status] || 0;
+    if (bP !== aP) return bP - aP;
+
+    const aUnread = Number(a.unread_count || 0);
+    const bUnread = Number(b.unread_count || 0);
+    if (bUnread !== aUnread) return bUnread - aUnread;
+
+    return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
+  });
+
   if (!filteredChats.length) {
     wrap.innerHTML = `
       <div class="chat-card">
