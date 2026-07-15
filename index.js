@@ -376,7 +376,13 @@ async function createCallbackRequest(phone) {
           status = 'pending',
           request_count = COALESCE(request_count, 1) + 1,
           is_repeat = true,
-          updated_at = NOW()
+          updated_at = NOW(),
+          assigned_call_agent_id = NULL,
+          next_followup_at = NULL,
+          first_response_at = NULL,
+          first_response_seconds = NULL,
+          first_response_status = NULL,
+          first_response_agent_id = NULL
         WHERE id = $1
         `,
         [
