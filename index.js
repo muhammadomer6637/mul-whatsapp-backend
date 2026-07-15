@@ -4594,7 +4594,11 @@ app.get("/api/export-leads", authenticateAgent, async (req, res) => {
         u.phone,
         u.program,
         c.status AS current_status,
-        COALESCE(cb.status, 'no_callback') AS callback_status
+        COALESCE(cb.status, 'no_callback') AS callback_status,
+        u.registered_at,
+        u.processing_fee_paid_at,
+        u.documents_submitted_at,
+        u.admission_fee_paid_at
       FROM users u
       LEFT JOIN chats c ON c.phone = u.phone
       LEFT JOIN callback_requests cb ON cb.phone = u.phone
@@ -4611,8 +4615,17 @@ app.get("/api/export-leads", authenticateAgent, async (req, res) => {
       "WhatsApp Number",
       "Program",
       "Current Status",
-      "Callback Status"
+      "Callback Status",
+      "Funnel Stage"
     ];
+
+    const funnelStageLabel = (row) => {
+      if (row.admission_fee_paid_at) return "Fee Paid";
+      if (row.documents_submitted_at) return "Documents Submitted";
+      if (row.processing_fee_paid_at) return "Processing Fee Paid";
+      if (row.registered_at) return "Registered";
+      return "Not Started";
+    };
 
     const rows = result.rows.map((row, index) => [
       index + 1,
@@ -4623,7 +4636,8 @@ app.get("/api/export-leads", authenticateAgent, async (req, res) => {
       row.current_status || "",
       row.callback_status === "no_callback"
         ? "No Callback"
-        : row.callback_status.replaceAll("_", " ")
+        : row.callback_status.replaceAll("_", " "),
+      funnelStageLabel(row)
     ]);
 
     const csv = [
