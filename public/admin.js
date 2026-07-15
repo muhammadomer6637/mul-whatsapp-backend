@@ -1192,7 +1192,13 @@ const admissionFeeIcon = funnel.admission_fee_paid_at ? "✓" : "○";
 
   menu.innerHTML = `
   <div class="funnel-menu-card">
-  
+
+    <button class="funnel-menu-item" onclick="addLeadDetails()">
+      ✏️ Add Lead Details
+    </button>
+
+    <hr>
+
     <button
   class="funnel-menu-item"
   ${funnel.registered_at ? "disabled" : `onclick="updateFunnelStage('registered')"`}
@@ -1268,6 +1274,60 @@ async function updateFunnelStage(stage) {
   } catch (error) {
     console.error("updateFunnelStage error:", error);
     notify("Funnel status update failed.", "error");
+  }
+}
+
+async function addLeadDetails() {
+  if (!selectedPhone) {
+    notify("Please select a chat first.", "warning");
+    return;
+  }
+
+  const currentChat = allChats.find(chat => chat.phone === selectedPhone);
+
+  const name = await customPrompt("Student's name:", {
+    defaultValue: currentChat?.name || ""
+  });
+  if (name === null) return;
+
+  const program = await customPrompt("Interested program:", {
+    defaultValue: currentChat?.program || ""
+  });
+  if (program === null) return;
+
+  if (!name.trim() || !program.trim()) {
+    notify("Name and program are both required.", "warning");
+    return;
+  }
+
+  try {
+    const res = await fetch(`${BASE}/api/update-lead`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        phone: selectedPhone,
+        name: name.trim(),
+        program: program.trim()
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to save lead details", "error");
+      return;
+    }
+
+    const menu = document.getElementById("funnelMenu");
+    if (menu) menu.remove();
+
+    notify("Lead details saved", "success");
+    await loadChats();
+    await openChat(selectedPhone, false);
+
+  } catch (error) {
+    console.error("addLeadDetails error:", error);
+    notify("Failed to save lead details", "error");
   }
 }
 

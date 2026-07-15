@@ -451,6 +451,50 @@ async function sendMediaFile(file) {
   }
 }
 
+async function addLeadDetails() {
+  if (!selectedPhone) return;
+
+  const name = prompt("Student's name:");
+  if (name === null) return;
+
+  const program = prompt("Interested program:");
+  if (program === null) return;
+
+  if (!name.trim() || !program.trim()) {
+    alert("Name and program are both required.");
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/update-lead", {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        phone: selectedPhone,
+        name: name.trim(),
+        program: program.trim()
+      })
+    });
+
+    if (handleAuthFailure(res)) return;
+
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.error || "Failed to save lead details");
+      return;
+    }
+
+    const menu = document.getElementById("funnelMenu");
+    if (menu) menu.remove();
+
+    await loadChatInfo();
+  } catch (error) {
+    console.error("addLeadDetails error:", error);
+    alert("Failed to save lead details");
+  }
+}
+
 async function toggleFunnelMenu() {
   const existing = document.getElementById("funnelMenu");
   if (existing) {
@@ -486,6 +530,10 @@ async function toggleFunnelMenu() {
   menu.className = "funnel-menu-card";
 
   menu.innerHTML = `
+    <button class="funnel-menu-item" onclick="addLeadDetails()">
+      ✏️ Add Lead Details
+    </button>
+    <hr>
     <button class="funnel-menu-item" ${funnel.registered_at ? "disabled" : `onclick="updateFunnelStage('registered')"`}>
       ${registeredIcon} Registered
     </button>

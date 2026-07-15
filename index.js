@@ -3694,6 +3694,41 @@ app.post("/api/funnel-status", authenticateAgent, async (req, res) => {
   }
 });
 
+app.post("/api/update-lead", authenticateAgent, async (req, res) => {
+  try {
+    const { phone, name, program } = req.body;
+
+    if (!phone || !name || !program) {
+      return res.status(400).json({
+        success: false,
+        error: "phone, name and program are required"
+      });
+    }
+
+    const existingUser = await pool.query(
+      "SELECT phone FROM users WHERE phone = $1 LIMIT 1",
+      [phone]
+    );
+
+    if (!existingUser.rows.length) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found"
+      });
+    }
+
+    await updateUserDetails(phone, { name, program });
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("POST /api/update-lead error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update lead details"
+    });
+  }
+});
+
 app.get("/api/funnel-status/:phone", authenticateAgent, async (req, res) => {
   try {
     const { phone } = req.params;
