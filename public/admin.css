@@ -2542,7 +2542,8 @@ body {
 ========================= */
 
 #agents,
-#callbacks {
+#callbacks,
+#settings {
   flex: 1;
   min-height: 0;
   overflow-y: auto !important;
@@ -2553,17 +2554,20 @@ body {
 
 #agents .panel,
 #callbacks .card,
-#callbacks .panel {
+#callbacks .panel,
+#settings .panel {
   margin-bottom: 40px;
 }
 
 #agents::-webkit-scrollbar,
-#callbacks::-webkit-scrollbar {
+#callbacks::-webkit-scrollbar,
+#settings::-webkit-scrollbar {
   width: 8px;
 }
 
 #agents::-webkit-scrollbar-thumb,
-#callbacks::-webkit-scrollbar-thumb {
+#callbacks::-webkit-scrollbar-thumb,
+#settings::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,0.14);
   border-radius: 999px;
 }
