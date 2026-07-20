@@ -3604,7 +3604,40 @@ app.post("/api/toggle-agent", authenticateAgent, async (req, res) => {
     [status ? "true" : "false"]
   );
 
+  await pool.query(
+    `
+    INSERT INTO agent_status_logs (status, changed_by_agent_id, changed_by_agent_name)
+    VALUES ($1, $2, $3)
+    `,
+    [status ? "on" : "off", req.agent.id, req.agent.name || null]
+  );
+
   res.json({ success: true });
+});
+
+app.get("/api/agent-status-log", authenticateAgent, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT status, changed_by_agent_name, changed_at
+      FROM agent_status_logs
+      WHERE changed_at >= CURRENT_DATE
+        AND changed_at < CURRENT_DATE + INTERVAL '1 day'
+      ORDER BY changed_at ASC
+      `
+    );
+
+    return res.json({
+      success: true,
+      log: result.rows
+    });
+  } catch (error) {
+    console.error("GET /api/agent-status-log error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch agent status log"
+    });
+  }
 });
 
 app.post("/api/funnel-status", authenticateAgent, async (req, res) => {

@@ -273,6 +273,48 @@ body {
   margin-bottom: 20px;
 }
 
+.report-card {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.report-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.report-card-title {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.report-card-total {
+  font-weight: 700;
+  color: var(--accent-2);
+}
+
+.report-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 14px;
+}
+
+.report-row:last-child {
+  border-bottom: none;
+}
+
+.report-row-duration {
+  color: var(--muted);
+}
+
 .weekly-overview-grid {
   display: grid;
   grid-template-columns: 3fr 1fr;

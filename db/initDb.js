@@ -297,6 +297,20 @@ await pool.query(`
   CREATE INDEX IF NOT EXISTS idx_user_interactions_type_created_at ON user_interactions (interaction_type, created_at);
 `);
 
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS agent_status_logs (
+    id SERIAL PRIMARY KEY,
+    status VARCHAR(10) NOT NULL,
+    changed_by_agent_id INTEGER,
+    changed_by_agent_name TEXT,
+    changed_at TIMESTAMP DEFAULT NOW()
+  );
+`);
+
+await pool.query(`
+  CREATE INDEX IF NOT EXISTS idx_agent_status_logs_changed_at ON agent_status_logs (changed_at);
+`);
+
     await pool.query(`
   ALTER TABLE callback_requests
   ADD COLUMN IF NOT EXISTS request_count INTEGER DEFAULT 1;

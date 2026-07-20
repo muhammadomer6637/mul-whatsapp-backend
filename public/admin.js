@@ -2079,41 +2079,6 @@ async function loadSystemHealth() {
       "In the last hour"
     ));
 
-    if (h.businessProfile?.ok) {
-      const p = h.businessProfile.data || {};
-      const fieldLabels = {
-        about: "About",
-        description: "Description",
-        address: "Address",
-        email: "Email",
-        websites: "Website",
-        vertical: "Category",
-        profile_picture_url: "Profile Photo"
-      };
-      const missing = Object.entries(fieldLabels)
-        .filter(([key]) => {
-          const value = p[key];
-          return value === undefined || value === null || (Array.isArray(value) && !value.length) || value === "";
-        })
-        .map(([, label]) => label);
-
-      cards.push(healthCard(
-        "WhatsApp Business Profile",
-        missing.length === 0 ? "✅ Complete" : `⚠️ ${missing.length} field(s) missing`,
-        missing.length === 0 ? "live" : "warning",
-        missing.length === 0
-          ? "About, Description, Address, Email, Website, Category, Profile Photo all set"
-          : `Missing: ${missing.join(", ")} - fill these in Meta Business Manager for verification eligibility`
-      ));
-    } else {
-      cards.push(healthCard(
-        "WhatsApp Business Profile",
-        "❌ Could not check",
-        "danger",
-        h.businessProfile?.error || "Unknown error"
-      ));
-    }
-
     const envOk = h.envVars.WHATSAPP_TOKEN && h.envVars.JWT_SECRET && h.envVars.DATABASE_URL;
     cards.push(healthCard(
       "Required Settings",
@@ -2148,9 +2113,100 @@ async function loadSystemHealth() {
     }
 
     grid.innerHTML = cards.join("");
+
+    await loadAgentAvailabilityReport();
   } catch (error) {
     console.error("loadSystemHealth error:", error);
     grid.innerHTML = `<p style="color:var(--muted);">Failed to load system health.</p>`;
+  }
+}
+
+function formatClockTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDurationMs(ms) {
+  const totalMinutes = Math.round(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+async function loadAgentAvailabilityReport() {
+  const container = document.getElementById("agentAvailabilityReport");
+  if (!container) return;
+
+  try {
+    const res = await fetch(`${BASE}/api/agent-status-log`, {
+      headers: authHeaders()
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      container.innerHTML = `<p style="color:var(--muted);">Failed to load agent availability report.</p>`;
+      return;
+    }
+
+    const log = data.log || [];
+
+    if (!log.length) {
+      container.innerHTML = `
+        <div class="report-card">
+          <div class="report-card-title">Agent Availability Today</div>
+          <p style="color:var(--muted); margin-top:8px;">No on/off activity recorded today.</p>
+        </div>
+      `;
+      return;
+    }
+
+    let totalMs = 0;
+    const rows = [];
+    let pendingOnAt = null;
+
+    for (const entry of log) {
+      if (entry.status === "on") {
+        pendingOnAt = new Date(entry.changed_at);
+      } else if (entry.status === "off" && pendingOnAt) {
+        const offAt = new Date(entry.changed_at);
+        const durationMs = Math.max(0, offAt - pendingOnAt);
+        totalMs += durationMs;
+        rows.push(`
+          <div class="report-row">
+            <span>${formatClockTime(pendingOnAt)} → ${formatClockTime(offAt)}</span>
+            <span class="report-row-duration">${formatDurationMs(durationMs)}</span>
+          </div>
+        `);
+        pendingOnAt = null;
+      }
+    }
+
+    if (pendingOnAt) {
+      const now = new Date();
+      const durationMs = Math.max(0, now - pendingOnAt);
+      totalMs += durationMs;
+      rows.push(`
+        <div class="report-row">
+          <span>${formatClockTime(pendingOnAt)} → still active</span>
+          <span class="report-row-duration">${formatDurationMs(durationMs)}</span>
+        </div>
+      `);
+    }
+
+    container.innerHTML = `
+      <div class="report-card">
+        <div class="report-card-header">
+          <div class="report-card-title">Agent Availability Today</div>
+          <div class="report-card-total">Total Active: ${formatDurationMs(totalMs)}</div>
+        </div>
+        ${rows.join("")}
+      </div>
+    `;
+  } catch (error) {
+    console.error("loadAgentAvailabilityReport error:", error);
+    container.innerHTML = `<p style="color:var(--muted);">Failed to load agent availability report.</p>`;
   }
 }
 
