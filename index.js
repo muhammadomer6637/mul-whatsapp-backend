@@ -3591,28 +3591,38 @@ app.get("/api/agent-status", authenticateAgent, async (req, res) => {
 
 // Toggle agent status
 app.post("/api/toggle-agent", authenticateAgent, async (req, res) => {
-  const { status } = req.body;
-  if (!["admin", "chat_agent"].includes(req.agent.role)) {
-  return res.status(403).json({
-    success: false,
-    error: "Only admin or chat agent can change live admissions status"
-  });
-}
+  try {
+    const { status } = req.body;
+    if (!["admin", "chat_agent"].includes(req.agent.role)) {
+      return res.status(403).json({
+        success: false,
+        error: "Only admin or chat agent can change live admissions status"
+      });
+    }
 
-  await pool.query(
-    "UPDATE system_settings SET value = $1 WHERE key = 'agent_available'",
-    [status ? "true" : "false"]
-  );
+    await pool.query(
+      "UPDATE system_settings SET value = $1 WHERE key = 'agent_available'",
+      [status ? "true" : "false"]
+    );
 
-  await pool.query(
-    `
-    INSERT INTO agent_status_logs (status, changed_by_agent_id, changed_by_agent_name)
-    VALUES ($1, $2, $3)
-    `,
-    [status ? "on" : "off", req.agent.id, req.agent.name || null]
-  );
+    try {
+      await pool.query(
+        `
+        INSERT INTO agent_status_logs (status, changed_by_agent_id, changed_by_agent_name)
+        VALUES ($1, $2, $3)
+        `,
+        [status ? "on" : "off", req.agent.id, req.agent.name || null]
+      );
+    } catch (logError) {
+      // Don't let a logging failure block the actual toggle from succeeding.
+      console.error("agent_status_logs insert error:", logError.message);
+    }
 
-  res.json({ success: true });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("POST /api/toggle-agent error:", error.message);
+    res.status(500).json({ success: false, error: "Failed to toggle agent status" });
+  }
 });
 
 app.get("/api/agent-status-log", authenticateAgent, async (req, res) => {
