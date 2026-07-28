@@ -479,7 +479,10 @@ async function saveMessage({
   file_name = null,
   mime_type = null,
   wamid = null,
-  status = null
+  status = null,
+  reply_to_text = null,
+  reply_to_sender = null,
+  reply_to_type = null
 }) {
   try {
     await pool.query(
@@ -496,10 +499,13 @@ async function saveMessage({
         mime_type,
         wamid,
         status,
+        reply_to_text,
+        reply_to_sender,
+        reply_to_type,
         created_at
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW()
       )
       `,
       [
@@ -512,7 +518,10 @@ async function saveMessage({
         file_name,
         mime_type,
         wamid,
-        status
+        status,
+        reply_to_text,
+        reply_to_sender,
+        reply_to_type
       ]
     );
 
@@ -524,6 +533,28 @@ async function saveMessage({
       err.message
     );
   }
+}
+
+// Looks up the message an agent is replying to and returns the WhatsApp
+// context needed to send a quoted reply. Returns null (silently, no
+// quote attached) if the message has no wamid - e.g. bot messages,
+// which aren't tracked for read-receipts and can't be quoted via the API.
+async function buildReplyContext(phone, replyToMessageId) {
+  if (!replyToMessageId) return null;
+
+  const result = await pool.query(
+    "SELECT wamid, text, sender, type FROM messages WHERE id = $1 AND phone = $2 LIMIT 1",
+    [replyToMessageId, phone]
+  );
+  const quoted = result.rows[0];
+  if (!quoted?.wamid) return null;
+
+  return {
+    wamid: quoted.wamid,
+    text: (quoted.text || "").slice(0, 200),
+    sender: quoted.sender,
+    type: quoted.type
+  };
 }
 
 const MESSAGE_STATUS_RANK = { sent: 1, delivered: 2, read: 3, failed: 4 };
@@ -1085,21 +1116,25 @@ async function sendDocumentMessage(
   caption = "",
   chatStatus = "active",
   sender = "bot",
-  mimeType = "application/pdf"
+  mimeType = "application/pdf",
+  replyContext = null
 ) {
   try {
+    const payload = {
+      messaging_product: "whatsapp",
+      to,
+      type: "document",
+      document: {
+        link: documentUrl,
+        filename,
+        caption
+      }
+    };
+    if (replyContext?.wamid) payload.context = { message_id: replyContext.wamid };
+
     const response = await axios.post(
       `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
-      {
-        messaging_product: "whatsapp",
-        to,
-        type: "document",
-        document: {
-          link: documentUrl,
-          filename,
-          caption
-        }
-      },
+      payload,
       {
         headers: {
           Authorization: `Bearer ${WHATSAPP_TOKEN}`,
@@ -1121,7 +1156,10 @@ async function sendDocumentMessage(
       file_name: filename,
       mime_type: mimeType,
       wamid,
-      status: wamid ? "sent" : null
+      status: wamid ? "sent" : null,
+      reply_to_text: replyContext?.wamid ? replyContext.text : null,
+      reply_to_sender: replyContext?.wamid ? replyContext.sender : null,
+      reply_to_type: replyContext?.wamid ? replyContext.type : null
     });
 
     await setOutgoingMeta(to, caption || filename, chatStatus);
@@ -1136,20 +1174,24 @@ async function sendImageMessage(
   imageUrl,
   caption = "",
   chatStatus = "active",
-  sender = "agent"
+  sender = "agent",
+  replyContext = null
 ) {
   try {
+    const payload = {
+      messaging_product: "whatsapp",
+      to,
+      type: "image",
+      image: {
+        link: imageUrl,
+        caption
+      }
+    };
+    if (replyContext?.wamid) payload.context = { message_id: replyContext.wamid };
+
     const response = await axios.post(
       `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
-      {
-        messaging_product: "whatsapp",
-        to,
-        type: "image",
-        image: {
-          link: imageUrl,
-          caption
-        }
-      },
+      payload,
       {
         headers: {
           Authorization: `Bearer ${WHATSAPP_TOKEN}`,
@@ -1168,7 +1210,10 @@ async function sendImageMessage(
       media_url: imageUrl,
       mime_type: "image/jpeg",
       wamid,
-      status: wamid ? "sent" : null
+      status: wamid ? "sent" : null,
+      reply_to_text: replyContext?.wamid ? replyContext.text : null,
+      reply_to_sender: replyContext?.wamid ? replyContext.sender : null,
+      reply_to_type: replyContext?.wamid ? replyContext.type : null
     });
 
     await setOutgoingMeta(to, caption || "[Image]", chatStatus);
@@ -1178,16 +1223,19 @@ async function sendImageMessage(
   }
 }
 
-async function sendAgentTextMessage(to, message, chatStatus = "agent_active") {
+async function sendAgentTextMessage(to, message, chatStatus = "agent_active", replyContext = null) {
   try {
+    const payload = {
+      messaging_product: "whatsapp",
+      to,
+      type: "text",
+      text: { body: message }
+    };
+    if (replyContext?.wamid) payload.context = { message_id: replyContext.wamid };
+
     const response = await axios.post(
       `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
-      {
-        messaging_product: "whatsapp",
-        to,
-        type: "text",
-        text: { body: message }
-      },
+      payload,
       {
         headers: {
           Authorization: `Bearer ${WHATSAPP_TOKEN}`,
@@ -1204,7 +1252,10 @@ async function sendAgentTextMessage(to, message, chatStatus = "agent_active") {
       type: "text",
       text: message,
       wamid,
-      status: wamid ? "sent" : null
+      status: wamid ? "sent" : null,
+      reply_to_text: replyContext?.wamid ? replyContext.text : null,
+      reply_to_sender: replyContext?.wamid ? replyContext.sender : null,
+      reply_to_type: replyContext?.wamid ? replyContext.type : null
     });
 
     await setOutgoingMeta(to, message, chatStatus);
@@ -2944,7 +2995,8 @@ If comma is missing, your request may not be forwarded correctly.`
       media_id,
       media_url,
       file_name,
-      mime_type
+      mime_type,
+      wamid: msg.id || null
     });
 
 const existingChatResult = await pool.query(
@@ -3970,7 +4022,7 @@ app.get("/api/messages/:phone", authenticateAgent, async (req, res) => {
     const result = await pool.query(
       `
       SELECT * FROM (
-        SELECT id, phone, sender, type, text, media_id, media_url, file_name, mime_type, status, created_at
+        SELECT id, phone, sender, type, text, media_id, media_url, file_name, mime_type, status, wamid, reply_to_text, reply_to_sender, reply_to_type, created_at
         FROM messages
         WHERE phone = $1
         ORDER BY created_at DESC
@@ -3996,7 +4048,7 @@ app.get("/api/messages/:phone", authenticateAgent, async (req, res) => {
 
 app.post("/api/send", authenticateAgent, async (req, res) => {
   try {
-    const { phone, message } = req.body;
+    const { phone, message, replyToMessageId } = req.body;
 
     console.log("API SEND REQUEST:", { phone, message });
 
@@ -4007,8 +4059,10 @@ app.post("/api/send", authenticateAgent, async (req, res) => {
       });
     }
 
+    const replyContext = await buildReplyContext(phone, replyToMessageId);
+
     await updateUserDetails(phone, { mode: "agent" });
-    await sendAgentTextMessage(phone, message, "agent_active");
+    await sendAgentTextMessage(phone, message, "agent_active", replyContext);
 
     return res.json({
       success: true,
@@ -4046,7 +4100,7 @@ function handleMediaUpload(req, res, next) {
 
 app.post("/api/send-media", authenticateAgent, handleMediaUpload, async (req, res) => {
   try {
-    const { phone, caption } = req.body;
+    const { phone, caption, replyToMessageId } = req.body;
     const file = req.file;
 
     if (!phone || !file) {
@@ -4078,10 +4132,12 @@ app.post("/api/send-media", authenticateAgent, handleMediaUpload, async (req, re
 
     const publicUrl = `${BASE_URL}/files/uploads/${fileName}`;
 
+    const replyContext = await buildReplyContext(phone, replyToMessageId);
+
     await updateUserDetails(phone, { mode: "agent" });
 
     if (isImage) {
-      await sendImageMessage(phone, publicUrl, caption || "", "agent_active", "agent");
+      await sendImageMessage(phone, publicUrl, caption || "", "agent_active", "agent", replyContext);
     } else {
       await sendDocumentMessage(
         phone,
@@ -4090,7 +4146,8 @@ app.post("/api/send-media", authenticateAgent, handleMediaUpload, async (req, re
         caption || "",
         "agent_active",
         "agent",
-        mimeType
+        mimeType,
+        replyContext
       );
     }
 

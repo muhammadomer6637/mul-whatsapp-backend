@@ -166,7 +166,9 @@ let hasMoreChats = false;
 let chatsBootstrapped = false;
 let renderedMessagesPhone = null;
 let renderedMessageIds = new Set();
+let renderedMessagesById = new Map();
 let lastRenderedDateLabel = null;
+let activeReply = null;
 let searchActive = false;
 let searchResults = [];
 let searchDebounceTimer = null;
@@ -928,6 +930,17 @@ function buildTickHtml(status) {
   return `<span class="sent-tick">✓</span>`;
 }
 
+function buildReplyQuoteHtml(message) {
+  if (!message.reply_to_text) return "";
+  const label = message.reply_to_sender ? capitalize(message.reply_to_sender) : "";
+  return `
+    <div class="reply-quote">
+      ${label ? `<div class="reply-quote-label">${escapeHtml(label)}</div>` : ""}
+      <div class="reply-quote-text">${escapeHtml(message.reply_to_text.slice(0, 150))}</div>
+    </div>
+  `;
+}
+
 function buildMessageRowHtml(message, isLatest) {
   let content = "";
 
@@ -982,15 +995,24 @@ function buildMessageRowHtml(message, isLatest) {
   const isOutgoing = message.sender === "agent" || message.sender === "bot";
   const sentTick = isOutgoing ? ` ${buildTickHtml(message.status)}` : "";
 
+  const replyQuote = buildReplyQuoteHtml(message);
+  const replyBtn = message.wamid
+    ? `<button class="reply-btn" onclick="startReply(${message.id})" title="Reply">↩</button>`
+    : "";
+  const bubbleHtml = `
+    <div class="message-bubble">
+      ${replyQuote}
+      ${content}
+      <div class="message-meta">
+        ${capitalize(message.sender)} · ${formatDateTime(message.created_at, true)}${sentTick}
+      </div>
+    </div>
+  `;
+
   return `
     ${divider}
     <div class="message-row ${message.sender}${isLatest ? " message-in" : ""}">
-      <div class="message-bubble">
-        ${content}
-        <div class="message-meta">
-          ${capitalize(message.sender)} · ${formatDateTime(message.created_at, true)}${sentTick}
-        </div>
-      </div>
+      ${message.sender === "user" ? bubbleHtml + replyBtn : replyBtn + bubbleHtml}
     </div>
   `;
 }
@@ -1081,7 +1103,10 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
         return buildMessageRowHtml(message, isLatest);
       }).join("");
       messagesBox.insertAdjacentHTML("beforeend", appendHtml);
-      newMessages.forEach(m => renderedMessageIds.add(m.id));
+      newMessages.forEach(m => {
+        renderedMessageIds.add(m.id);
+        renderedMessagesById.set(m.id, m);
+      });
     }
   } else {
     lastRenderedDateLabel = null;
@@ -1100,6 +1125,9 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
 
     renderedMessagesPhone = phone;
     renderedMessageIds = new Set(data.messages.map(m => m.id));
+    renderedMessagesById = new Map(data.messages.map(m => [m.id, m]));
+    activeReply = null;
+    renderReplyPreview();
   }
 
 
@@ -1474,6 +1502,47 @@ function selectQuickReply(qr) {
 
 document.addEventListener("DOMContentLoaded", setupMessageInputShortcuts);
 
+function startReply(messageId) {
+  const message = renderedMessagesById.get(messageId);
+  if (!message) return;
+
+  const previewText = message.text
+    || (message.type === "image" ? "📷 Photo"
+      : message.type === "document" ? "📄 Document"
+      : message.type === "video" ? "🎥 Video"
+      : message.type === "audio" ? "🎤 Audio"
+      : "");
+
+  activeReply = { id: messageId, sender: message.sender, text: previewText };
+  renderReplyPreview();
+  document.getElementById("messageInput")?.focus();
+}
+
+function cancelReply() {
+  activeReply = null;
+  renderReplyPreview();
+}
+
+function renderReplyPreview() {
+  const bar = document.getElementById("replyPreviewBar");
+  if (!bar) return;
+
+  if (!activeReply) {
+    bar.innerHTML = "";
+    bar.classList.add("hidden");
+    return;
+  }
+
+  bar.classList.remove("hidden");
+  bar.innerHTML = `
+    <div class="reply-preview-content">
+      <div class="reply-preview-label">Replying to ${escapeHtml(capitalize(activeReply.sender))}</div>
+      <div class="reply-preview-text">${escapeHtml(activeReply.text.slice(0, 120))}</div>
+    </div>
+    <button class="reply-preview-cancel" onclick="cancelReply()" title="Cancel reply">✕</button>
+  `;
+}
+
 async function sendMessage() {
   const input = document.getElementById("messageInput");
   const msg = input.value.trim();
@@ -1489,7 +1558,11 @@ async function sendMessage() {
     const res = await fetch(`${BASE}/api/send`, {
       method: "POST",
      headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ phone: selectedPhone, message: msg })
+      body: JSON.stringify({
+        phone: selectedPhone,
+        message: msg,
+        replyToMessageId: activeReply?.id || null
+      })
     });
 
     const data = await res.json();
@@ -1500,6 +1573,8 @@ async function sendMessage() {
     }
 
     input.value = "";
+    activeReply = null;
+    renderReplyPreview();
     await loadChats();
     await openChat(selectedPhone, false);
   } catch (error) {
@@ -1524,6 +1599,7 @@ async function sendMediaFile(file) {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("phone", selectedPhone);
+    if (activeReply?.id) formData.append("replyToMessageId", activeReply.id);
 
     const res = await fetch(`${BASE}/api/send-media`, {
       method: "POST",
@@ -1538,6 +1614,8 @@ async function sendMediaFile(file) {
       return;
     }
 
+    activeReply = null;
+    renderReplyPreview();
     await loadChats();
     await openChat(selectedPhone, false);
   } catch (error) {

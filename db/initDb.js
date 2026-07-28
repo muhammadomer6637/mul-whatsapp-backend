@@ -50,6 +50,16 @@ module.exports = async function initDb() {
     `);
 
     await pool.query(`
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_text TEXT;
+    `);
+    await pool.query(`
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_sender VARCHAR(20);
+    `);
+    await pool.query(`
+      ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_type VARCHAR(30);
+    `);
+
+    await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_chats_status_updated_at
       ON chats (status, updated_at DESC);
     `);
