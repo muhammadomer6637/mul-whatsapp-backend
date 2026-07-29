@@ -60,6 +60,22 @@ module.exports = async function initDb() {
     `);
 
     await pool.query(`
+      ALTER TABLE chats ADD COLUMN IF NOT EXISTS last_csat_asked_at TIMESTAMP;
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS csat_responses (
+        id SERIAL PRIMARY KEY,
+        phone VARCHAR(30) NOT NULL,
+        rating VARCHAR(10) NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_csat_responses_created_at ON csat_responses (created_at);
+    `);
+
+    await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_chats_status_updated_at
       ON chats (status, updated_at DESC);
     `);

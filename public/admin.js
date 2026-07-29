@@ -370,6 +370,7 @@ async function loadDashboard(range = "24h") {
     const callback = data.callbackStats || {};
     const funnel = data.funnelStats || {};
     const responseStats = data.responseStats || {};
+    const csat = data.csatStats || {};
     const botInterestStats = data.botInterestStats || [];
     const agentCategoryStats = data.agentCategoryStats || [];
     
@@ -481,6 +482,12 @@ document.getElementById("stats").innerHTML = `
     <div class="label">Callback Avg Response Time</div>
     <div class="value">${formatDuration(responseStats.averageCallbackResponseSeconds || 0)}</div>
     <div class="meta">Average first action by call agents</div>
+  </div>
+
+  <div class="stat-card performance">
+    <div class="label">Customer Satisfaction</div>
+    <div class="value">${csat.total ? `${Math.round((csat.positive / csat.total) * 100)}%` : "No data"}</div>
+    <div class="meta">${csat.total ? `${csat.positive} positive, ${csat.negative} negative (${csat.total} responses)` : "No CSAT responses in this range"}</div>
   </div>
 `;
 

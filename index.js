@@ -2611,6 +2611,25 @@ app.post("/webhook", async (req, res) => {
 
     const from = msg.from;
     const contactName = contact?.profile?.name || null;
+
+    // CSAT button tap ("csat_good"/"csat_bad" sent from switch-mode's
+    // reply-buttons prompt). Handled in complete isolation, before the
+    // bot state machine below ever sees this message - it is not a menu
+    // navigation choice and must never be interpreted as one.
+    if (
+      msg.type === "interactive" &&
+      msg.interactive?.type === "button_reply" &&
+      ["csat_good", "csat_bad"].includes(msg.interactive.button_reply.id)
+    ) {
+      const rating = msg.interactive.button_reply.id === "csat_good" ? "positive" : "negative";
+      await pool.query(
+        "INSERT INTO csat_responses (phone, rating) VALUES ($1, $2)",
+        [from, rating]
+      );
+      await sendTextMessage(from, "Thank you for your feedback!", "active");
+      return res.sendStatus(200);
+    }
+
     const type = msg.type || "text";
 
     let text = msg.text?.body?.trim() || "";
@@ -4179,6 +4198,12 @@ app.post("/api/switch-mode", authenticateAgent, async (req, res) => {
       });
     }
 
+    const priorChatResult = await pool.query(
+      "SELECT status, last_csat_asked_at FROM chats WHERE phone = $1 LIMIT 1",
+      [phone]
+    );
+    const priorChat = priorChatResult.rows[0];
+
     await updateUserDetails(phone, {
       mode,
       awaitingLead: mode === "bot" ? false : null,
@@ -4219,6 +4244,25 @@ You have now been transferred back to our automated admissions assistant. You ma
 If you require further assistance from an admissions representative, simply select "Chat with Admissions Advisor" again.`,
     "active"
   );
+
+  const askedToday = priorChat?.last_csat_asked_at &&
+    new Date(priorChat.last_csat_asked_at).toDateString() === new Date().toDateString();
+
+  if (priorChat?.status === "agent_active" && !askedToday) {
+    await sendReplyButtons(
+      phone,
+      "How was your experience with our admissions representative today?",
+      [
+        { id: "csat_good", title: "👍 Good" },
+        { id: "csat_bad", title: "👎 Not great" }
+      ],
+      "active"
+    );
+    await pool.query(
+      "UPDATE chats SET last_csat_asked_at = NOW() WHERE phone = $1",
+      [phone]
+    );
+  }
 }
 
     return res.json({
@@ -4394,7 +4438,8 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       callbackRepeat,
       callbackStatuses,
       responseStats,
-      callbackResponseStats
+      callbackResponseStats,
+      csatStats
     ] = await Promise.all([
       pool.query(
         `
@@ -4640,6 +4685,18 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
           AND ${whereCreated.replaceAll("created_at", "first_response_at")}
         `,
         queryParams
+      ),
+
+      pool.query(
+        `
+        SELECT
+          COUNT(*) FILTER (WHERE rating = 'positive')::int AS positive,
+          COUNT(*) FILTER (WHERE rating = 'negative')::int AS negative,
+          COUNT(*)::int AS total
+        FROM csat_responses
+        WHERE ${whereCreated}
+        `,
+        queryParams
       )
     ]);
 
@@ -4687,6 +4744,12 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
           responseStats.rows[0].average_chat_response_seconds || 0,
         averageCallbackResponseSeconds:
           callbackResponseStats.rows[0].average_callback_response_seconds || 0
+      },
+
+      csatStats: {
+        positive: csatStats.rows[0].positive || 0,
+        negative: csatStats.rows[0].negative || 0,
+        total: csatStats.rows[0].total || 0
       },
 
       botInterestStats: botInterestStats.rows,
