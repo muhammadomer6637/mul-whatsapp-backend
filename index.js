@@ -161,7 +161,7 @@ function getFeeResult(categoryId, programName) {
   }
 
   const installmentDetail = entry.installment != null
-    ? `${formatPkr(entry.installment)} per quarterly installment (${category.totalInstallments || entry.totalInstallments} installments)`
+    ? `${formatPkr(entry.installment)} per quarterly instalment (${entry.totalInstallments || category.totalInstallments} instalments)`
     : entry.installmentEarly != null
       ? `${formatPkr(entry.installmentEarly)} (1st & 2nd semester), then ${formatPkr(entry.installmentLate)} per semester after`
       : "Fee details not available yet - please contact an admissions advisor.";
