@@ -132,16 +132,28 @@
             "text": "${data.program}"
           },
           {
-            "type": "TextBody",
-            "text": "Admission Fee: ${data.admission_fee}"
+            "type": "TextCaption",
+            "text": "Admission Fee"
           },
           {
             "type": "TextBody",
-            "text": "Installments: ${data.installment_detail}"
+            "text": "${data.admission_fee}"
+          },
+          {
+            "type": "TextCaption",
+            "text": "Installments"
           },
           {
             "type": "TextBody",
-            "text": "Total Fee Package: ${data.total_fee}"
+            "text": "${data.installment_detail}"
+          },
+          {
+            "type": "TextCaption",
+            "text": "Total Fee Package"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.total_fee}"
           },
           {
             "type": "Footer",
