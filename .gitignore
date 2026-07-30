@@ -1,2 +1,4 @@
 node_modules/
 .env
+flow_private_key.pem
+flow_public_key.pem

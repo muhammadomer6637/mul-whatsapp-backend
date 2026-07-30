@@ -1,0 +1,152 @@
+{
+  "version": "5.1",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "CATEGORY": ["PROGRAM"],
+    "PROGRAM": ["RESULT"],
+    "RESULT": []
+  },
+  "screens": [
+    {
+      "id": "CATEGORY",
+      "title": "Fee Calculator",
+      "data": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          }
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "category_form",
+            "children": [
+              {
+                "type": "TextSubheading",
+                "text": "Select your program level"
+              },
+              {
+                "type": "RadioButtonsGroup",
+                "name": "category",
+                "label": "Program level",
+                "data-source": "${data.categories}",
+                "required": true
+              },
+              {
+                "type": "Footer",
+                "label": "Next",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "category": "${form.category}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "PROGRAM",
+      "title": "Fee Calculator",
+      "data": {
+        "category": { "type": "string" },
+        "programs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" }
+            }
+          }
+        }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "program_form",
+            "children": [
+              {
+                "type": "TextSubheading",
+                "text": "Select your program"
+              },
+              {
+                "type": "Dropdown",
+                "name": "program",
+                "label": "Program",
+                "data-source": "${data.programs}",
+                "required": true
+              },
+              {
+                "type": "Footer",
+                "label": "Check Fee",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "category": "${data.category}",
+                    "program": "${form.program}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "RESULT",
+      "title": "Fee Calculator",
+      "terminal": true,
+      "success": true,
+      "data": {
+        "program": { "type": "string" },
+        "admission_fee": { "type": "string" },
+        "installment_detail": { "type": "string" },
+        "total_fee": { "type": "string" }
+      },
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "${data.program}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Admission Fee: ${data.admission_fee}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Installments: ${data.installment_detail}"
+          },
+          {
+            "type": "TextBody",
+            "text": "Total Fee Package: ${data.total_fee}"
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "program": "${data.program}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

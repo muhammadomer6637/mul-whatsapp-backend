@@ -30,6 +30,149 @@ const BASE_URL =
   "https://mul-whatsapp-backend-production.up.railway.app";
 const JWT_SECRET = process.env.JWT_SECRET;
 const ADMIN_RECOVERY_KEY = process.env.ADMIN_RECOVERY_KEY;
+const WHATSAPP_FLOW_PRIVATE_KEY = process.env.WHATSAPP_FLOW_PRIVATE_KEY;
+const WHATSAPP_FLOW_ID = process.env.WHATSAPP_FLOW_ID;
+
+const FEE_STRUCTURE = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "data", "fee-structure-fall-2026.json"), "utf-8")
+);
+
+// WhatsApp Flows data-exchange encryption (Meta's spec: RSA-OAEP-SHA256 for
+// the AES key, AES-128-GCM for the payload, response IV is the bitwise
+// inverse of the request IV). See:
+// https://developers.facebook.com/docs/whatsapp/flows/reference/flowsdataendpoint
+function decryptFlowRequest(body) {
+  const { encrypted_flow_data, encrypted_aes_key, initial_vector } = body;
+
+  const flowDataBuffer = Buffer.from(encrypted_flow_data, "base64");
+  const encryptedAesKeyBuffer = Buffer.from(encrypted_aes_key, "base64");
+  const initialVectorBuffer = Buffer.from(initial_vector, "base64");
+
+  const aesKeyBuffer = crypto.privateDecrypt(
+    {
+      key: WHATSAPP_FLOW_PRIVATE_KEY,
+      padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+      oaepHash: "sha256"
+    },
+    encryptedAesKeyBuffer
+  );
+
+  const TAG_LENGTH = 16;
+  const encryptedBody = flowDataBuffer.subarray(0, -TAG_LENGTH);
+  const authTag = flowDataBuffer.subarray(-TAG_LENGTH);
+
+  const decipher = crypto.createDecipheriv("aes-128-gcm", aesKeyBuffer, initialVectorBuffer);
+  decipher.setAuthTag(authTag);
+
+  const decrypted = Buffer.concat([
+    decipher.update(encryptedBody),
+    decipher.final()
+  ]).toString("utf-8");
+
+  return {
+    decryptedBody: JSON.parse(decrypted),
+    aesKeyBuffer,
+    initialVectorBuffer
+  };
+}
+
+function encryptFlowResponse(responseObject, aesKeyBuffer, initialVectorBuffer) {
+  const flippedIv = Buffer.from(initialVectorBuffer.map((byte) => ~byte & 0xff));
+
+  const cipher = crypto.createCipheriv("aes-128-gcm", aesKeyBuffer, flippedIv);
+  const encrypted = Buffer.concat([
+    cipher.update(JSON.stringify(responseObject), "utf-8"),
+    cipher.final(),
+    cipher.getAuthTag()
+  ]);
+
+  return encrypted.toString("base64");
+}
+
+function formatPkr(amount) {
+  return typeof amount === "number" ? `PKR ${amount.toLocaleString("en-PK")}` : "N/A";
+}
+
+function getFeeCategoryOptions() {
+  return Object.entries(FEE_STRUCTURE.categories).map(([id, cat]) => ({
+    id,
+    title: cat.label
+  }));
+}
+
+function getFeeProgramOptions(categoryId) {
+  const category = FEE_STRUCTURE.categories[categoryId];
+  if (!category) return [];
+  return category.programs.map((p) => ({ id: p.program, title: p.program }));
+}
+
+async function sendFeeCalculatorFlow(to) {
+  if (!WHATSAPP_FLOW_ID) return;
+  try {
+    await axios.post(
+      `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "flow",
+          header: { type: "text", text: "Fee Calculator" },
+          body: { text: "Want the exact fee for a specific program? Tap below to check in a few taps." },
+          action: {
+            name: "flow",
+            parameters: {
+              flow_message_version: "3",
+              flow_id: WHATSAPP_FLOW_ID,
+              flow_cta: "Check Fee",
+              flow_action: "navigate",
+              flow_action_payload: {
+                screen: "CATEGORY",
+                data: { categories: getFeeCategoryOptions() }
+              }
+            }
+          }
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+  } catch (error) {
+    console.error("Send fee calculator flow error:", error.response?.data || error.message);
+    recordSendFailure();
+  }
+}
+
+function getFeeResult(categoryId, programName) {
+  const category = FEE_STRUCTURE.categories[categoryId];
+  const entry = category?.programs.find((p) => p.program === programName);
+
+  if (!entry) {
+    return {
+      program: programName,
+      admission_fee: "N/A",
+      installment_detail: "Fee details not available - please contact an admissions advisor.",
+      total_fee: "N/A"
+    };
+  }
+
+  const installmentDetail = entry.installment != null
+    ? `${formatPkr(entry.installment)} per installment (${category.totalInstallments || entry.totalInstallments} installments)`
+    : entry.installmentEarly != null
+      ? `${formatPkr(entry.installmentEarly)} (1st & 2nd semester), then ${formatPkr(entry.installmentLate)} per semester after`
+      : "Fee details not available yet - please contact an admissions advisor.";
+
+  return {
+    program: entry.program,
+    admission_fee: formatPkr(entry.admissionFee),
+    installment_detail: installmentDetail,
+    total_fee: formatPkr(entry.totalFee)
+  };
+}
 
 function isValidRecoveryKey(providedKey) {
   if (!ADMIN_RECOVERY_KEY || !providedKey) return false;
@@ -2575,6 +2718,59 @@ app.get("/events", (req, res) => {
   });
 });
 
+app.post("/api/whatsapp-flow", async (req, res) => {
+  let aesKeyBuffer;
+  let initialVectorBuffer;
+
+  try {
+    const decrypted = decryptFlowRequest(req.body);
+    aesKeyBuffer = decrypted.aesKeyBuffer;
+    initialVectorBuffer = decrypted.initialVectorBuffer;
+
+    const { action, screen, data } = decrypted.decryptedBody;
+
+    if (action === "ping") {
+      const response = encryptFlowResponse({ data: { status: "active" } }, aesKeyBuffer, initialVectorBuffer);
+      res.setHeader("Content-Type", "text/plain");
+      return res.send(response);
+    }
+
+    let responsePayload;
+
+    if (action === "INIT") {
+      responsePayload = {
+        screen: "CATEGORY",
+        data: { categories: getFeeCategoryOptions() }
+      };
+    } else if (action === "data_exchange" && screen === "CATEGORY") {
+      const categoryId = data?.category;
+      responsePayload = {
+        screen: "PROGRAM",
+        data: {
+          category: categoryId,
+          programs: getFeeProgramOptions(categoryId)
+        }
+      };
+    } else if (action === "data_exchange" && screen === "PROGRAM") {
+      responsePayload = {
+        screen: "RESULT",
+        data: getFeeResult(data?.category, data?.program)
+      };
+    } else {
+      responsePayload = { screen: "CATEGORY", data: { categories: getFeeCategoryOptions() } };
+    }
+
+    const encryptedResponse = encryptFlowResponse(responsePayload, aesKeyBuffer, initialVectorBuffer);
+    res.setHeader("Content-Type", "text/plain");
+    return res.send(encryptedResponse);
+  } catch (error) {
+    console.error("POST /api/whatsapp-flow error:", error.message);
+    // 432 tells WhatsApp decryption/processing failed so it can retry
+    // rather than treating this as a normal server error.
+    return res.status(432).send();
+  }
+});
+
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
@@ -2627,6 +2823,19 @@ app.post("/webhook", async (req, res) => {
         [from, rating]
       );
       await sendTextMessage(from, "Thank you for your feedback!", "active");
+      return res.sendStatus(200);
+    }
+
+    // Fee Calculator Flow completion ("nfm_reply" - Meta's message type for
+    // a finished WhatsApp Flow). Handled in isolation, purely for tracking
+    // which program a student checked fees for; never reaches the bot menu.
+    if (msg.type === "interactive" && msg.interactive?.type === "nfm_reply") {
+      try {
+        const flowResponse = JSON.parse(msg.interactive.nfm_reply?.response_json || "{}");
+        await saveUserInteraction(from, "fee_calculator", flowResponse.program || "unknown");
+      } catch (flowLogError) {
+        console.error("Fee calculator flow log error:", flowLogError.message);
+      }
       return res.sendStatus(200);
     }
 
@@ -3320,6 +3529,8 @@ Please find attached the complete fee structure.`,
         "Fee Structure Fall 2026.pdf",
         "MUL Fee Structure Fall 2026"
       );
+
+      await sendFeeCalculatorFlow(from);
 
       return res.sendStatus(200);
     }
