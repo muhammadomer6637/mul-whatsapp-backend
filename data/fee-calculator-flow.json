@@ -1,5 +1,5 @@
 {
-  "version": "5.1",
+  "version": "7.3",
   "data_api_version": "3.0",
   "routing_model": {
     "CATEGORY": ["PROGRAM"],
@@ -19,7 +19,11 @@
               "id": { "type": "string" },
               "title": { "type": "string" }
             }
-          }
+          },
+          "__example__": [
+            { "id": "bs", "title": "BS Programs" },
+            { "id": "mphil", "title": "M.Phil / MS" }
+          ]
         }
       },
       "layout": {
@@ -59,7 +63,7 @@
       "id": "PROGRAM",
       "title": "Fee Calculator",
       "data": {
-        "category": { "type": "string" },
+        "category": { "type": "string", "__example__": "bs" },
         "programs": {
           "type": "array",
           "items": {
@@ -68,7 +72,11 @@
               "id": { "type": "string" },
               "title": { "type": "string" }
             }
-          }
+          },
+          "__example__": [
+            { "id": "BS Computer Science", "title": "BS Computer Science" },
+            { "id": "BS Software Engineering", "title": "BS Software Engineering" }
+          ]
         }
       },
       "layout": {
@@ -111,10 +119,10 @@
       "terminal": true,
       "success": true,
       "data": {
-        "program": { "type": "string" },
-        "admission_fee": { "type": "string" },
-        "installment_detail": { "type": "string" },
-        "total_fee": { "type": "string" }
+        "program": { "type": "string", "__example__": "BS Computer Science" },
+        "admission_fee": { "type": "string", "__example__": "PKR 25,000" },
+        "installment_detail": { "type": "string", "__example__": "PKR 85,000 per installment (4 installments)" },
+        "total_fee": { "type": "string", "__example__": "PKR 340,000" }
       },
       "layout": {
         "type": "SingleColumnLayout",

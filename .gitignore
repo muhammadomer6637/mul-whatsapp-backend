@@ -2,3 +2,7 @@ node_modules/
 .env
 flow_private_key.pem
 flow_public_key.pem
+flow_private_key_single_line.txt
+test_ping_request.json
+make_single_line_key.js
+test_key_reconstruction.js

@@ -30,7 +30,7 @@ const BASE_URL =
   "https://mul-whatsapp-backend-production.up.railway.app";
 const JWT_SECRET = process.env.JWT_SECRET;
 const ADMIN_RECOVERY_KEY = process.env.ADMIN_RECOVERY_KEY;
-const WHATSAPP_FLOW_PRIVATE_KEY = process.env.WHATSAPP_FLOW_PRIVATE_KEY;
+const WHATSAPP_FLOW_PRIVATE_KEY = (process.env.WHATSAPP_FLOW_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 const WHATSAPP_FLOW_ID = process.env.WHATSAPP_FLOW_ID;
 
 const FEE_STRUCTURE = JSON.parse(
