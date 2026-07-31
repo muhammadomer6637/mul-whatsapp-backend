@@ -128,12 +128,14 @@ function applyRolePermissions() {
   const agentManagementBtn = document.querySelector('.nav-btn[data-section="agents"]');
   const callbackBtn = document.querySelector('.nav-btn[data-section="callbacks"]');
   const agentStatusWrap = document.querySelector(".agent-status-wrap");
+  const feeStructureTabBtn = document.getElementById("feeStructureTabBtn");
 
   if (dashboardBtn) dashboardBtn.style.display = "none";
   if (agentPanelBtn) agentPanelBtn.style.display = "none";
   if (agentManagementBtn) agentManagementBtn.style.display = "none";
   if (callbackBtn) callbackBtn.style.display = "none";
   if (agentStatusWrap) agentStatusWrap.style.display = "none";
+  if (feeStructureTabBtn) feeStructureTabBtn.style.display = "none";
 
   if (currentAgent.role === "admin") {
     if (dashboardBtn) dashboardBtn.style.display = "flex";
@@ -141,6 +143,7 @@ function applyRolePermissions() {
     if (agentManagementBtn) agentManagementBtn.style.display = "flex";
     if (callbackBtn) callbackBtn.style.display = "flex";
     if (agentStatusWrap) agentStatusWrap.style.display = "flex";
+    if (feeStructureTabBtn) feeStructureTabBtn.style.display = "inline-flex";
     return;
   }
 
@@ -1912,6 +1915,9 @@ function showSettingsTab(tab, btn) {
   } else if (tab === "systemHealth") {
     document.getElementById("systemHealthTab").classList.remove("hidden");
     loadSystemHealth();
+  } else if (tab === "feeStructure") {
+    document.getElementById("feeStructureTab").classList.remove("hidden");
+    loadFeeStructure();
   }
 
   if (btn) btn.classList.add("active-filter");
@@ -2058,6 +2064,362 @@ async function deleteQuickReply(id) {
   } catch (error) {
     console.error("deleteQuickReply error:", error);
     notify("Failed to delete quick reply", "error");
+  }
+}
+
+// =========================
+// FEE STRUCTURE
+// =========================
+let feeCategories = [];
+
+function formatFeeAmount(value) {
+  if (value === null || value === undefined || value === "") return "N/A";
+  return `PKR ${Number(value).toLocaleString("en-PK")}`;
+}
+
+async function loadFeeStructure() {
+  const container = document.getElementById("feeStructureBody");
+  container.innerHTML = `<div class="loading-spinner"><span></span><span></span><span></span></div>`;
+
+  try {
+    const res = await fetch(`${BASE}/api/fee-structure`, {
+      headers: authHeaders()
+    });
+    const data = await res.json();
+    if (!data.success) return;
+
+    feeCategories = data.categories || [];
+
+    container.innerHTML = feeCategories.length
+      ? feeCategories.map(cat => buildFeeCategoryHtml(cat)).join("")
+      : `
+        <div class="empty-chat-state">
+          <div class="empty-chat-icon">💰</div>
+          <h3>No fee categories yet</h3>
+          <p>Click "Add Category" to start (e.g. BS Programs, M.Phil / MS).</p>
+        </div>
+      `;
+  } catch (error) {
+    console.error("loadFeeStructure error:", error);
+  }
+}
+
+function buildFeeCategoryHtml(category) {
+  return `
+    <div class="fee-category-card">
+      <div class="fee-category-header">
+        <h4>${escapeHtml(category.label)}</h4>
+        <div class="fee-category-actions">
+          <button class="ghost-btn" onclick="openFeeProgramModal(null, ${category.id})">+ Add Program</button>
+          <span class="icon-action" onclick="openFeeCategoryModal(${category.id})" title="Edit category">✎</span>
+          <span class="icon-action" onclick="deleteFeeCategory(${category.id})" title="Delete category">🗑</span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="styled-table">
+          <thead>
+            <tr>
+              <th>Program</th>
+              <th>Admission Fee</th>
+              <th>Instalment Info</th>
+              <th>Total Fee</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              category.programs.length
+                ? category.programs.map(p => buildFeeProgramRow(p)).join("")
+                : `<tr><td colspan="5" style="text-align:center; color:var(--muted); padding:16px;">No programs yet.</td></tr>`
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function buildFeeProgramRow(program) {
+  const instalmentInfo = program.pattern_type === "quarterly"
+    ? `${formatFeeAmount(program.per_instalment_amount)} × ${program.total_instalments ?? "?"} (quarterly)`
+    : `${formatFeeAmount(program.early_semester_amount)} (1st/2nd sem), ${formatFeeAmount(program.later_semester_amount)}/sem after`;
+
+  return `
+    <tr>
+      <td>${escapeHtml(program.program_name)}</td>
+      <td>${formatFeeAmount(program.admission_fee)}</td>
+      <td>${instalmentInfo}</td>
+      <td>${formatFeeAmount(program.total_fee)}</td>
+      <td class="agent-action-icons">
+        <span class="icon-action" onclick="openFeeProgramModal(${program.id})" title="Edit">✎</span>
+        <span class="icon-action" onclick="deleteFeeProgram(${program.id})" title="Delete">🗑</span>
+      </td>
+    </tr>
+  `;
+}
+
+function openFeeCategoryModal(id = null) {
+  const existing = id ? feeCategories.find(c => c.id === id) : null;
+
+  const overlay = document.createElement("div");
+  overlay.className = "confirm-modal-overlay";
+  overlay.innerHTML = `
+    <div class="confirm-modal-card">
+      <p style="font-weight:700; font-size:16px;">${existing ? "Edit category" : "Add category"}</p>
+
+      <label class="field-label">Category Name</label>
+      <input id="feeCategoryLabel" class="prompt-input" type="text" placeholder="e.g. BS Programs" value="${existing ? escapeHtml(existing.label) : ""}" />
+
+      <div class="confirm-modal-actions">
+        <button class="ghost-btn" data-action="cancel">Cancel</button>
+        <button class="primary-btn" data-action="save">Save</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  overlay.querySelector("#feeCategoryLabel").focus();
+
+  overlay.addEventListener("click", async (event) => {
+    const action = event.target.dataset.action;
+    if (!action) return;
+
+    if (action === "cancel") {
+      overlay.remove();
+      return;
+    }
+
+    if (action === "save") {
+      await saveFeeCategory(existing?.id || null, overlay);
+    }
+  });
+}
+
+async function saveFeeCategory(id, overlay) {
+  const label = overlay.querySelector("#feeCategoryLabel").value.trim();
+
+  if (!label) {
+    notify("Please enter a category name", "warning");
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      id ? `${BASE}/api/fee-categories/${id}` : `${BASE}/api/fee-categories`,
+      {
+        method: id ? "PUT" : "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ label })
+      }
+    );
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to save category", "error");
+      return;
+    }
+
+    notify("Category saved", "success");
+    overlay.remove();
+    await loadFeeStructure();
+  } catch (error) {
+    console.error("saveFeeCategory error:", error);
+    notify("Failed to save category", "error");
+  }
+}
+
+async function deleteFeeCategory(id) {
+  const confirmed = await customConfirm("Delete this category and all its programs?");
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`${BASE}/api/fee-categories/${id}`, {
+      method: "DELETE",
+      headers: authHeaders()
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to delete category", "error");
+      return;
+    }
+
+    notify("Category deleted", "success");
+    await loadFeeStructure();
+  } catch (error) {
+    console.error("deleteFeeCategory error:", error);
+    notify("Failed to delete category", "error");
+  }
+}
+
+function toggleFeePatternFields(pattern) {
+  document.getElementById("feeQuarterlyFields").style.display = pattern === "quarterly" ? "" : "none";
+  document.getElementById("feeEarlyLateFields").style.display = pattern === "early_late" ? "" : "none";
+}
+
+function openFeeProgramModal(id = null, categoryId = null) {
+  let existing = null;
+  if (id) {
+    for (const cat of feeCategories) {
+      const found = cat.programs.find(p => p.id === id);
+      if (found) { existing = found; break; }
+    }
+  }
+
+  const targetCategoryId = existing ? existing.category_id : categoryId;
+  const pattern = existing ? existing.pattern_type : "quarterly";
+
+  const categoryOptions = feeCategories.map(c => `
+    <option value="${c.id}" ${String(c.id) === String(targetCategoryId) ? "selected" : ""}>${escapeHtml(c.label)}</option>
+  `).join("");
+
+  const overlay = document.createElement("div");
+  overlay.className = "confirm-modal-overlay";
+  overlay.innerHTML = `
+    <div class="confirm-modal-card">
+      <p style="font-weight:700; font-size:16px;">${existing ? "Edit program" : "Add program"}</p>
+
+      <label class="field-label">Category</label>
+      <select id="feeProgramCategory" class="prompt-input">${categoryOptions}</select>
+
+      <label class="field-label">Program Name</label>
+      <input id="feeProgramName" class="prompt-input" type="text" value="${existing ? escapeHtml(existing.program_name) : ""}" />
+
+      <label class="field-label">Fee Pattern</label>
+      <select id="feeProgramPattern" class="prompt-input" onchange="toggleFeePatternFields(this.value)">
+        <option value="quarterly" ${pattern === "quarterly" ? "selected" : ""}>Quarterly Instalments</option>
+        <option value="early_late" ${pattern === "early_late" ? "selected" : ""}>Early/Late Semester</option>
+      </select>
+
+      <label class="field-label">Admission Fee (PKR)</label>
+      <input id="feeProgramAdmissionFee" class="prompt-input" type="number" value="${existing?.admission_fee ?? ""}" />
+
+      <div id="feeQuarterlyFields" style="${pattern === "quarterly" ? "" : "display:none;"}">
+        <label class="field-label">Per-Instalment Amount (PKR)</label>
+        <input id="feeProgramPerInstalment" class="prompt-input" type="number" value="${existing?.per_instalment_amount ?? ""}" />
+
+        <label class="field-label">Total Instalments</label>
+        <input id="feeProgramTotalInstalments" class="prompt-input" type="number" value="${existing?.total_instalments ?? ""}" />
+      </div>
+
+      <div id="feeEarlyLateFields" style="${pattern === "early_late" ? "" : "display:none;"}">
+        <label class="field-label">Early-Semester Amount (1st &amp; 2nd, PKR)</label>
+        <input id="feeProgramEarlyAmount" class="prompt-input" type="number" value="${existing?.early_semester_amount ?? ""}" />
+
+        <label class="field-label">Later-Semester Amount (per semester after, PKR)</label>
+        <input id="feeProgramLaterAmount" class="prompt-input" type="number" value="${existing?.later_semester_amount ?? ""}" />
+      </div>
+
+      <label class="field-label">Total Fee Package (PKR)</label>
+      <input id="feeProgramTotalFee" class="prompt-input" type="number" value="${existing?.total_fee ?? ""}" />
+
+      <div class="confirm-modal-actions">
+        <button class="ghost-btn" data-action="cancel">Cancel</button>
+        <button class="primary-btn" data-action="save">Save</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  overlay.querySelector("#feeProgramName").focus();
+
+  overlay.addEventListener("click", async (event) => {
+    const action = event.target.dataset.action;
+    if (!action) return;
+
+    if (action === "cancel") {
+      overlay.remove();
+      return;
+    }
+
+    if (action === "save") {
+      await saveFeeProgram(existing?.id || null, overlay);
+    }
+  });
+}
+
+async function saveFeeProgram(id, overlay) {
+  const categoryId = overlay.querySelector("#feeProgramCategory").value;
+  const programName = overlay.querySelector("#feeProgramName").value.trim();
+  const patternType = overlay.querySelector("#feeProgramPattern").value;
+  const admissionFee = overlay.querySelector("#feeProgramAdmissionFee").value;
+  const totalFee = overlay.querySelector("#feeProgramTotalFee").value;
+
+  if (!programName) {
+    notify("Program name is required", "warning");
+    return;
+  }
+
+  const payload = {
+    categoryId,
+    programName,
+    patternType,
+    admissionFee: admissionFee ? Number(admissionFee) : null,
+    totalFee: totalFee ? Number(totalFee) : null
+  };
+
+  if (patternType === "quarterly") {
+    const perInstalmentAmount = overlay.querySelector("#feeProgramPerInstalment").value;
+    const totalInstalments = overlay.querySelector("#feeProgramTotalInstalments").value;
+    payload.perInstalmentAmount = perInstalmentAmount ? Number(perInstalmentAmount) : null;
+    payload.totalInstalments = totalInstalments ? Number(totalInstalments) : null;
+  } else {
+    const earlySemesterAmount = overlay.querySelector("#feeProgramEarlyAmount").value;
+    const laterSemesterAmount = overlay.querySelector("#feeProgramLaterAmount").value;
+    payload.earlySemesterAmount = earlySemesterAmount ? Number(earlySemesterAmount) : null;
+    payload.laterSemesterAmount = laterSemesterAmount ? Number(laterSemesterAmount) : null;
+  }
+
+  try {
+    const res = await fetch(
+      id ? `${BASE}/api/fee-programs/${id}` : `${BASE}/api/fee-programs`,
+      {
+        method: id ? "PUT" : "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(payload)
+      }
+    );
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to save program", "error");
+      return;
+    }
+
+    notify("Program saved", "success");
+    overlay.remove();
+    await loadFeeStructure();
+  } catch (error) {
+    console.error("saveFeeProgram error:", error);
+    notify("Failed to save program", "error");
+  }
+}
+
+async function deleteFeeProgram(id) {
+  const confirmed = await customConfirm("Delete this program?");
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`${BASE}/api/fee-programs/${id}`, {
+      method: "DELETE",
+      headers: authHeaders()
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to delete program", "error");
+      return;
+    }
+
+    notify("Program deleted", "success");
+    await loadFeeStructure();
+  } catch (error) {
+    console.error("deleteFeeProgram error:", error);
+    notify("Failed to delete program", "error");
   }
 }
 

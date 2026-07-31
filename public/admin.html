@@ -536,6 +536,9 @@
           <button class="ghost-btn settings-tab-btn" data-settings-tab="systemHealth" onclick="showSettingsTab('systemHealth', this)">
             System Health
           </button>
+          <button id="feeStructureTabBtn" class="ghost-btn settings-tab-btn" data-settings-tab="feeStructure" onclick="showSettingsTab('feeStructure', this)">
+            Fee Structure
+          </button>
         </div>
 
         <div id="quickRepliesTab" class="settings-tab-panel">
@@ -580,6 +583,22 @@
             <div id="systemHealthGrid" class="stats-grid"></div>
 
             <div id="agentAvailabilityReport" style="margin-top:16px;"></div>
+          </div>
+        </div>
+
+        <div id="feeStructureTab" class="settings-tab-panel hidden">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Fee Structure</h3>
+                <p>Manage categories and program fees shown in the WhatsApp Fee Calculator</p>
+              </div>
+              <button class="primary-btn" onclick="openFeeCategoryModal()">
+                Add Category
+              </button>
+            </div>
+
+            <div id="feeStructureBody" style="margin-top:20px;"></div>
           </div>
         </div>
       </section>

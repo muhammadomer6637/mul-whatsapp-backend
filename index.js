@@ -33,10 +33,6 @@ const ADMIN_RECOVERY_KEY = process.env.ADMIN_RECOVERY_KEY;
 const WHATSAPP_FLOW_PRIVATE_KEY = (process.env.WHATSAPP_FLOW_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 const WHATSAPP_FLOW_ID = process.env.WHATSAPP_FLOW_ID;
 
-const FEE_STRUCTURE = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "data", "fee-structure-fall-2026.json"), "utf-8")
-);
-
 // WhatsApp Flows data-exchange encryption (Meta's spec: RSA-OAEP-SHA256 for
 // the AES key, AES-128-GCM for the payload, response IV is the bitwise
 // inverse of the request IV). See:
@@ -93,22 +89,26 @@ function formatPkr(amount) {
   return typeof amount === "number" ? `PKR ${amount.toLocaleString("en-PK")}` : "N/A";
 }
 
-function getFeeCategoryOptions() {
-  return Object.entries(FEE_STRUCTURE.categories).map(([id, cat]) => ({
-    id,
-    title: cat.label
-  }));
+async function getFeeCategoryOptions() {
+  const result = await pool.query(
+    "SELECT id, label FROM fee_categories ORDER BY display_order ASC, label ASC"
+  );
+  return result.rows.map((row) => ({ id: String(row.id), title: row.label }));
 }
 
-function getFeeProgramOptions(categoryId) {
-  const category = FEE_STRUCTURE.categories[categoryId];
-  if (!category) return [];
-  return category.programs.map((p) => ({ id: p.program, title: p.program }));
+async function getFeeProgramOptions(categoryId) {
+  const result = await pool.query(
+    "SELECT program_name FROM fee_programs WHERE category_id = $1 ORDER BY program_name ASC",
+    [categoryId]
+  );
+  return result.rows.map((row) => ({ id: row.program_name, title: row.program_name }));
 }
 
 async function sendFeeCalculatorFlow(to) {
   if (!WHATSAPP_FLOW_ID) return;
   try {
+    const categories = await getFeeCategoryOptions();
+
     await axios.post(
       `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
       {
@@ -128,7 +128,7 @@ async function sendFeeCalculatorFlow(to) {
               flow_action: "navigate",
               flow_action_payload: {
                 screen: "CATEGORY",
-                data: { categories: getFeeCategoryOptions() }
+                data: { categories }
               }
             }
           }
@@ -147,9 +147,12 @@ async function sendFeeCalculatorFlow(to) {
   }
 }
 
-function getFeeResult(categoryId, programName) {
-  const category = FEE_STRUCTURE.categories[categoryId];
-  const entry = category?.programs.find((p) => p.program === programName);
+async function getFeeResult(categoryId, programName) {
+  const result = await pool.query(
+    "SELECT * FROM fee_programs WHERE category_id = $1 AND program_name = $2 LIMIT 1",
+    [categoryId, programName]
+  );
+  const entry = result.rows[0];
 
   if (!entry) {
     return {
@@ -160,17 +163,23 @@ function getFeeResult(categoryId, programName) {
     };
   }
 
-  const installmentDetail = entry.installment != null
-    ? `${formatPkr(entry.installment)} per quarterly instalment (${entry.totalInstallments || category.totalInstallments} instalments)`
-    : entry.installmentEarly != null
-      ? `${formatPkr(entry.installmentEarly)} (1st & 2nd semester), then ${formatPkr(entry.installmentLate)} per semester after`
+  const perInstalment = entry.per_instalment_amount != null ? Number(entry.per_instalment_amount) : null;
+  const earlyAmount = entry.early_semester_amount != null ? Number(entry.early_semester_amount) : null;
+  const lateAmount = entry.later_semester_amount != null ? Number(entry.later_semester_amount) : null;
+  const admissionFee = entry.admission_fee != null ? Number(entry.admission_fee) : null;
+  const totalFee = entry.total_fee != null ? Number(entry.total_fee) : null;
+
+  const installmentDetail = perInstalment != null
+    ? `${formatPkr(perInstalment)} per quarterly instalment (${entry.total_instalments} instalments)`
+    : earlyAmount != null
+      ? `${formatPkr(earlyAmount)} (1st & 2nd semester), then ${formatPkr(lateAmount)} per semester after`
       : "Fee details not available yet - please contact an admissions advisor.";
 
   return {
-    program: entry.program,
-    admission_fee: formatPkr(entry.admissionFee),
+    program: entry.program_name,
+    admission_fee: formatPkr(admissionFee),
     installment_detail: installmentDetail,
-    total_fee: formatPkr(entry.totalFee)
+    total_fee: formatPkr(totalFee)
   };
 }
 
@@ -2482,6 +2491,268 @@ app.delete("/api/quick-replies/:id", authenticateAgent, async (req, res) => {
 });
 
 // =========================
+// FEE STRUCTURE (admin-managed, powers the WhatsApp Flow fee calculator)
+// =========================
+
+app.get("/api/fee-structure", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const categoriesResult = await pool.query(
+      "SELECT id, label, display_order FROM fee_categories ORDER BY display_order ASC, label ASC"
+    );
+    const programsResult = await pool.query(
+      "SELECT * FROM fee_programs ORDER BY program_name ASC"
+    );
+
+    const categories = categoriesResult.rows.map((category) => ({
+      ...category,
+      programs: programsResult.rows.filter((program) => program.category_id === category.id)
+    }));
+
+    return res.json({ success: true, categories });
+  } catch (error) {
+    console.error("GET /api/fee-structure error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to fetch fee structure"
+    });
+  }
+});
+
+app.post("/api/fee-categories", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { label } = req.body;
+
+    if (!label || !label.trim()) {
+      return res.status(400).json({ success: false, error: "Category name is required" });
+    }
+
+    const result = await pool.query(
+      "INSERT INTO fee_categories (label) VALUES ($1) RETURNING id, label, display_order",
+      [label.trim()]
+    );
+
+    return res.json({ success: true, category: result.rows[0] });
+  } catch (error) {
+    console.error("POST /api/fee-categories error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to create category"
+    });
+  }
+});
+
+app.put("/api/fee-categories/:id", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { label } = req.body;
+
+    if (!label || !label.trim()) {
+      return res.status(400).json({ success: false, error: "Category name is required" });
+    }
+
+    const result = await pool.query(
+      "UPDATE fee_categories SET label = $1 WHERE id = $2 RETURNING id, label, display_order",
+      [label.trim(), id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: "Category not found" });
+    }
+
+    return res.json({ success: true, category: result.rows[0] });
+  } catch (error) {
+    console.error("PUT /api/fee-categories/:id error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update category"
+    });
+  }
+});
+
+app.delete("/api/fee-categories/:id", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      "DELETE FROM fee_categories WHERE id = $1 RETURNING id",
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: "Category not found" });
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("DELETE /api/fee-categories/:id error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to delete category"
+    });
+  }
+});
+
+function validateFeeProgramInput(body) {
+  const { categoryId, programName, patternType, admissionFee, totalFee } = body;
+
+  if (!categoryId || !programName || !programName.trim()) {
+    return "Category and program name are required";
+  }
+  if (!["quarterly", "early_late"].includes(patternType)) {
+    return "Pattern type must be quarterly or early_late";
+  }
+  if (admissionFee === undefined || admissionFee === null || admissionFee === "") {
+    return "Admission fee is required";
+  }
+  if (totalFee === undefined || totalFee === null || totalFee === "") {
+    return "Total fee package is required";
+  }
+
+  if (patternType === "quarterly") {
+    const { perInstalmentAmount, totalInstalments } = body;
+    if (!perInstalmentAmount || !totalInstalments) {
+      return "Per-instalment amount and total instalments are required for the quarterly pattern";
+    }
+  } else {
+    const { earlySemesterAmount, laterSemesterAmount } = body;
+    if (!earlySemesterAmount || !laterSemesterAmount) {
+      return "Early and later semester amounts are required for the early/late pattern";
+    }
+  }
+
+  return null;
+}
+
+app.post("/api/fee-programs", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const validationError = validateFeeProgramInput(req.body);
+    if (validationError) {
+      return res.status(400).json({ success: false, error: validationError });
+    }
+
+    const {
+      categoryId, programName, patternType, admissionFee, totalFee,
+      perInstalmentAmount, totalInstalments, earlySemesterAmount, laterSemesterAmount
+    } = req.body;
+
+    const isQuarterly = patternType === "quarterly";
+
+    const result = await pool.query(
+      `
+      INSERT INTO fee_programs (
+        category_id, program_name, pattern_type,
+        admission_fee, per_instalment_amount, total_instalments,
+        early_semester_amount, later_semester_amount, total_fee
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING *
+      `,
+      [
+        categoryId,
+        programName.trim(),
+        patternType,
+        admissionFee,
+        isQuarterly ? perInstalmentAmount : null,
+        isQuarterly ? totalInstalments : null,
+        isQuarterly ? null : earlySemesterAmount,
+        isQuarterly ? null : laterSemesterAmount,
+        totalFee
+      ]
+    );
+
+    return res.json({ success: true, program: result.rows[0] });
+  } catch (error) {
+    console.error("POST /api/fee-programs error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to create program"
+    });
+  }
+});
+
+app.put("/api/fee-programs/:id", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const validationError = validateFeeProgramInput(req.body);
+    if (validationError) {
+      return res.status(400).json({ success: false, error: validationError });
+    }
+
+    const {
+      categoryId, programName, patternType, admissionFee, totalFee,
+      perInstalmentAmount, totalInstalments, earlySemesterAmount, laterSemesterAmount
+    } = req.body;
+
+    const isQuarterly = patternType === "quarterly";
+
+    const result = await pool.query(
+      `
+      UPDATE fee_programs SET
+        category_id = $1,
+        program_name = $2,
+        pattern_type = $3,
+        admission_fee = $4,
+        per_instalment_amount = $5,
+        total_instalments = $6,
+        early_semester_amount = $7,
+        later_semester_amount = $8,
+        total_fee = $9
+      WHERE id = $10
+      RETURNING *
+      `,
+      [
+        categoryId,
+        programName.trim(),
+        patternType,
+        admissionFee,
+        isQuarterly ? perInstalmentAmount : null,
+        isQuarterly ? totalInstalments : null,
+        isQuarterly ? null : earlySemesterAmount,
+        isQuarterly ? null : laterSemesterAmount,
+        totalFee,
+        id
+      ]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: "Program not found" });
+    }
+
+    return res.json({ success: true, program: result.rows[0] });
+  } catch (error) {
+    console.error("PUT /api/fee-programs/:id error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update program"
+    });
+  }
+});
+
+app.delete("/api/fee-programs/:id", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      "DELETE FROM fee_programs WHERE id = $1 RETURNING id",
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: "Program not found" });
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("DELETE /api/fee-programs/:id error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to delete program"
+    });
+  }
+});
+
+// =========================
 // SYSTEM HEALTH API
 // =========================
 
@@ -2740,7 +3011,7 @@ app.post("/api/whatsapp-flow", async (req, res) => {
     if (action === "INIT") {
       responsePayload = {
         screen: "CATEGORY",
-        data: { categories: getFeeCategoryOptions() }
+        data: { categories: await getFeeCategoryOptions() }
       };
     } else if (action === "data_exchange" && screen === "CATEGORY") {
       const categoryId = data?.category;
@@ -2748,16 +3019,16 @@ app.post("/api/whatsapp-flow", async (req, res) => {
         screen: "PROGRAM",
         data: {
           category: categoryId,
-          programs: getFeeProgramOptions(categoryId)
+          programs: await getFeeProgramOptions(categoryId)
         }
       };
     } else if (action === "data_exchange" && screen === "PROGRAM") {
       responsePayload = {
         screen: "RESULT",
-        data: getFeeResult(data?.category, data?.program)
+        data: await getFeeResult(data?.category, data?.program)
       };
     } else {
-      responsePayload = { screen: "CATEGORY", data: { categories: getFeeCategoryOptions() } };
+      responsePayload = { screen: "CATEGORY", data: { categories: await getFeeCategoryOptions() } };
     }
 
     const encryptedResponse = encryptFlowResponse(responsePayload, aesKeyBuffer, initialVectorBuffer);

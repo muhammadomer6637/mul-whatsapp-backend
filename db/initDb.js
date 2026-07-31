@@ -476,6 +476,86 @@ await pool.query(`
       // Ignore if constraint already exists
     }
 
+    // FEE STRUCTURE TABLES (admin-managed, powers the WhatsApp Flow fee calculator)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS fee_categories (
+        id SERIAL PRIMARY KEY,
+        label TEXT NOT NULL,
+        display_order INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS fee_programs (
+        id SERIAL PRIMARY KEY,
+        category_id INTEGER NOT NULL REFERENCES fee_categories(id) ON DELETE CASCADE,
+        program_name TEXT NOT NULL,
+        pattern_type VARCHAR(20) NOT NULL DEFAULT 'quarterly',
+        admission_fee NUMERIC,
+        per_instalment_amount NUMERIC,
+        total_instalments INTEGER,
+        early_semester_amount NUMERIC,
+        later_semester_amount NUMERIC,
+        total_fee NUMERIC,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_fee_programs_category_id ON fee_programs (category_id);
+    `);
+
+    // One-time seed from the original JSON extraction - only runs if the
+    // tables are still empty, so it never overwrites admin edits made
+    // through the Settings > Fee Structure panel after this first run.
+    const feeCategoryCount = await pool.query("SELECT COUNT(*) FROM fee_categories");
+    if (Number(feeCategoryCount.rows[0].count) === 0) {
+      const fs = require("fs");
+      const path = require("path");
+      const seedPath = path.join(__dirname, "..", "data", "fee-structure-fall-2026.json");
+
+      if (fs.existsSync(seedPath)) {
+        const seedData = JSON.parse(fs.readFileSync(seedPath, "utf-8"));
+
+        for (const [, category] of Object.entries(seedData.categories || {})) {
+          const categoryResult = await pool.query(
+            "INSERT INTO fee_categories (label) VALUES ($1) RETURNING id",
+            [category.label]
+          );
+          const categoryId = categoryResult.rows[0].id;
+
+          for (const program of category.programs || []) {
+            const isEarlyLate = program.installmentEarly != null;
+
+            await pool.query(
+              `
+              INSERT INTO fee_programs (
+                category_id, program_name, pattern_type,
+                admission_fee, per_instalment_amount, total_instalments,
+                early_semester_amount, later_semester_amount, total_fee
+              )
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+              `,
+              [
+                categoryId,
+                program.program,
+                isEarlyLate ? "early_late" : "quarterly",
+                program.admissionFee ?? null,
+                isEarlyLate ? null : (program.installment ?? null),
+                isEarlyLate ? null : (program.totalInstallments || category.totalInstallments || null),
+                isEarlyLate ? program.installmentEarly : null,
+                isEarlyLate ? program.installmentLate : null,
+                program.totalFee ?? null
+              ]
+            );
+          }
+        }
+
+        console.log("Fee structure seeded from data/fee-structure-fall-2026.json");
+      }
+    }
+
     console.log("Tables created / verified successfully");
   } catch (error) {
     console.error("initDb error:", error.message);
