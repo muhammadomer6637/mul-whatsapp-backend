@@ -118,14 +118,14 @@ async function sendFeeCalculatorFlow(to) {
         type: "interactive",
         interactive: {
           type: "flow",
-          header: { type: "text", text: "Fee Calculator" },
-          body: { text: "Want the exact fee for a specific program? Tap below to check in a few taps." },
+          header: { type: "text", text: "Explore Programs & Fees" },
+          body: { text: "Browse programs, check eligibility, and see the exact fee - all in a few taps." },
           action: {
             name: "flow",
             parameters: {
               flow_message_version: "3",
               flow_id: WHATSAPP_FLOW_ID,
-              flow_cta: "Check Fee",
+              flow_cta: "Explore Now",
               flow_action: "navigate",
               flow_action_payload: {
                 screen: "CATEGORY",
@@ -3917,6 +3917,8 @@ Please wait, our admission representative will message you shortly.`,
         programsMenu(),
         [{ id: "main_menu", title: "Main Menu" }]
       );
+
+      await sendFeeCalculatorFlow(from);
 
       return res.sendStatus(200);
     }

@@ -9,7 +9,7 @@
   "screens": [
     {
       "id": "CATEGORY",
-      "title": "Fee Calculator",
+      "title": "Explore Programs & Fees",
       "data": {
         "categories": {
           "type": "array",
@@ -61,7 +61,7 @@
     },
     {
       "id": "PROGRAM",
-      "title": "Fee Calculator",
+      "title": "Explore Programs & Fees",
       "data": {
         "category": { "type": "string", "__example__": "bs" },
         "programs": {
@@ -115,7 +115,7 @@
     },
     {
       "id": "RESULT",
-      "title": "Fee Calculator",
+      "title": "Explore Programs & Fees",
       "terminal": true,
       "success": true,
       "data": {
