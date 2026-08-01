@@ -2639,7 +2639,7 @@ app.delete("/api/fee-categories/:id", authenticateAgent, requireAdmin, async (re
 });
 
 function validateFeeProgramInput(body) {
-  const { categoryId, programName, patternType, admissionFee, totalFee } = body;
+  const { categoryId, programName, patternType } = body;
 
   if (!categoryId || !programName || !programName.trim()) {
     return "Category and program name are required";
@@ -2647,25 +2647,9 @@ function validateFeeProgramInput(body) {
   if (!["quarterly", "early_late"].includes(patternType)) {
     return "Pattern type must be quarterly or early_late";
   }
-  if (admissionFee === undefined || admissionFee === null || admissionFee === "") {
-    return "Admission fee is required";
-  }
-  if (totalFee === undefined || totalFee === null || totalFee === "") {
-    return "Total fee package is required";
-  }
 
-  if (patternType === "quarterly") {
-    const { perInstalmentAmount, totalInstalments } = body;
-    if (!perInstalmentAmount || !totalInstalments) {
-      return "Per-instalment amount and total instalments are required for the quarterly pattern";
-    }
-  } else {
-    const { earlySemesterAmount, laterSemesterAmount } = body;
-    if (!earlySemesterAmount || !laterSemesterAmount) {
-      return "Early and later semester amounts are required for the early/late pattern";
-    }
-  }
-
+  // Fee fields are intentionally optional - some programs (e.g. short
+  // courses) only have eligibility criteria and no published fee yet.
   return null;
 }
 
@@ -2678,7 +2662,8 @@ app.post("/api/fee-programs", authenticateAgent, requireAdmin, async (req, res) 
 
     const {
       categoryId, programName, patternType, admissionFee, totalFee,
-      perInstalmentAmount, totalInstalments, earlySemesterAmount, laterSemesterAmount
+      perInstalmentAmount, totalInstalments, earlySemesterAmount, laterSemesterAmount,
+      eligibilityCriteria
     } = req.body;
 
     const isQuarterly = patternType === "quarterly";
@@ -2688,21 +2673,23 @@ app.post("/api/fee-programs", authenticateAgent, requireAdmin, async (req, res) 
       INSERT INTO fee_programs (
         category_id, program_name, pattern_type,
         admission_fee, per_instalment_amount, total_instalments,
-        early_semester_amount, later_semester_amount, total_fee
+        early_semester_amount, later_semester_amount, total_fee,
+        eligibility_criteria
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
       `,
       [
         categoryId,
         programName.trim(),
         patternType,
-        admissionFee,
-        isQuarterly ? perInstalmentAmount : null,
-        isQuarterly ? totalInstalments : null,
-        isQuarterly ? null : earlySemesterAmount,
-        isQuarterly ? null : laterSemesterAmount,
-        totalFee
+        admissionFee || null,
+        isQuarterly ? (perInstalmentAmount || null) : null,
+        isQuarterly ? (totalInstalments || null) : null,
+        isQuarterly ? null : (earlySemesterAmount || null),
+        isQuarterly ? null : (laterSemesterAmount || null),
+        totalFee || null,
+        eligibilityCriteria || null
       ]
     );
 
@@ -2727,7 +2714,8 @@ app.put("/api/fee-programs/:id", authenticateAgent, requireAdmin, async (req, re
 
     const {
       categoryId, programName, patternType, admissionFee, totalFee,
-      perInstalmentAmount, totalInstalments, earlySemesterAmount, laterSemesterAmount
+      perInstalmentAmount, totalInstalments, earlySemesterAmount, laterSemesterAmount,
+      eligibilityCriteria
     } = req.body;
 
     const isQuarterly = patternType === "quarterly";
@@ -2743,20 +2731,22 @@ app.put("/api/fee-programs/:id", authenticateAgent, requireAdmin, async (req, re
         total_instalments = $6,
         early_semester_amount = $7,
         later_semester_amount = $8,
-        total_fee = $9
-      WHERE id = $10
+        total_fee = $9,
+        eligibility_criteria = $10
+      WHERE id = $11
       RETURNING *
       `,
       [
         categoryId,
         programName.trim(),
         patternType,
-        admissionFee,
-        isQuarterly ? perInstalmentAmount : null,
-        isQuarterly ? totalInstalments : null,
-        isQuarterly ? null : earlySemesterAmount,
-        isQuarterly ? null : laterSemesterAmount,
-        totalFee,
+        admissionFee || null,
+        isQuarterly ? (perInstalmentAmount || null) : null,
+        isQuarterly ? (totalInstalments || null) : null,
+        isQuarterly ? null : (earlySemesterAmount || null),
+        isQuarterly ? null : (laterSemesterAmount || null),
+        totalFee || null,
+        eligibilityCriteria || null,
         id
       ]
     );

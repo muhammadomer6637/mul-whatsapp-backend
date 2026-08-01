@@ -2123,6 +2123,7 @@ function buildFeeCategoryHtml(category) {
               <th>Admission Fee</th>
               <th>Instalment Info</th>
               <th>Total Fee</th>
+              <th>Eligibility Criteria</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -2130,7 +2131,7 @@ function buildFeeCategoryHtml(category) {
             ${
               category.programs.length
                 ? category.programs.map(p => buildFeeProgramRow(p)).join("")
-                : `<tr><td colspan="5" style="text-align:center; color:var(--muted); padding:16px;">No programs yet.</td></tr>`
+                : `<tr><td colspan="6" style="text-align:center; color:var(--muted); padding:16px;">No programs yet.</td></tr>`
             }
           </tbody>
         </table>
@@ -2150,6 +2151,7 @@ function buildFeeProgramRow(program) {
       <td>${formatFeeAmount(program.admission_fee)}</td>
       <td>${instalmentInfo}</td>
       <td>${formatFeeAmount(program.total_fee)}</td>
+      <td style="max-width:280px; white-space:normal;">${program.eligibility_criteria ? escapeHtml(program.eligibility_criteria) : `<span style="color:var(--muted);">Not set</span>`}</td>
       <td class="agent-action-icons">
         <span class="icon-action" onclick="openFeeProgramModal(${program.id})" title="Edit">✎</span>
         <span class="icon-action" onclick="deleteFeeProgram(${program.id})" title="Delete">🗑</span>
@@ -2315,6 +2317,9 @@ function openFeeProgramModal(id = null, categoryId = null) {
       <label class="field-label">Total Fee Package (PKR)</label>
       <input id="feeProgramTotalFee" class="prompt-input" type="number" value="${existing?.total_fee ?? ""}" />
 
+      <label class="field-label">Eligibility Criteria</label>
+      <textarea id="feeProgramEligibility" class="prompt-input" rows="3" placeholder="e.g. Intermediate (12 years of Education). Minimum 45% marks. Interview.">${existing?.eligibility_criteria ? escapeHtml(existing.eligibility_criteria) : ""}</textarea>
+
       <div class="confirm-modal-actions">
         <button class="ghost-btn" data-action="cancel">Cancel</button>
         <button class="primary-btn" data-action="save">Save</button>
@@ -2346,6 +2351,7 @@ async function saveFeeProgram(id, overlay) {
   const patternType = overlay.querySelector("#feeProgramPattern").value;
   const admissionFee = overlay.querySelector("#feeProgramAdmissionFee").value;
   const totalFee = overlay.querySelector("#feeProgramTotalFee").value;
+  const eligibilityCriteria = overlay.querySelector("#feeProgramEligibility").value.trim();
 
   if (!programName) {
     notify("Program name is required", "warning");
@@ -2357,7 +2363,8 @@ async function saveFeeProgram(id, overlay) {
     programName,
     patternType,
     admissionFee: admissionFee ? Number(admissionFee) : null,
-    totalFee: totalFee ? Number(totalFee) : null
+    totalFee: totalFee ? Number(totalFee) : null,
+    eligibilityCriteria: eligibilityCriteria || null
   };
 
   if (patternType === "quarterly") {
