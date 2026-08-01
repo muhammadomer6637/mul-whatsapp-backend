@@ -3266,18 +3266,6 @@ Please wait, our admission representative will message you shortly.`,
           }
         } else {
           await saveUserInteraction(from, "fee_calculator", flowResponse.program || "unknown");
-
-          if (flowResponse.action === "apply") {
-            await sendTextMessage(
-              from,
-              `Great! You can start your application here:
-
-https://admission.mul.edu.pk/
-
-If you need any help during the process, just message us anytime.`,
-              "active"
-            );
-          }
         }
       } catch (flowLogError) {
         console.error("Flow completion handling error:", flowLogError.message);

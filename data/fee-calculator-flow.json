@@ -168,11 +168,8 @@
             "type": "EmbeddedLink",
             "text": "Apply Now",
             "on-click-action": {
-              "name": "complete",
-              "payload": {
-                "program": "${data.program}",
-                "action": "apply"
-              }
+              "name": "open_url",
+              "url": "https://admission.mul.edu.pk/"
             }
           },
           {
@@ -181,8 +178,7 @@
             "on-click-action": {
               "name": "complete",
               "payload": {
-                "program": "${data.program}",
-                "action": "done"
+                "program": "${data.program}"
               }
             }
           }
