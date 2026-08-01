@@ -120,6 +120,7 @@
       "success": true,
       "data": {
         "program": { "type": "string", "__example__": "BS Computer Science" },
+        "eligibility": { "type": "string", "__example__": "Intermediate (12 years of Education). Minimum 45% marks. Interview." },
         "admission_fee": { "type": "string", "__example__": "PKR 25,000" },
         "installment_detail": { "type": "string", "__example__": "PKR 85,000 per installment (4 installments)" },
         "total_fee": { "type": "string", "__example__": "PKR 340,000" }
@@ -130,6 +131,14 @@
           {
             "type": "TextHeading",
             "text": "${data.program}"
+          },
+          {
+            "type": "TextCaption",
+            "text": "Eligibility Criteria"
+          },
+          {
+            "type": "TextBody",
+            "text": "${data.eligibility}"
           },
           {
             "type": "TextCaption",
@@ -156,12 +165,24 @@
             "text": "${data.total_fee}"
           },
           {
+            "type": "EmbeddedLink",
+            "text": "Apply Now",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "program": "${data.program}",
+                "action": "apply"
+              }
+            }
+          },
+          {
             "type": "Footer",
             "label": "Done",
             "on-click-action": {
               "name": "complete",
               "payload": {
-                "program": "${data.program}"
+                "program": "${data.program}",
+                "action": "done"
               }
             }
           }
