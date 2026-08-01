@@ -510,6 +510,13 @@ await pool.query(`
       ALTER TABLE fee_programs ADD COLUMN IF NOT EXISTS eligibility_criteria TEXT;
     `);
 
+    await pool.query(`
+      ALTER TABLE fee_categories ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT true;
+    `);
+    await pool.query(`
+      ALTER TABLE fee_programs ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT true;
+    `);
+
     // One-time seed from the original JSON extraction - only runs if the
     // tables are still empty, so it never overwrites admin edits made
     // through the Settings > Fee Structure panel after this first run.

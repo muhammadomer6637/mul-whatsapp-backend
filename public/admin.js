@@ -2105,12 +2105,14 @@ async function loadFeeStructure() {
 }
 
 function buildFeeCategoryHtml(category) {
+  const isActive = category.active !== false;
   return `
-    <div class="fee-category-card">
+    <div class="fee-category-card" style="${isActive ? "" : "opacity:0.55;"}">
       <div class="fee-category-header">
-        <h4>${escapeHtml(category.label)}</h4>
+        <h4>${escapeHtml(category.label)} <span class="status-chip status-${isActive ? "active" : "agent_waiting"}" style="margin-left:8px; font-size:11px;">${isActive ? "Active" : "Inactive"}</span></h4>
         <div class="fee-category-actions">
           <button class="ghost-btn" onclick="openFeeProgramModal(null, ${category.id})">+ Add Program</button>
+          <span class="icon-action" onclick="toggleFeeCategoryActive(${category.id}, ${isActive})" title="${isActive ? "Deactivate" : "Activate"} category">${isActive ? "⏸" : "▶"}</span>
           <span class="icon-action" onclick="openFeeCategoryModal(${category.id})" title="Edit category">✎</span>
           <span class="icon-action" onclick="deleteFeeCategory(${category.id})" title="Delete category">🗑</span>
         </div>
@@ -2145,14 +2147,17 @@ function buildFeeProgramRow(program) {
     ? `${formatFeeAmount(program.per_instalment_amount)} × ${program.total_instalments ?? "?"} (quarterly)`
     : `${formatFeeAmount(program.early_semester_amount)} (1st/2nd sem), ${formatFeeAmount(program.later_semester_amount)}/sem after`;
 
+  const isActive = program.active !== false;
+
   return `
-    <tr>
-      <td>${escapeHtml(program.program_name)}</td>
+    <tr style="${isActive ? "" : "opacity:0.55;"}">
+      <td>${escapeHtml(program.program_name)} <span class="status-chip status-${isActive ? "active" : "agent_waiting"}" style="margin-left:6px; font-size:10px;">${isActive ? "Active" : "Inactive"}</span></td>
       <td>${formatFeeAmount(program.admission_fee)}</td>
       <td>${instalmentInfo}</td>
       <td>${formatFeeAmount(program.total_fee)}</td>
       <td style="max-width:280px; white-space:normal;">${program.eligibility_criteria ? escapeHtml(program.eligibility_criteria) : `<span style="color:var(--muted);">Not set</span>`}</td>
       <td class="agent-action-icons">
+        <span class="icon-action" onclick="toggleFeeProgramActive(${program.id}, ${isActive})" title="${isActive ? "Deactivate" : "Activate"}">${isActive ? "⏸" : "▶"}</span>
         <span class="icon-action" onclick="openFeeProgramModal(${program.id})" title="Edit">✎</span>
         <span class="icon-action" onclick="deleteFeeProgram(${program.id})" title="Delete">🗑</span>
       </td>
@@ -2253,6 +2258,29 @@ async function deleteFeeCategory(id) {
   } catch (error) {
     console.error("deleteFeeCategory error:", error);
     notify("Failed to delete category", "error");
+  }
+}
+
+async function toggleFeeCategoryActive(id, currentlyActive) {
+  try {
+    const res = await fetch(`${BASE}/api/fee-categories/${id}/active`, {
+      method: "PUT",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ active: !currentlyActive })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to update category status", "error");
+      return;
+    }
+
+    notify(`Category ${currentlyActive ? "deactivated" : "activated"}`, "success");
+    await loadFeeStructure();
+  } catch (error) {
+    console.error("toggleFeeCategoryActive error:", error);
+    notify("Failed to update category status", "error");
   }
 }
 
@@ -2427,6 +2455,29 @@ async function deleteFeeProgram(id) {
   } catch (error) {
     console.error("deleteFeeProgram error:", error);
     notify("Failed to delete program", "error");
+  }
+}
+
+async function toggleFeeProgramActive(id, currentlyActive) {
+  try {
+    const res = await fetch(`${BASE}/api/fee-programs/${id}/active`, {
+      method: "PUT",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ active: !currentlyActive })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to update program status", "error");
+      return;
+    }
+
+    notify(`Program ${currentlyActive ? "deactivated" : "activated"}`, "success");
+    await loadFeeStructure();
+  } catch (error) {
+    console.error("toggleFeeProgramActive error:", error);
+    notify("Failed to update program status", "error");
   }
 }
 

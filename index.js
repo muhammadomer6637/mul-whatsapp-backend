@@ -92,14 +92,14 @@ function formatPkr(amount) {
 
 async function getFeeCategoryOptions() {
   const result = await pool.query(
-    "SELECT id, label FROM fee_categories ORDER BY display_order ASC, label ASC"
+    "SELECT id, label FROM fee_categories WHERE active = true ORDER BY display_order ASC, label ASC"
   );
   return result.rows.map((row) => ({ id: String(row.id), title: row.label }));
 }
 
 async function getFeeProgramOptions(categoryId) {
   const result = await pool.query(
-    "SELECT program_name FROM fee_programs WHERE category_id = $1 ORDER BY program_name ASC",
+    "SELECT program_name FROM fee_programs WHERE category_id = $1 AND active = true ORDER BY program_name ASC",
     [categoryId]
   );
   return result.rows.map((row) => ({ id: row.program_name, title: row.program_name }));
@@ -2543,7 +2543,7 @@ app.delete("/api/quick-replies/:id", authenticateAgent, async (req, res) => {
 app.get("/api/fee-structure", authenticateAgent, requireAdmin, async (req, res) => {
   try {
     const categoriesResult = await pool.query(
-      "SELECT id, label, display_order FROM fee_categories ORDER BY display_order ASC, label ASC"
+      "SELECT id, label, display_order, active FROM fee_categories ORDER BY display_order ASC, label ASC"
     );
     const programsResult = await pool.query(
       "SELECT * FROM fee_programs ORDER BY program_name ASC"
@@ -2611,6 +2611,30 @@ app.put("/api/fee-categories/:id", authenticateAgent, requireAdmin, async (req, 
     return res.status(500).json({
       success: false,
       error: "Failed to update category"
+    });
+  }
+});
+
+app.put("/api/fee-categories/:id/active", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { active } = req.body;
+
+    const result = await pool.query(
+      "UPDATE fee_categories SET active = $1 WHERE id = $2 RETURNING id, label, display_order, active",
+      [!!active, id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: "Category not found" });
+    }
+
+    return res.json({ success: true, category: result.rows[0] });
+  } catch (error) {
+    console.error("PUT /api/fee-categories/:id/active error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update category status"
     });
   }
 });
@@ -2761,6 +2785,30 @@ app.put("/api/fee-programs/:id", authenticateAgent, requireAdmin, async (req, re
     return res.status(500).json({
       success: false,
       error: "Failed to update program"
+    });
+  }
+});
+
+app.put("/api/fee-programs/:id/active", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { active } = req.body;
+
+    const result = await pool.query(
+      "UPDATE fee_programs SET active = $1 WHERE id = $2 RETURNING *",
+      [!!active, id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: "Program not found" });
+    }
+
+    return res.json({ success: true, program: result.rows[0] });
+  } catch (error) {
+    console.error("PUT /api/fee-programs/:id/active error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to update program status"
     });
   }
 });
