@@ -101,10 +101,9 @@
               {
                 "type": "TextInput",
                 "name": "other_program",
-                "label": "Type your program",
+                "label": "If not listed above, type your program here",
                 "input-type": "text",
-                "visible": "${form.program == 'OTHER'}",
-                "required": "${form.program == 'OTHER'}"
+                "required": false
               },
               {
                 "type": "TextInput",

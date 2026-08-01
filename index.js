@@ -3163,9 +3163,9 @@ app.post("/webhook", async (req, res) => {
         const leadName = (flowResponse.name || "").trim();
 
         if (leadName) {
-          const finalProgram = flowResponse.program === "OTHER"
-            ? (flowResponse.other_program || "").trim() || "Not specified"
-            : flowResponse.program || "Not specified";
+          const finalProgram = (flowResponse.other_program || "").trim()
+            || flowResponse.program
+            || "Not specified";
 
           await saveUserInteraction(from, "lead_capture_flow", finalProgram);
 
