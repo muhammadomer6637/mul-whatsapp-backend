@@ -506,6 +506,10 @@ await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_fee_programs_category_id ON fee_programs (category_id);
     `);
 
+    await pool.query(`
+      ALTER TABLE fee_programs ADD COLUMN IF NOT EXISTS eligibility_criteria TEXT;
+    `);
+
     // One-time seed from the original JSON extraction - only runs if the
     // tables are still empty, so it never overwrites admin edits made
     // through the Settings > Fee Structure panel after this first run.

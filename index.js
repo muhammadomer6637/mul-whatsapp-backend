@@ -4459,6 +4459,75 @@ app.post("/api/update-lead", authenticateAgent, async (req, res) => {
   }
 });
 
+// One-time admin-triggered data import: fills in eligibility_criteria for
+// existing programs (matched against MUL's public admissions page) and
+// adds a new "Short Courses" category with its own programs. Safe to run
+// more than once - eligibility updates are idempotent, and course rows are
+// only inserted if a program with that exact name doesn't already exist
+// under the Short Courses category.
+app.post("/api/admin/import-eligibility", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const eligibilityData = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "data", "eligibility-import.json"), "utf-8")
+    );
+    const courseData = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "data", "course-programs-import.json"), "utf-8")
+    );
+
+    let updatedCount = 0;
+    for (const entry of eligibilityData) {
+      const result = await pool.query(
+        "UPDATE fee_programs SET eligibility_criteria = $1 WHERE program_name = $2",
+        [entry.eligibility, entry.ourProgram]
+      );
+      updatedCount += result.rowCount;
+    }
+
+    let courseCategoryResult = await pool.query(
+      "SELECT id FROM fee_categories WHERE label = 'Short Courses' LIMIT 1"
+    );
+    let courseCategoryId;
+    if (courseCategoryResult.rows.length) {
+      courseCategoryId = courseCategoryResult.rows[0].id;
+    } else {
+      const inserted = await pool.query(
+        "INSERT INTO fee_categories (label, display_order) VALUES ('Short Courses', 100) RETURNING id"
+      );
+      courseCategoryId = inserted.rows[0].id;
+    }
+
+    let coursesAdded = 0;
+    for (const course of courseData) {
+      const existing = await pool.query(
+        "SELECT id FROM fee_programs WHERE category_id = $1 AND program_name = $2 LIMIT 1",
+        [courseCategoryId, course.name]
+      );
+      if (existing.rows.length) continue;
+
+      await pool.query(
+        `
+        INSERT INTO fee_programs (category_id, program_name, pattern_type, eligibility_criteria)
+        VALUES ($1, $2, 'quarterly', $3)
+        `,
+        [courseCategoryId, course.name, course.eligibility]
+      );
+      coursesAdded++;
+    }
+
+    return res.json({
+      success: true,
+      eligibilityUpdated: updatedCount,
+      coursesAdded
+    });
+  } catch (error) {
+    console.error("POST /api/admin/import-eligibility error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to import eligibility data"
+    });
+  }
+});
+
 // Admin-only testing utility: clears a phone's name/program so the bot
 // treats it as a brand-new lead again (the "existing user" branches skip
 // straight past lead-capture otherwise). Not used by any live student flow.
