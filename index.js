@@ -32,6 +32,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const ADMIN_RECOVERY_KEY = process.env.ADMIN_RECOVERY_KEY;
 const WHATSAPP_FLOW_PRIVATE_KEY = (process.env.WHATSAPP_FLOW_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 const WHATSAPP_FLOW_ID = process.env.WHATSAPP_FLOW_ID;
+const WHATSAPP_LEAD_FLOW_ID = process.env.WHATSAPP_LEAD_FLOW_ID;
 
 // WhatsApp Flows data-exchange encryption (Meta's spec: RSA-OAEP-SHA256 for
 // the AES key, AES-128-GCM for the payload, response IV is the bitwise
@@ -144,6 +145,51 @@ async function sendFeeCalculatorFlow(to) {
   } catch (error) {
     console.error("Send fee calculator flow error:", error.response?.data || error.message);
     recordSendFailure();
+  }
+}
+
+async function sendLeadCaptureFlow(to) {
+  if (!WHATSAPP_LEAD_FLOW_ID) return false;
+  try {
+    const categories = await getFeeCategoryOptions();
+
+    await axios.post(
+      `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "flow",
+          header: { type: "text", text: "Talk to an Advisor" },
+          body: { text: "Please share a few quick details so our admissions team can reach out to you." },
+          action: {
+            name: "flow",
+            parameters: {
+              flow_message_version: "3",
+              flow_id: WHATSAPP_LEAD_FLOW_ID,
+              flow_cta: "Continue",
+              flow_action: "navigate",
+              flow_action_payload: {
+                screen: "LEAD_CATEGORY",
+                data: { categories }
+              }
+            }
+          }
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+    return true;
+  } catch (error) {
+    console.error("Send lead capture flow error:", error.response?.data || error.message);
+    recordSendFailure();
+    return false;
   }
 }
 
@@ -3027,6 +3073,14 @@ app.post("/api/whatsapp-flow", async (req, res) => {
         screen: "RESULT",
         data: await getFeeResult(data?.category, data?.program)
       };
+    } else if (action === "data_exchange" && screen === "LEAD_CATEGORY") {
+      const categoryId = data?.category;
+      const programs = await getFeeProgramOptions(categoryId);
+      programs.push({ id: "OTHER", title: "Other (my program isn't listed)" });
+      responsePayload = {
+        screen: "LEAD_PROGRAM",
+        data: { category: categoryId, programs }
+      };
     } else {
       responsePayload = { screen: "CATEGORY", data: { categories: await getFeeCategoryOptions() } };
     }
@@ -3097,15 +3151,84 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // Fee Calculator Flow completion ("nfm_reply" - Meta's message type for
-    // a finished WhatsApp Flow). Handled in isolation, purely for tracking
-    // which program a student checked fees for; never reaches the bot menu.
+    // WhatsApp Flow completion ("nfm_reply"). Handled in isolation, before
+    // the bot state machine below ever sees this message. Two flows share
+    // this branch: the Fee Calculator (no "name" field in its payload -
+    // just logged for analytics) and the Lead Capture flow (has "name" -
+    // treated as a real lead, same handoff as the typed "Name, Program"
+    // path further down).
     if (msg.type === "interactive" && msg.interactive?.type === "nfm_reply") {
       try {
         const flowResponse = JSON.parse(msg.interactive.nfm_reply?.response_json || "{}");
-        await saveUserInteraction(from, "fee_calculator", flowResponse.program || "unknown");
+        const leadName = (flowResponse.name || "").trim();
+
+        if (leadName) {
+          const finalProgram = flowResponse.program === "OTHER"
+            ? (flowResponse.other_program || "").trim() || "Not specified"
+            : flowResponse.program || "Not specified";
+
+          await saveUserInteraction(from, "lead_capture_flow", finalProgram);
+
+          const chatStatusResult = await pool.query(
+            "SELECT status FROM chats WHERE phone = $1 LIMIT 1",
+            [from]
+          );
+          const alreadyActive = chatStatusResult.rows[0]?.status === "agent_active";
+
+          if (!alreadyActive) {
+            await updateUserDetails(from, {
+              name: leadName,
+              program: finalProgram,
+              mode: "agent",
+              awaitingLead: false
+            });
+
+            await pool.query(
+              "UPDATE users SET name = $2, program = $3 WHERE phone = $1",
+              [from, leadName, finalProgram]
+            );
+
+            await upsertChat(from, `Lead: ${leadName} - ${finalProgram}`, "agent_waiting");
+
+            await pool.query(
+              "UPDATE chats SET agent_requested = true WHERE phone = $1",
+              [from]
+            );
+
+            await pool.query(
+              `
+              UPDATE chats
+              SET
+                agent_waiting_started_at = NOW(),
+                agent_taken_at = NULL,
+                agent_response_seconds = NULL
+              WHERE phone = $1
+              `,
+              [from]
+            );
+
+            if (userStates[from]) {
+              userStates[from].awaitingLead = false;
+              userStates[from].previousMenu = "main";
+              userStates[from].currentMenu = "agent_waiting";
+              userStates[from].hasInteracted = true;
+            }
+
+            await sendTextMessage(
+              from,
+              `✅ Thank you, ${leadName}!
+
+Your request has been forwarded to our support team.
+
+Please wait, our admission representative will message you shortly.`,
+              "agent_waiting"
+            );
+          }
+        } else {
+          await saveUserInteraction(from, "fee_calculator", flowResponse.program || "unknown");
+        }
       } catch (flowLogError) {
-        console.error("Fee calculator flow log error:", flowLogError.message);
+        console.error("Flow completion handling error:", flowLogError.message);
       }
       return res.sendStatus(200);
     }
@@ -3416,6 +3539,11 @@ if (userStates[from]?.currentMenu === "agent_category") {
       userStates[from].currentMenu = "agent";
 
       await updateUserDetails(from, { mode: "agent", awaitingLead: true });
+
+      const flowSent = await sendLeadCaptureFlow(from);
+      if (flowSent) {
+        return res.sendStatus(200);
+      }
 
       await sendTextMessage(
         from,
