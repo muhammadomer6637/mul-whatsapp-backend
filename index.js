@@ -4459,6 +4459,35 @@ app.post("/api/update-lead", authenticateAgent, async (req, res) => {
   }
 });
 
+// Admin-only testing utility: clears a phone's name/program so the bot
+// treats it as a brand-new lead again (the "existing user" branches skip
+// straight past lead-capture otherwise). Not used by any live student flow.
+app.post("/api/admin/reset-test-lead", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        error: "phone is required"
+      });
+    }
+
+    await pool.query(
+      "UPDATE users SET name = NULL, program = NULL WHERE phone = $1",
+      [phone]
+    );
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("POST /api/admin/reset-test-lead error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to reset test lead"
+    });
+  }
+});
+
 app.get("/api/funnel-status/:phone", authenticateAgent, async (req, res) => {
   try {
     const { phone } = req.params;
