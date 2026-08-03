@@ -3027,7 +3027,7 @@ body {
     display: block;
     background-color: #fff;
     background-image: url('/icon-192.png');
-    background-size: cover;
+    background-size: 92%;
     background-position: center;
     background-repeat: no-repeat;
   }
