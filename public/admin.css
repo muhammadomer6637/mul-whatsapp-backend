@@ -3010,13 +3010,8 @@ body {
   .sidebar .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 4px 0 20px;
     justify-content: center;
-  }
-
-  .sidebar.expanded .brand {
-    justify-content: flex-start;
+    padding: 4px 0 20px;
   }
 
   .brand-logo-icon {
@@ -3030,22 +3025,12 @@ body {
     background-size: 92%;
     background-position: center;
     background-repeat: no-repeat;
+    transition: width 0.2s ease, height 0.2s ease;
   }
 
-  .brand-text {
-    display: none;
-    overflow: hidden;
-  }
-
-  .sidebar.expanded .brand-text {
-    display: block;
-  }
-
-  .brand-title {
-    font-size: 12.5px;
-    font-weight: 700;
-    color: #fff;
-    line-height: 1.3;
+  .sidebar.expanded .brand-logo-icon {
+    width: 64px;
+    height: 64px;
   }
 
   .sidebar .nav-btn {
