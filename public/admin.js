@@ -191,6 +191,21 @@ function closeSidebar() {
   document.getElementById("sidebarOverlay")?.classList.remove("sidebar-open");
 }
 
+function toggleSidebarCollapse() {
+  const sidebar = document.getElementById("sidebar");
+  if (!sidebar) return;
+  const expanded = sidebar.classList.toggle("expanded");
+  localStorage.setItem("mul_nexus_sidebar_expanded", expanded ? "1" : "0");
+}
+
+(function restoreSidebarCollapseState() {
+  if (localStorage.getItem("mul_nexus_sidebar_expanded") === "1") {
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("sidebar")?.classList.add("expanded");
+    });
+  }
+})();
+
 function showSection(id, btn = null) {
   currentSection = id;
   closeSidebar();
