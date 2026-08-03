@@ -3011,13 +3011,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0;
     padding: 4px 0 20px;
-  }
-
-  .sidebar.expanded .brand {
-    justify-content: flex-start;
-    gap: 14px;
   }
 
   .brand-logo-icon {
@@ -3027,45 +3021,29 @@ body {
     flex-shrink: 0;
     display: block;
     background-color: #fff;
-    background-image: url('/icon-192.png');
+    background-image: url('/mul-logo-round.png');
     background-size: 92%;
     background-position: center;
     background-repeat: no-repeat;
-    transition: width 0.2s ease, height 0.2s ease;
   }
 
   .sidebar.expanded .brand-logo-icon {
-    width: 90px;
-    height: 90px;
-  }
-
-  .brand-divider {
     display: none;
-    width: 1px;
-    height: 70px;
-    background: rgba(255,255,255,0.25);
-    flex-shrink: 0;
   }
 
-  .sidebar.expanded .brand-divider {
-    display: block;
-  }
-
-  .brand-text {
+  .brand-logo-full {
     display: none;
-    overflow: hidden;
+    width: 100%;
+    max-width: 210px;
+    aspect-ratio: 1096 / 430;
+    background-image: url('/mul-logo-white.png');
+    background-size: contain;
+    background-position: left center;
+    background-repeat: no-repeat;
   }
 
-  .sidebar.expanded .brand-text {
+  .sidebar.expanded .brand-logo-full {
     display: block;
-  }
-
-  .brand-title {
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 18px;
-    font-weight: 600;
-    color: #fff;
-    line-height: 1.3;
   }
 
   .sidebar .nav-btn {
