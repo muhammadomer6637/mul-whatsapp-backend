@@ -2988,9 +2988,9 @@ body {
   .sidebar-toggle-collapse {
     position: absolute;
     top: 26px;
-    right: -12px;
-    width: 24px;
-    height: 24px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
     background: var(--panel-2);
     border: 1px solid var(--line);
