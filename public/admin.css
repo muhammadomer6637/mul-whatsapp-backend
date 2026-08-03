@@ -3011,7 +3011,13 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 0;
     padding: 4px 0 20px;
+  }
+
+  .sidebar.expanded .brand {
+    justify-content: flex-start;
+    gap: 14px;
   }
 
   .brand-logo-icon {
@@ -3029,8 +3035,37 @@ body {
   }
 
   .sidebar.expanded .brand-logo-icon {
-    width: 64px;
-    height: 64px;
+    width: 90px;
+    height: 90px;
+  }
+
+  .brand-divider {
+    display: none;
+    width: 1px;
+    height: 70px;
+    background: rgba(255,255,255,0.25);
+    flex-shrink: 0;
+  }
+
+  .sidebar.expanded .brand-divider {
+    display: block;
+  }
+
+  .brand-text {
+    display: none;
+    overflow: hidden;
+  }
+
+  .sidebar.expanded .brand-text {
+    display: block;
+  }
+
+  .brand-title {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.3;
   }
 
   .sidebar .nav-btn {
