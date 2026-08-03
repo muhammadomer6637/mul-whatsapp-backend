@@ -3112,12 +3112,25 @@ body {
     flex: 1;
   }
 
+  /* The pre-existing .switch rule elsewhere in this file sets
+     "display: inline-block !important" - these overrides need
+     !important too, or they lose to it and the switch stays visible
+     (overlapping the collapsed status icon) even when collapsed. */
   .sidebar .switch {
-    display: none;
+    display: none !important;
   }
 
   .sidebar.expanded .switch {
-    display: inline-block;
+    display: inline-block !important;
+  }
+
+  .agent-status-wrap {
+    flex-direction: column;
+    gap: 4px !important;
+  }
+
+  .sidebar.expanded .agent-status-wrap {
+    flex-direction: row;
   }
 
   .sidebar-logout-btn {
