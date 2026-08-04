@@ -727,12 +727,14 @@ body {
 
 .wa-list-top h3 {
   margin: 0;
-  font-size: 22px;
+  font-size: 17px;
+  font-weight: 600;
 }
 
 .wa-list-top p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: var(--muted);
+  font-size: 12px;
 }
 
 #agentMiniStats {
@@ -746,36 +748,36 @@ body {
 
 #agentMiniStats .agent-mini-card {
   padding: 8px 6px;
-  border-radius: 12px;
-  background: rgba(47, 125, 246, 0.12);
-  border: 1px solid rgba(86, 165, 255, 0.22);
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
   text-align: center;
 }
 
 #agentMiniStats .agent-mini-card span {
   display: block;
-  font-size: 11px;
-  color: #9fc5ff;
-  margin-bottom: 5px;
-  font-weight: 800;
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 4px;
+  font-weight: 600;
 }
 
 #agentMiniStats .agent-mini-card strong {
   display: block;
-  font-size: 16px;
+  font-size: 15px;
   color: #ffffff;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .pill-badge {
-  min-width: 28px;
-  padding: 6px 10px;
+  min-width: 26px;
+  padding: 5px 9px;
   border-radius: 999px;
-  background: rgba(47,125,246,0.18);
-  border: 1px solid rgba(86,165,255,0.25);
+  background: var(--accent);
+  color: #fff;
   text-align: center;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .wa-search {
