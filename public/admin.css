@@ -785,19 +785,27 @@ body {
 
 .wa-search input {
   width: 100%;
-  background: rgba(255,255,255,0.05);
+  background: var(--panel-2);
   border: 1px solid var(--line);
   color: white;
-  border-radius: 14px;
-  padding: 12px 14px;
+  font-size: 13px;
+  border-radius: 10px;
+  padding: 9px 12px;
   outline: none;
 }
 
 .wa-filters {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   padding: 0 12px 12px;
   flex-shrink: 0;
+}
+
+.wa-filters .ghost-btn {
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .chat-list {
@@ -822,9 +830,9 @@ body {
 .chat-item {
   background: rgba(255,255,255,0.03);
   border: 1px solid transparent;
-  border-radius: 16px;
-  padding: 13px;
-  margin-bottom: 10px;
+  border-radius: 12px;
+  padding: 11px;
+  margin-bottom: 8px;
   cursor: pointer;
 }
 
@@ -849,30 +857,31 @@ body {
 
 .chat-program {
   color: var(--muted);
-  font-size: 13px;
-  margin-bottom: 8px;
+  font-size: 11.5px;
+  margin-bottom: 4px;
 }
 
 .chat-preview {
-  color: #cbd8ef;
-  font-size: 13px;
-  line-height: 1.35;
-  max-height: 38px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .unread-badge {
-  background: linear-gradient(135deg, #ff6174, #ff8392);
+  background: var(--accent);
   color: white;
-  font-size: 11px;
-  font-weight: 900;
-  min-width: 25px;
-  height: 25px;
-  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .wa-chat-window {
@@ -884,8 +893,8 @@ body {
 }
 
 .wa-chat-header {
-  min-height: 74px;
-  padding: 14px 18px;
+  min-height: 64px;
+  padding: 13px 20px;
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
@@ -895,25 +904,30 @@ body {
 }
 
 .wa-avatar {
-  width: 46px;
-  height: 46px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--accent-2);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 900;
+  font-weight: 600;
+  font-size: 13px;
+  flex-shrink: 0;
 }
 
 .wa-chat-header h3 {
-  margin: 0 0 4px;
-  font-size: 19px;
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .wa-chat-header p {
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .messages {
@@ -1052,17 +1066,36 @@ body {
 
 .composer textarea {
   width: 100%;
-  background: rgba(255,255,255,0.05);
+  background: var(--panel-2);
   border: 1px solid var(--line);
   outline: none;
   color: white;
-  border-radius: 16px;
-  padding: 13px 15px;
-  font-size: 15px;
-    min-height: 50px;
+  border-radius: 14px;
+  padding: 10px 13px;
+  font-size: 13.5px;
+  min-height: 44px;
   max-height: 120px;
   resize: vertical;
   font-family: inherit;
+}
+
+.composer .primary-btn,
+.composer .danger-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.composer .primary-btn {
+  background: var(--accent);
+  padding: 0 16px;
+}
+
+.composer .danger-btn {
+  padding: 0 14px;
 }
 
 .quick-reply-dropdown {
@@ -1166,21 +1199,21 @@ body {
 }
 
 .quick-replies button {
-  border: 1px solid rgba(86,165,255,0.28);
-  background: rgba(47,125,246,0.14);
-  color: #d9eaff;
-  border-radius: 999px;
-  padding: 8px 13px;
-  font-size: 12px;
-  font-weight: 800;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  border-radius: 20px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
   transition: 0.2s ease;
 }
 
 .quick-replies button:hover {
-  background: rgba(47,125,246,0.26);
-  border-color: rgba(86,165,255,0.48);
-  transform: translateY(-1px);
+  background: rgba(47,125,246,0.16);
+  border-color: rgba(86,165,255,0.4);
+  color: #d9eaff;
 }
 
 .primary-btn {
@@ -1586,19 +1619,20 @@ CALLBACK CENTER
 }
 
 .quick-replies button {
-  border: 1px solid rgba(86,165,255,0.24);
-  background: rgba(47,125,246,0.12);
-  color: #d9eaff;
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 800;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  border-radius: 20px;
+  padding: 5px 11px;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .quick-replies button:hover {
-  background: rgba(47,125,246,0.24);
-  border-color: rgba(86,165,255,0.45);
+  background: rgba(47,125,246,0.16);
+  border-color: rgba(86,165,255,0.4);
+  color: #d9eaff;
 }
 
 .chat-item.new-message-highlight {
