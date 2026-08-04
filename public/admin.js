@@ -958,12 +958,9 @@ function buildTickHtml(status) {
 function buildReplyQuoteHtml(message) {
   if (!message.reply_to_text) return "";
   const label = message.reply_to_sender ? capitalize(message.reply_to_sender) : "";
-  return `
-    <div class="reply-quote">
-      ${label ? `<div class="reply-quote-label">${escapeHtml(label)}</div>` : ""}
-      <div class="reply-quote-text">${escapeHtml(message.reply_to_text.slice(0, 150))}</div>
-    </div>
-  `;
+  return `<div class="reply-quote">${
+    label ? `<div class="reply-quote-label">${escapeHtml(label)}</div>` : ""
+  }<div class="reply-quote-text">${escapeHtml(message.reply_to_text.slice(0, 150))}</div></div>`;
 }
 
 function buildMessageRowHtml(message, isLatest) {
@@ -973,39 +970,22 @@ function buildMessageRowHtml(message, isLatest) {
     (message.type === "image" || message.mime_type?.includes("image"))
     && message.media_url
   ) {
-    content = `
-      <img src="${escapeHtml(message.media_url)}"
-           style="max-width:200px;border-radius:10px;cursor:pointer"
-           onclick="window.open('${escapeHtml(message.media_url)}','_blank')" />
-    `;
+    content = `<img src="${escapeHtml(message.media_url)}" style="max-width:200px;border-radius:10px;cursor:pointer" onclick="window.open('${escapeHtml(message.media_url)}','_blank')" />`;
   } else if (
     (message.type === "document" || message.mime_type?.includes("pdf"))
     && message.media_url
   ) {
-    content = `
-      <a href="${escapeHtml(message.media_url)}" target="_blank"
-         style="color:#56a5ff;text-decoration:underline">
-         📄 ${escapeHtml(message.file_name || "Open Document")}
-      </a>
-    `;
+    content = `<a href="${escapeHtml(message.media_url)}" target="_blank" style="color:#56a5ff;text-decoration:underline">📄 ${escapeHtml(message.file_name || "Open Document")}</a>`;
   } else if (
     (message.type === "video" || message.mime_type?.includes("video"))
     && message.media_url
   ) {
-    content = `
-      <video controls style="max-width:220px;border-radius:10px">
-        <source src="${escapeHtml(message.media_url)}">
-      </video>
-    `;
+    content = `<video controls style="max-width:220px;border-radius:10px"><source src="${escapeHtml(message.media_url)}"></video>`;
   } else if (
     (message.type === "audio" || message.mime_type?.includes("audio"))
     && message.media_url
   ) {
-    content = `
-      <audio controls>
-        <source src="${escapeHtml(message.media_url)}">
-      </audio>
-    `;
+    content = `<audio controls><source src="${escapeHtml(message.media_url)}"></audio>`;
   } else {
     content = `<div>${escapeHtml(message.text || message.type || "")}</div>`;
   }
@@ -1024,15 +1004,7 @@ function buildMessageRowHtml(message, isLatest) {
   const replyBtn = message.wamid
     ? `<button class="reply-btn" onclick="startReply(${message.id})" title="Reply">↩</button>`
     : "";
-  const bubbleHtml = `
-    <div class="message-bubble">
-      ${replyQuote}
-      ${content}
-      <div class="message-meta">
-        ${capitalize(message.sender)} · ${formatDateTime(message.created_at, true)}${sentTick}
-      </div>
-    </div>
-  `;
+  const bubbleHtml = `<div class="message-bubble">${replyQuote}${content}<div class="message-meta">${capitalize(message.sender)} · ${formatDateTime(message.created_at, true)}${sentTick}</div></div>`;
 
   return `
     ${divider}
