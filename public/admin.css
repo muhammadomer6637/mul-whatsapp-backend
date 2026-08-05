@@ -484,11 +484,11 @@ body {
 }
 
 .stat-card.live {
-  border-color: rgba(24,195,126,0.28);
+  border-color: rgba(24,195,126,0.22);
   background: linear-gradient(
     180deg,
-    rgba(10,74,54,0.95),
-    rgba(7,52,38,0.95)
+    rgba(15,58,46,0.55),
+    rgba(8,18,38,0.94)
   );
 }
 
