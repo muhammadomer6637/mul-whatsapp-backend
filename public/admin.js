@@ -393,46 +393,88 @@ async function loadDashboard(range = "24h") {
     const agentCategoryStats = data.agentCategoryStats || [];
     
 document.getElementById("stats").innerHTML = `
-  <div class="stat-card performance">
-    <div class="label">Total Conversations</div>
-    <div class="value">${stats.conversationsStarted}</div>
-    <div class="meta">Date filtered</div>
+  <div class="stat-cluster">
+    <div class="stat-cluster-label">
+      <span class="eyebrow">This Period</span>
+      <span class="cluster-sub">— based on the date range selected above</span>
+    </div>
+    <div class="stat-cluster-grid">
+
+      <div class="stat-card performance">
+        <div class="stat-card-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 1 3.2 6.4L4 20l1.3-3.6A7.96 7.96 0 0 1 4 12Z"/></svg>
+        </div>
+        <div class="label">Total Conversations</div>
+        <div class="value">${stats.conversationsStarted}</div>
+        <div class="meta">Date filtered</div>
+      </div>
+
+      <div class="stat-card performance">
+        <div class="stat-card-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v4M4 12l3.5 5h9L20 12M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/></svg>
+        </div>
+        <div class="label">Total Incoming Messages</div>
+        <div class="value">${stats.totalIncomingMessages}</div>
+        <div class="meta">Date filtered user messages</div>
+      </div>
+
+      <div class="stat-card performance">
+        <div class="stat-card-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9M6.3 6.3a9 9 0 1 0 11.4 0"/></svg>
+        </div>
+        <div class="label">Agent Chat Requests</div>
+        <div class="value">${stats.agentChatRequests || 0}</div>
+        <div class="meta">Date filtered users requested agent</div>
+      </div>
+
+      <div class="stat-card performance">
+        <div class="stat-card-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>
+        </div>
+        <div class="label">Agent Messages Sent</div>
+        <div class="value">${stats.agentMessagesSent || 0}</div>
+        <div class="meta">Date filtered agent replies</div>
+      </div>
+
+    </div>
   </div>
 
-  <div class="stat-card performance">
-    <div class="label">Total Incoming Messages</div>
-    <div class="value">${stats.totalIncomingMessages}</div>
-    <div class="meta">Date filtered user messages</div>
-  </div>
+  <div class="stat-cluster">
+    <div class="stat-cluster-label">
+      <span class="live-pulse-dot"></span>
+      <span class="eyebrow">Right Now</span>
+      <span class="cluster-sub">— live, ignores the date range</span>
+    </div>
+    <div class="stat-cluster-grid">
 
-  <div class="stat-card performance">
-  <div class="label">Agent Chat Requests</div>
-  <div class="value">${stats.agentChatRequests || 0}</div>
-  <div class="meta">Date filtered users requested agent</div>
-</div>
+      <div class="stat-card live">
+        <div class="stat-card-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.2c2.5.3 4.5 2.6 4.5 5.8"/></svg>
+        </div>
+        <div class="label">Active with Agent</div>
+        <div class="value">${stats.activeWithAgent}</div>
+        <div class="meta">Live now</div>
+      </div>
 
-<div class="stat-card performance">
-  <div class="label">Agent Messages Sent</div>
-  <div class="value">${stats.agentMessagesSent || 0}</div>
-  <div class="meta">Date filtered agent replies</div>
-</div>
+      <div class="stat-card live">
+        <div class="stat-card-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+        </div>
+        <div class="label">Agent Waiting</div>
+        <div class="value">${stats.agentWaiting}</div>
+        <div class="meta">Live now</div>
+      </div>
 
-  <div class="stat-card live">
-    <div class="label">Active with Agent</div>
-    <div class="value">${stats.activeWithAgent}</div>
-    <div class="meta">Live now</div>
-  </div>
+      <div class="stat-card live">
+        <div class="stat-card-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M8 4h8"/><circle cx="9" cy="14" r="1.2"/><circle cx="15" cy="14" r="1.2"/></svg>
+        </div>
+        <div class="label">Active with Bot</div>
+        <div class="value">${stats.activeWithBot}</div>
+        <div class="meta">Live now</div>
+      </div>
 
-  <div class="stat-card live">
-    <div class="label">Agent Waiting</div>
-    <div class="value">${stats.agentWaiting}</div>
-    <div class="meta">Live now</div>
-  </div>
-
-  <div class="stat-card live">
-    <div class="label">Active with Bot</div>
-    <div class="value">${stats.activeWithBot}</div>
-    <div class="meta">Live now</div>
+    </div>
   </div>
 `;
         markLoaded("stats");
@@ -511,25 +553,17 @@ document.getElementById("stats").innerHTML = `
 
     const allTimeTopProgramsWrap = document.getElementById("allTimeTopProgramsList");
     const allTimeTopPrograms = data.allTimeTopPrograms || [];
+    const allTimeTotalChip = document.getElementById("allTimeTopProgramsTotal");
 
     if (!allTimeTopPrograms.length) {
       allTimeTopProgramsWrap.innerHTML = `<p style="color: var(--muted);">No program inquiry data available.</p>`;
+      if (allTimeTotalChip) allTimeTotalChip.textContent = "0";
     } else {
-      const normalizedAllTime = normalizeProgramsForDisplay(allTimeTopPrograms).slice(0, 10);
-      const maxAllTimeCount = Math.max(...normalizedAllTime.map(p => p.inquiries), 1);
+      const normalizedAllTime = normalizeProgramsForDisplay(allTimeTopPrograms);
+      const allTimeTotal = normalizedAllTime.reduce((sum, p) => sum + p.inquiries, 0);
+      if (allTimeTotalChip) allTimeTotalChip.textContent = allTimeTotal.toLocaleString();
 
-      allTimeTopProgramsWrap.innerHTML = normalizedAllTime.map(program => {
-        const width = (program.inquiries / maxAllTimeCount) * 100;
-        return `
-          <div class="program-row">
-            <div class="program-row-head">
-              <div class="program-name">${escapeHtml(program.program)}</div>
-              <div class="program-count">${program.inquiries}</div>
-            </div>
-            <div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div>
-          </div>
-        `;
-      }).join("");
+      allTimeTopProgramsWrap.innerHTML = renderRankedProgramRows(normalizedAllTime, { limit: 6 });
     }
 
    document.getElementById("botInterestStats").innerHTML =
@@ -566,25 +600,17 @@ document.querySelector(".fill-3").style.width = `${Math.min(documentsWidth, 100)
 document.querySelector(".fill-4").style.width = `${Math.min(feePaidWidth, 100)}%`;
 
     const topProgramsWrap = document.getElementById("topProgramsList");
+    const topProgramsTotalChip = document.getElementById("topProgramsTotal");
 
     if (!data.topPrograms.length) {
       topProgramsWrap.innerHTML = `<p style="color: var(--muted);">No program inquiry data available.</p>`;
+      if (topProgramsTotalChip) topProgramsTotalChip.textContent = "0";
     } else {
       const normalized = normalizeProgramsForDisplay(data.topPrograms);
-      const maxCount = Math.max(...normalized.map(p => p.inquiries), 1);
+      const periodTotal = normalized.reduce((sum, p) => sum + p.inquiries, 0);
+      if (topProgramsTotalChip) topProgramsTotalChip.textContent = periodTotal.toLocaleString();
 
-      topProgramsWrap.innerHTML = normalized.map(program => {
-        const width = (program.inquiries / maxCount) * 100;
-        return `
-          <div class="program-row">
-            <div class="program-row-head">
-              <div class="program-name">${escapeHtml(program.program)}</div>
-              <div class="program-count">${program.inquiries}</div>
-            </div>
-            <div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div>
-          </div>
-        `;
-      }).join("");
+      topProgramsWrap.innerHTML = renderRankedProgramRows(normalized, { limit: 6 });
     }
 
     const leadsBody = document.querySelector("#leadsTable tbody");
@@ -3386,6 +3412,57 @@ function normalizeProgramsForDisplay(programs) {
   return Object.entries(merged)
     .map(([program, inquiries]) => ({ program, inquiries }))
     .sort((a, b) => b.inquiries - a.inquiries || a.program.localeCompare(b.program));
+}
+
+function getProgramLevel(programName) {
+  const name = String(programName || "").toLowerCase();
+  if (name.startsWith("phd")) return "Doctoral";
+  if (name.startsWith("m.phil") || name.startsWith("mphil") || name.startsWith("ms ") || name.startsWith("mba")) {
+    return "Graduate";
+  }
+  if (name.includes("llb") || name.includes("pharmacy") || name.includes("law")) return "Professional";
+  return "Undergrad";
+}
+
+function renderRankedProgramRows(normalizedPrograms, { limit = 6 } = {}) {
+  const total = normalizedPrograms.reduce((sum, p) => sum + p.inquiries, 0) || 1;
+  const shown = normalizedPrograms.slice(0, limit);
+  const rest = normalizedPrograms.slice(limit);
+  const maxCount = Math.max(...shown.map(p => p.inquiries), 1);
+
+  const rows = shown.map((program, i) => {
+    const width = (program.inquiries / maxCount) * 100;
+    const pct = Math.round((program.inquiries / total) * 100);
+    return `
+      <div class="ranked-row${i === 0 ? " rank-1" : ""}">
+        <div class="ranked-rank">${i + 1}</div>
+        <div class="ranked-main">
+          <div class="ranked-name-line">
+            <span class="ranked-name">${escapeHtml(program.program)}</span>
+            <span class="ranked-level-tag">${getProgramLevel(program.program)}</span>
+          </div>
+          <div class="ranked-bar-track"><div class="ranked-bar-fill" style="width:${width}%"></div></div>
+        </div>
+        <div class="ranked-count-col">
+          <span class="ranked-count-n">${program.inquiries}</span>
+          <span class="ranked-count-pct">${pct}%</span>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  if (!rest.length) return rows;
+
+  const restCount = rest.reduce((sum, p) => sum + p.inquiries, 0);
+  const restPct = Math.round((restCount / total) * 100);
+  const otherNote = `
+    <div class="ranked-other-note">
+      <span><b>${rest.length} more program${rest.length === 1 ? "" : "s"}</b> below this cut-off</span>
+      <span>${restCount} inquiries · ${restPct}%</span>
+    </div>
+  `;
+
+  return rows + otherNote;
 }
 
 document.addEventListener("DOMContentLoaded", () => {

@@ -273,6 +273,75 @@ body {
   margin-bottom: 20px;
 }
 
+.stats-clusters {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.stat-cluster-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-cluster-label .eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stat-cluster-label .cluster-sub {
+  font-size: 11.5px;
+  color: var(--muted-2, var(--muted));
+}
+
+.live-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(34, 197, 141, 0.18);
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .live-pulse-dot {
+    animation: livePulse 2.2s ease-in-out infinite;
+  }
+}
+
+@keyframes livePulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(34, 197, 141, 0.18); }
+  50% { box-shadow: 0 0 0 6px rgba(34, 197, 141, 0.05); }
+}
+
+.stat-cluster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));
+  gap: 14px;
+}
+
+.stat-card-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(86, 165, 255, 0.12);
+  color: var(--accent-2);
+  margin-bottom: 10px;
+}
+
+.stat-card.live .stat-card-icon {
+  background: rgba(34, 197, 141, 0.14);
+  color: var(--success);
+}
+
 .report-card {
   background: var(--panel-2);
   border: 1px solid var(--line);
@@ -567,6 +636,8 @@ body {
 .panel-header {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
   margin-bottom: 18px;
 }
 
@@ -620,6 +691,167 @@ body {
 .bar-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+
+/* ---- Ranked program list (Top Programs panels) ----
+   Deliberately new class names, not .program-row/.program-name/etc:
+   those already carry a duplicate !important block elsewhere in this
+   file (forced 22px/900 name, ::after " Inquiries" suffix, glow bar)
+   that would silently fight anything added here. */
+.panel-total-chip {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+
+.panel-total-chip .n {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.panel-total-chip .l {
+  font-size: 9.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+
+.ranked-row {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 8px;
+  border-radius: 12px;
+  transition: background 0.15s ease;
+}
+
+.ranked-row:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.ranked-row + .ranked-row {
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.ranked-rank {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.ranked-row.rank-1 .ranked-rank {
+  color: #08111f;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.ranked-main {
+  min-width: 0;
+}
+
+.ranked-name-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.ranked-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ranked-level-tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.ranked-level-tag::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--muted);
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+.ranked-bar-track {
+  height: 5px;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+
+.ranked-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+
+.ranked-count-col {
+  text-align: right;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 56px;
+}
+
+.ranked-count-n {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.ranked-count-pct {
+  font-size: 10.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}
+
+.ranked-other-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 8px 2px;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.ranked-other-note b {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .mini-stats {
