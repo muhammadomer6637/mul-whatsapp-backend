@@ -5182,6 +5182,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       activeWithBot,
       activeWithAgent,
       topPrograms,
+      allTimeTopPrograms,
       recentLeads,
       funnelStats,
       callbackTotals,
@@ -5317,6 +5318,22 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         `,
         queryParams
       ),
+
+      // All-time (not scoped to the selected date range) - fed to the normalized
+      // "Top Programs" panel that merges free-text spelling variants client-side.
+      // No LIMIT here beyond a safety cap: normalization merges rows together in
+      // admin.js, so we need the raw grouped counts, not a pre-merge top 10.
+      pool.query(`
+        SELECT
+          program,
+          COUNT(*)::int AS inquiries
+        FROM users
+        WHERE program IS NOT NULL
+          AND TRIM(program) <> ''
+        GROUP BY program
+        ORDER BY inquiries DESC, program ASC
+        LIMIT 300
+      `),
 
       pool.query(`
         SELECT
@@ -5505,6 +5522,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       botInterestStats: botInterestStats.rows,
       agentCategoryStats: agentCategoryStats.rows,
       topPrograms: topPrograms.rows,
+      allTimeTopPrograms: allTimeTopPrograms.rows,
       recentLeads: recentLeads.rows,
       weeklyConversations: weeklyConversations.rows
     });

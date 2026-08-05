@@ -509,12 +509,28 @@ document.getElementById("stats").innerHTML = `
   </div>
 `;
 
-    document.getElementById("queueSnapshot").innerHTML = `
-      <div class="mini-stat"><h4>Agent Waiting</h4><div class="mini-value">${stats.agentWaiting}</div></div>
-      <div class="mini-stat"><h4>Agent Active</h4><div class="mini-value">${stats.agentActive}</div></div>
-      <div class="mini-stat"><h4>Active with Bot</h4><div class="mini-value">${stats.activeWithBot}</div></div>
-     <div class="mini-stat"><h4>Total Incoming</h4><div class="mini-value">${stats.totalIncomingMessages}</div></div>
-    `;
+    const allTimeTopProgramsWrap = document.getElementById("allTimeTopProgramsList");
+    const allTimeTopPrograms = data.allTimeTopPrograms || [];
+
+    if (!allTimeTopPrograms.length) {
+      allTimeTopProgramsWrap.innerHTML = `<p style="color: var(--muted);">No program inquiry data available.</p>`;
+    } else {
+      const normalizedAllTime = normalizeProgramsForDisplay(allTimeTopPrograms).slice(0, 10);
+      const maxAllTimeCount = Math.max(...normalizedAllTime.map(p => p.inquiries), 1);
+
+      allTimeTopProgramsWrap.innerHTML = normalizedAllTime.map(program => {
+        const width = (program.inquiries / maxAllTimeCount) * 100;
+        return `
+          <div class="program-row">
+            <div class="program-row-head">
+              <div class="program-name">${escapeHtml(program.program)}</div>
+              <div class="program-count">${program.inquiries}</div>
+            </div>
+            <div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div>
+          </div>
+        `;
+      }).join("");
+    }
 
    document.getElementById("botInterestStats").innerHTML =
   renderInteractionStats(botInterestStats, "bot");
@@ -3185,22 +3201,170 @@ function titleCase(str) {
 
 function normalizeProgramKey(name) {
   if (!name) return "";
-  const raw = String(name).trim().toLowerCase().replace(/\s+/g, " ");
+  const raw = String(name).trim().toLowerCase().replace(/\s+/g, " ").replace(/\.$/, "");
 
   const map = {
     "bscs": "BS Computer Science",
     "bs cs": "BS Computer Science",
+    "cs": "BS Computer Science",
+    "computer science": "BS Computer Science",
     "bs computer science": "BS Computer Science",
+
     "bsse": "BS Software Engineering",
     "bs se": "BS Software Engineering",
+    "se": "BS Software Engineering",
+    "software engineering": "BS Software Engineering",
     "bs software engineering": "BS Software Engineering",
+
+    "bsai": "BS Artificial Intelligence",
+    "bs ai": "BS Artificial Intelligence",
+    "ai": "BS Artificial Intelligence",
+    "artificial intelligence": "BS Artificial Intelligence",
+    "bs artificial intelligence": "BS Artificial Intelligence",
+
+    "bscys": "BS Cyber Security",
+    "bs cys": "BS Cyber Security",
+    "cyber security": "BS Cyber Security",
+    "cybersecurity": "BS Cyber Security",
+    "bs cyber security": "BS Cyber Security",
+
+    "bsds": "BS Data Science",
+    "bs ds": "BS Data Science",
+    "data science": "BS Data Science",
+    "bs data science": "BS Data Science",
+    "ms data science": "MS Data Science",
+
+    "bsit": "BS Information Technology",
+    "bs it": "BS Information Technology",
+    "it": "BS Information Technology",
+    "information technology": "BS Information Technology",
+    "bs information technology": "BS Information Technology",
+
+    "bs im": "BS Information Management",
+    "information management": "BS Information Management",
+
+    "istm": "BS Information System & Technology Management",
+    "bs istm": "BS Information System & Technology Management",
+
+    "af": "BS Accounting & Finance",
+    "accounting and finance": "BS Accounting & Finance",
+    "accounting & finance": "BS Accounting & Finance",
+    "bs accounting & finance": "BS Accounting & Finance",
+    "bs accounting and finance": "BS Accounting & Finance",
+
+    "business analytics": "BS Business Analytics",
+    "bs business analytics": "BS Business Analytics",
+
     "bba": "BBA",
+    "business administration": "BBA",
+
+    "bcom": "B.Com (Hons)",
+    "b.com": "B.Com (Hons)",
+    "b com": "B.Com (Hons)",
+    "bcom hons": "B.Com (Hons)",
+
+    "biotech": "BS Biotechnology",
+    "biotechnology": "BS Biotechnology",
+    "bs biotechnology": "BS Biotechnology",
+
+    "biochemistry": "BS Bio Chemistry",
+    "bio chemistry": "BS Bio Chemistry",
+
+    "criminology": "BS Criminology and Forensic Sciences",
+    "forensics": "BS Criminology and Forensic Sciences",
+    "forensic science": "BS Criminology and Forensic Sciences",
+
+    "digital marketing": "BS Digital Marketing",
+    "bs digital marketing": "BS Digital Marketing",
+
+    "digital media": "BS Digital Media Communication",
+
+    "ecommerce": "BS E-Commerce",
+    "e-commerce": "BS E-Commerce",
+
+    "economics": "BS Economics",
+    "eco": "BS Economics",
+    "bs economics": "BS Economics",
+
+    "education": "BS Education",
+    "bs education": "BS Education",
+
+    "fintech": "BS Financial Technology",
+    "financial technology": "BS Financial Technology",
+
+    "food science": "BS Food Science and Technology",
+
+    "nutrition": "BS Human Nutrition & Dietetics",
+    "dietetics": "BS Human Nutrition & Dietetics",
+
+    "ir": "BS International Relations",
+    "international relations": "BS International Relations",
+    "bs international relations": "BS International Relations",
+
+    "islamic banking": "BS Islamic Banking & Finance",
+    "ibf": "BS Islamic Banking & Finance",
+    "islamic banking and finance": "BS Islamic Banking & Finance",
+    "ms ibf": "MS Islamic Banking & Finance",
+
+    "mlt": "BS Medical Lab Technology",
+    "medical lab technology": "BS Medical Lab Technology",
+
+    "multimedia": "BS Multimedia Arts",
+    "multimedia arts": "BS Multimedia Arts",
+
+    "peace studies": "BS Peace & Conflict Studies",
+
+    "political science": "BS Political Science",
+    "poli sci": "BS Political Science",
+    "ps": "BS Political Science",
+    "bs political science": "BS Political Science",
+
+    "psychology": "BS Psychology",
+    "psych": "BS Psychology",
+    "bs psychology": "BS Psychology",
+
+    "sociology": "BS Sociology",
+    "socio": "BS Sociology",
+    "bs sociology": "BS Sociology",
+
+    "statistics": "BS Statistics & Data Science",
+
     "dpt": "Doctor of Physiotherapy",
+
+    "pharmd": "Doctor of Pharmacy",
+    "pharm-d": "Doctor of Pharmacy",
+    "pharm d": "Doctor of Pharmacy",
+    "doctor of pharmacy": "Doctor of Pharmacy",
+    "pharmacy": "Doctor of Pharmacy",
+
     "llb": "Bachelor of Laws (LLB)",
+    "law": "Bachelor of Laws (LLB)",
+    "bachelor of law": "Bachelor of Laws (LLB)",
+    "bachelor of laws": "Bachelor of Laws (LLB)",
+
+    "mass comm": "Mass Communication",
+    "masscom": "Mass Communication",
+    "mass communication": "Mass Communication",
+
+    "mba": "MBA Professional",
+    "mba professional": "MBA Professional",
+    "mba executive": "MBA Executive",
+    "executive mba": "MBA Executive",
+
+    "english": "English",
+
     "m.phil education": "M.Phil Education",
     "mphil education": "M.Phil Education",
     "m.phil sociology": "M.Phil Sociology",
-    "mphil sociology": "M.Phil Sociology"
+    "mphil sociology": "M.Phil Sociology",
+    "m.phil computer science": "M.Phil Computer Science",
+    "mphil computer science": "M.Phil Computer Science",
+    "m.phil economics": "M.Phil Economics",
+    "mphil economics": "M.Phil Economics",
+
+    "phd economics": "PhD Economics",
+    "phd education": "PhD Education",
+    "phd mass communication": "PhD Mass Communication"
   };
 
   return map[raw] || titleCase(raw);
