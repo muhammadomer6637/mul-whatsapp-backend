@@ -9,6 +9,15 @@ let searchResults = [];
 let searchDebounceTimer = null;
 let pollIntervalId = null;
 
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function authHeadersLive(extra = {}) {
   const token =
     sessionStorage.getItem("mul_nexus_token") ||
@@ -242,6 +251,8 @@ function renderChats() {
   }
 
   filteredChats.forEach(chat => {
+    const phone = String(chat.phone || "");
+    const unreadCount = Number(chat.unread_count || 0);
     const statusClass =
       chat.status === "agent_waiting"
         ? "waiting"
@@ -254,14 +265,14 @@ function renderChats() {
 
     const preview =
       chat.last_message
-        ? chat.last_message.replace(/\n/g, " ").substring(0, 70) + "..."
+        ? String(chat.last_message).replace(/\n/g, " ").substring(0, 70) + "..."
         : "No message yet";
 
     wrap.innerHTML += `
-      <div class="chat-card" onclick="openChat('${chat.phone}')">
+      <div class="chat-card" data-phone="${escapeHtml(phone)}">
 
         <div class="chat-top">
-          <strong>${chat.name || "Unknown Student"}</strong>
+          <strong>${escapeHtml(chat.name || "Unknown Student")}</strong>
 
           <span class="badge ${statusClass}">
             ${statusText}
@@ -269,22 +280,22 @@ function renderChats() {
         </div>
 
         <div class="program">
-          ${chat.program || "Program Not Selected"}
+          ${escapeHtml(chat.program || "Program Not Selected")}
         </div>
 
         <div class="last-msg">
-          ${preview}
+          ${escapeHtml(preview)}
         </div>
 
         <div style="margin-top:10px; font-size:12px; opacity:.7;">
-          ${chat.phone}
+          ${escapeHtml(phone)}
         </div>
 
         ${
-          chat.unread_count > 0
+          unreadCount > 0
             ? `
               <div style="margin-top:8px; color:#22c55e; font-size:13px; font-weight:700;">
-                ${chat.unread_count} unread
+                ${unreadCount} unread
               </div>
             `
             : ""
@@ -292,6 +303,10 @@ function renderChats() {
 
       </div>
     `;
+  });
+
+  wrap.querySelectorAll(".chat-card[data-phone]").forEach(card => {
+    card.addEventListener("click", () => openChat(card.dataset.phone));
   });
 
   updateLoadMoreButton();
