@@ -184,16 +184,165 @@ body {
 }
 
 .topbar h1 {
-  margin: 0 0 8px;
-  font-size: 44px;
-  line-height: 1;
-  font-weight: 900;
+  margin: 0 0 5px;
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.3px;
 }
 
 .topbar p {
   margin: 0;
   color: var(--muted);
-  font-size: 16px;
+  font-size: 13px;
+}
+
+.profile-chip {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-shrink: 0;
+}
+
+.profile-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.profile-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.profile-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--accent-2);
+  cursor: pointer;
+}
+
+/* ---- Dashboard toolbar redesign ----
+   Uses !important throughout: .range-toolbar/.custom-range-wrap/.date-input/
+   .export-btn/.range-btn already carry several duplicate blocks elsewhere in
+   this file (some also !important), so anything added without !important
+   here would silently lose depending on source order. Added as supplementary
+   classes alongside the originals rather than replacing them, so the
+   existing onclick/id-based JS (setRange, applyCustomRange, exportDashboardData)
+   keeps working unchanged. */
+/* Every rule below is scoped under .toolbar-card (2-class-selector
+   specificity) rather than relying on !important + source order alone -
+   the legacy duplicate blocks are also !important, and several of them
+   appear LATER in this file than a bare-class rule placed here would,
+   so bare classes would silently lose. Scoping under the wrapper wins
+   regardless of where the legacy blocks fall. */
+.toolbar-card {
+  background: var(--panel-2) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 16px !important;
+  padding: 12px 14px !important;
+}
+
+.toolbar-card .seg-group {
+  display: flex !important;
+  gap: 3px !important;
+  background: rgba(0,0,0,0.18) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 11px !important;
+  padding: 3px !important;
+}
+
+.toolbar-card .seg-btn {
+  background: transparent !important;
+  border: none !important;
+  color: var(--muted) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 7px 13px !important;
+  border-radius: 8px !important;
+}
+
+.toolbar-card .seg-btn.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+  color: #fff !important;
+}
+
+.toolbar-card .toolbar-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+.toolbar-card .range-date-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  background: rgba(0,0,0,0.18) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 11px !important;
+  padding: 0 10px !important;
+  color: var(--muted) !important;
+}
+
+.toolbar-card .range-date-input {
+  height: 38px !important;
+  min-width: 0 !important;
+  width: 116px !important;
+  background: transparent !important;
+  border: none !important;
+  color: var(--text) !important;
+  padding: 0 !important;
+  font-size: 12px !important;
+}
+
+.toolbar-card .range-date-sep {
+  color: var(--muted) !important;
+  font-size: 11px !important;
+}
+
+.toolbar-card .apply-pill-btn {
+  background: var(--panel-2) !important;
+  border: 1px solid var(--line) !important;
+  color: var(--text) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 8px 14px !important;
+  border-radius: 10px !important;
+  height: auto !important;
+}
+
+.toolbar-card .export-pill-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  height: auto !important;
+  background: linear-gradient(135deg, var(--success), var(--accent-2)) !important;
+  color: #08111f !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  padding: 8px 15px !important;
+  border-radius: 10px !important;
 }
 
 .refresh-btn,
@@ -575,11 +724,11 @@ body {
   }
 
   .topbar h1 {
-    font-size: 28px;
+    font-size: 21px;
   }
 
   .topbar p {
-    font-size: 14px;
+    font-size: 12px;
   }
 }
 
@@ -715,6 +864,56 @@ body {
   font-variant-numeric: tabular-nums;
   line-height: 1.15;
 }
+
+.rate-chip {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(24,195,126,0.1);
+  border: 1px solid rgba(24,195,126,0.28);
+}
+
+.rate-chip .n {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--success);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.rate-chip .l {
+  font-size: 9.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+
+.cb-tone-info .stat-card-icon {
+  background: rgba(86,165,255,0.12);
+  color: var(--accent-2);
+}
+
+.cb-tone-warn {
+  border-color: rgba(240,177,85,0.22) !important;
+  background: linear-gradient(180deg, rgba(58,42,10,0.55), rgba(8,18,38,0.94)) !important;
+}
+.cb-tone-warn .stat-card-icon { background: rgba(240,177,85,0.16); color: var(--warning); }
+
+.cb-tone-danger {
+  border-color: rgba(255,98,118,0.22) !important;
+  background: linear-gradient(180deg, rgba(58,15,22,0.55), rgba(8,18,38,0.94)) !important;
+}
+.cb-tone-danger .stat-card-icon { background: rgba(255,98,118,0.16); color: var(--danger); }
+
+.cb-tone-success {
+  border-color: rgba(24,195,126,0.22) !important;
+  background: linear-gradient(180deg, rgba(15,58,46,0.55), rgba(8,18,38,0.94)) !important;
+}
+.cb-tone-success .stat-card-icon { background: rgba(24,195,126,0.16); color: var(--success); }
 
 .panel-total-chip .l {
   font-size: 9.5px;

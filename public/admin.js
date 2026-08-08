@@ -123,6 +123,22 @@ if (currentAgent.role === "admin") {
 function applyRolePermissions() {
   if (!currentAgent) return;
 
+  const topbarAgentName = document.getElementById("topbarAgentName");
+  const topbarAvatar = document.getElementById("topbarAvatar");
+  const displayName = currentAgent.name || currentAgent.username || "Agent";
+
+  if (topbarAgentName) topbarAgentName.textContent = displayName;
+  if (topbarAvatar) {
+    const initials = displayName
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map(part => part[0])
+      .join("")
+      .toUpperCase();
+    topbarAvatar.textContent = initials || "A";
+  }
+
   const dashboardBtn = document.querySelector('.nav-btn[data-section="dashboard"]');
   const agentPanelBtn = document.querySelector('.nav-btn[data-section="agent"]');
   const agentManagementBtn = document.querySelector('.nav-btn[data-section="agents"]');
@@ -481,53 +497,106 @@ document.getElementById("stats").innerHTML = `
 
         renderWeeklyOverviewCharts(data.weeklyConversations || [], stats);
 
+        const callbackTotalRequests = callback.totalRequests || 0;
+        const callbackConverted = callback.converted || 0;
+        const conversionRateEl = document.getElementById("callbackConversionRate");
+        if (conversionRateEl) {
+          conversionRateEl.textContent = callbackTotalRequests
+            ? `${Math.round((callbackConverted / callbackTotalRequests) * 100)}%`
+            : "0%";
+        }
+
         document.getElementById("callbackStats").innerHTML = `
-      <div class="stat-card">
-        <div class="label">Callback Requests</div>
-        <div class="value">${callback.totalRequests || 0}</div>
-        <div class="meta">Total callback requests received</div>
+      <div class="stat-cluster">
+        <div class="stat-cluster-label">
+          <span class="eyebrow">Volume</span>
+          <span class="cluster-sub">— callbacks requested in this period</span>
+        </div>
+        <div class="stat-cluster-grid">
+
+          <div class="stat-card cb-tone-info">
+            <div class="stat-card-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3h3l1.5 4-2 1.5a12 12 0 0 0 6.5 6.5l1.5-2 4 1.5v3c0 1-1 2-2 2C11 19.5 4.5 13 4.5 5c0-1 1-2 2-2Z"/></svg>
+            </div>
+            <div class="label">Callback Requests</div>
+            <div class="value">${callbackTotalRequests}</div>
+            <div class="meta">Total received</div>
+          </div>
+
+          <div class="stat-card cb-tone-info">
+            <div class="stat-card-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.2c2.5.3 4.5 2.6 4.5 5.8"/></svg>
+            </div>
+            <div class="label">Unique Callbacks</div>
+            <div class="value">${callback.uniqueNumbers || 0}</div>
+            <div class="meta">Unique student phone numbers</div>
+          </div>
+
+          <div class="stat-card cb-tone-info">
+            <div class="stat-card-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1l4 4-4 4M3 12.9V11a4 4 0 0 1 4-4h14M7 21.9l-4-4 4-4M21 11.1V13a4 4 0 0 1-4 4H3"/></svg>
+            </div>
+            <div class="label">Repeat Requests</div>
+            <div class="value">${callback.repeatRequests || 0}</div>
+            <div class="meta">Students requesting callback again</div>
+          </div>
+
+        </div>
       </div>
 
-      <div class="stat-card">
-        <div class="label">Unique Callbacks</div>
-        <div class="value">${callback.uniqueNumbers || 0}</div>
-        <div class="meta">Unique student phone numbers</div>
-      </div>
+      <div class="stat-cluster">
+        <div class="stat-cluster-label">
+          <span class="eyebrow">Call Outcomes</span>
+          <span class="cluster-sub">— what happened when agents called</span>
+        </div>
+        <div class="stat-cluster-grid" style="grid-template-columns:repeat(5, 1fr);">
 
-      <div class="stat-card">
-        <div class="label">Repeat Requests</div>
-        <div class="value">${callback.repeatRequests || 0}</div>
-        <div class="meta">Students requesting callback again</div>
-      </div>
+          <div class="stat-card cb-tone-warn">
+            <div class="stat-card-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+            </div>
+            <div class="label">Pending Calls</div>
+            <div class="value">${callback.pending || 0}</div>
+            <div class="meta">Awaiting representative action</div>
+          </div>
 
-      <div class="stat-card">
-        <div class="label">Pending Calls</div>
-        <div class="value">${callback.pending || 0}</div>
-        <div class="meta">Awaiting representative action</div>
-      </div>
+          <div class="stat-card cb-tone-info">
+            <div class="stat-card-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3h3l1.5 4-2 1.5a12 12 0 0 0 6.5 6.5l1.5-2 4 1.5v3c0 1-1 2-2 2C11 19.5 4.5 13 4.5 5c0-1 1-2 2-2Z"/></svg>
+            </div>
+            <div class="label">Called</div>
+            <div class="value">${callback.called || 0}</div>
+            <div class="meta">Successfully contacted</div>
+          </div>
 
-      <div class="stat-card">
-        <div class="label">Called</div>
-        <div class="value">${callback.called || 0}</div>
-        <div class="meta">Successfully contacted</div>
-      </div>
+          <div class="stat-card cb-tone-danger">
+            <div class="stat-card-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.7 3h2.6l1.3 3.5-1.7 1.3a10 10 0 0 0 3.3 3.3l1.3-1.7L21 11v2.6c0 1-.8 1.9-1.8 1.7A17 17 0 0 1 5.7 4.8C5.5 3.8 6.4 3 7.4 3Z"/><path d="M4 4l16 16"/></svg>
+            </div>
+            <div class="label">Not Responded</div>
+            <div class="value">${callback.notResponded || 0}</div>
+            <div class="meta">No response from student</div>
+          </div>
 
-      <div class="stat-card">
-        <div class="label">Not Responded</div>
-        <div class="value">${callback.notResponded || 0}</div>
-        <div class="meta">No response from student</div>
-      </div>
+          <div class="stat-card cb-tone-warn">
+            <div class="stat-card-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8.5 14.5l2 2 4-4"/></svg>
+            </div>
+            <div class="label">Follow-Up Required</div>
+            <div class="value">${callback.followupRequired || 0}</div>
+            <div class="meta">Need another call attempt</div>
+          </div>
 
-      <div class="stat-card">
-        <div class="label">Follow-Up Required</div>
-        <div class="value">${callback.followupRequired || 0}</div>
-        <div class="meta">Need another call attempt</div>
-      </div>
+          <div class="stat-card cb-tone-success">
+            <div class="stat-card-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.6 5.9 6.4.6-4.8 4.3 1.4 6.3L12 16l-5.6 3.1 1.4-6.3-4.8-4.3 6.4-.6Z"/></svg>
+            </div>
+            <div class="label">Converted</div>
+            <div class="value">${callbackConverted}</div>
+            <div class="meta">Successfully converted leads</div>
+          </div>
 
-      <div class="stat-card">
-        <div class="label">Converted</div>
-        <div class="value">${callback.converted || 0}</div>
-        <div class="meta">Successfully converted leads</div>
+        </div>
       </div>
     `;
 

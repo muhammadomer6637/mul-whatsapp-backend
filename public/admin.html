@@ -135,31 +135,43 @@
         </div>
 
      <div class="topbar-actions">
-  <button class="refresh-btn" onclick="openProfileModal()">My Profile</button>
+  <div class="profile-chip">
+    <div class="profile-avatar" id="topbarAvatar">–</div>
+    <div class="profile-meta">
+      <span class="profile-name" id="topbarAgentName">—</span>
+      <span class="profile-link" onclick="openProfileModal()">My Profile
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </span>
+    </div>
+  </div>
 </div>
       </header>
 
       <section id="dashboard" class="section">
         <div class="toolbar">
-        <div class="range-toolbar">
+        <div class="range-toolbar toolbar-card">
 
-  <div class="range-group">
-    <button class="range-btn active" onclick="setRange(this, '24h')">24 Hours</button>
-    <button class="range-btn" onclick="setRange(this, '7d')">7 Days</button>
-    <button class="range-btn" onclick="setRange(this, '30d')">30 Days</button>
+  <div class="range-group seg-group">
+    <button class="range-btn seg-btn active" onclick="setRange(this, '24h')">24 Hours</button>
+    <button class="range-btn seg-btn" onclick="setRange(this, '7d')">7 Days</button>
+    <button class="range-btn seg-btn" onclick="setRange(this, '30d')">30 Days</button>
   </div>
 
-  <div class="custom-range-wrap">
+  <div class="custom-range-wrap toolbar-right">
 
-    <input type="date" id="startDate" class="date-input" />
+    <div class="range-date-group">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+      <input type="date" id="startDate" class="date-input range-date-input" />
+      <span class="range-date-sep">&rarr;</span>
+      <input type="date" id="endDate" class="date-input range-date-input" />
+    </div>
 
-    <input type="date" id="endDate" class="date-input" />
-
-    <button class="range-btn" onclick="applyCustomRange()">
+    <button class="range-btn apply-pill-btn" onclick="applyCustomRange()">
       Apply
     </button>
 
-    <button class="export-btn" onclick="exportDashboardData()">
+    <button class="export-btn export-pill-btn" onclick="exportDashboardData()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M6 10l6 6 6-6M5 21h14"/></svg>
       Export Data
     </button>
   </div>
@@ -200,9 +212,13 @@
       <h3>Callback Performance</h3>
       <p>Callback requests and call outcomes in the selected period</p>
     </div>
+    <div class="rate-chip">
+      <span class="n" id="callbackConversionRate">0%</span>
+      <span class="l">Conversion</span>
+    </div>
   </div>
 
-  <div class="stats-grid" id="callbackStats"></div>
+  <div class="stats-clusters" id="callbackStats"></div>
 </div>
 
         <div class="panel" id="responsePerformancePanel" style="margin-top: 0; margin-bottom: 28px;">
