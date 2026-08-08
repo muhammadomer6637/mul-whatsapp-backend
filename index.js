@@ -5499,10 +5499,15 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      // Flow Performance panel - sent/completed counts only reflect data
-      // from the day flow_sent tracking was added onward (historical sends
-      // were never logged), completion counts go back further since
-      // completions were already logged before this.
+      // Flow Performance panel. "Completed" was already being logged before
+      // "sent" tracking was added, so a naive completed/sent ratio would
+      // compare two different populations and never mean anything (could
+      // even show >100%). Fixed by also floor-ing the completed queries at
+      // the timestamp of that flow's very first logged "sent" - whatever
+      // that turns out to be, since it's the actual moment both sides of
+      // the ratio became comparable, not a hardcoded date. COALESCE'd to
+      // NOW() so a flow with zero sends yet reports 0 completions instead
+      // of matching everything before a NULL cutoff.
       pool.query(
         `
         SELECT COUNT(*)::int AS count
@@ -5520,6 +5525,10 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         FROM user_interactions
         WHERE interaction_type = 'fee_calculator'
           AND ${whereCreated}
+          AND created_at >= COALESCE(
+            (SELECT MIN(created_at) FROM user_interactions WHERE interaction_type = 'flow_sent' AND category = 'fee_calculator'),
+            NOW()
+          )
         GROUP BY category
         ORDER BY count DESC
         `,
@@ -5543,6 +5552,10 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         FROM user_interactions
         WHERE interaction_type = 'lead_capture_flow'
           AND ${whereCreated}
+          AND created_at >= COALESCE(
+            (SELECT MIN(created_at) FROM user_interactions WHERE interaction_type = 'flow_sent' AND category = 'lead_capture_flow'),
+            NOW()
+          )
         `,
         queryParams
       )
