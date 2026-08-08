@@ -752,6 +752,32 @@ function renderConversationsLineChart(conversations) {
 
   if (weeklyConversationsChartInstance) weeklyConversationsChartInstance.destroy();
 
+  const n = conversations.length;
+  const showLabelEvery = n > 10 ? 5 : 1;
+
+  // Draws the value above each node directly on the canvas - Chart.js has
+  // no built-in per-point label, and loading a datalabels plugin from a
+  // CDN felt like overkill for this. Sparse (every 5th + last) once there
+  // are more than 10 points (monthly view) so it doesn't turn into a wall
+  // of numbers, same rule as the axis tick labels below.
+  const valueLabelPlugin = {
+    id: "valueLabels",
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      const meta = chart.getDatasetMeta(0);
+      const values = chart.data.datasets[0].data;
+      ctx.save();
+      ctx.font = "700 11px -apple-system, BlinkMacSystemFont, Arial, sans-serif";
+      ctx.fillStyle = "#e8eefc";
+      ctx.textAlign = "center";
+      meta.data.forEach((point, i) => {
+        if (n > 10 && i % showLabelEvery !== 0 && i !== n - 1) return;
+        ctx.fillText(values[i], point.x, point.y - 10);
+      });
+      ctx.restore();
+    }
+  };
+
   weeklyConversationsChartInstance = new Chart(lineCanvas, {
     type: "line",
     data: {
@@ -763,15 +789,17 @@ function renderConversationsLineChart(conversations) {
         fill: true,
         tension: 0.35,
         pointBackgroundColor: "#56a5ff",
-        pointRadius: conversations.length > 10 ? 0 : 3
+        pointRadius: n > 10 ? 0 : 3
       }]
     },
+    plugins: [valueLabelPlugin],
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { top: 20 } },
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: "#a8bbdc", autoSkip: true, maxTicksLimit: conversations.length > 10 ? 10 : conversations.length }, grid: { color: "rgba(255,255,255,0.06)" } },
+        x: { ticks: { color: "#a8bbdc", autoSkip: true, maxTicksLimit: n > 10 ? 10 : n }, grid: { color: "rgba(255,255,255,0.06)" } },
         y: { ticks: { color: "#a8bbdc" }, grid: { color: "rgba(255,255,255,0.06)" }, beginAtZero: true }
       }
     }
@@ -808,6 +836,12 @@ function renderWeeklyOverviewCharts(weeklyConversations, stats, monthlyConversat
 
   const agentRequested = Number(stats.agentChatRequests || 0);
   const botOnly = Math.max(Number(stats.conversationsStarted || 0) - agentRequested, 0);
+  const donutTotal = botOnly + agentRequested;
+
+  const botPctEl = document.getElementById("donutBotPct");
+  const agentPctEl = document.getElementById("donutAgentPct");
+  if (botPctEl) botPctEl.textContent = donutTotal ? `${Math.round((botOnly / donutTotal) * 100)}%` : "0%";
+  if (agentPctEl) agentPctEl.textContent = donutTotal ? `${Math.round((agentRequested / donutTotal) * 100)}%` : "0%";
 
   botAgentDonutChartInstance = new Chart(donutCanvas, {
     type: "doughnut",

@@ -572,6 +572,18 @@ body {
   flex-shrink: 0;
 }
 
+.donut-legend > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.donut-legend b {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .legend-dot {
   width: 8px;
   height: 8px;
