@@ -5171,6 +5171,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
     const [
       conversationsStarted,
       weeklyConversations,
+      monthlyConversations,
       unreadConversations,
       totalIncomingMessages,
       agentChatRequests,
@@ -5207,6 +5208,24 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
           COUNT(u.id)::int AS count
         FROM generate_series(
           CURRENT_DATE - INTERVAL '6 days',
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        ) AS day
+        LEFT JOIN users u ON u.created_at::date = day::date
+        GROUP BY day
+        ORDER BY day
+      `),
+
+      // Same shape as weeklyConversations above, just a 30-day window with
+      // day-of-month labels instead of day-name labels - feeds the
+      // Weekly/Monthly toggle on the Weekly Overview chart (independent of
+      // the main dashboard date-range filter, always daily granularity).
+      pool.query(`
+        SELECT
+          TO_CHAR(day, 'DD') AS label,
+          COUNT(u.id)::int AS count
+        FROM generate_series(
+          CURRENT_DATE - INTERVAL '29 days',
           CURRENT_DATE,
           INTERVAL '1 day'
         ) AS day
@@ -5524,7 +5543,8 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       topPrograms: topPrograms.rows,
       allTimeTopPrograms: allTimeTopPrograms.rows,
       recentLeads: recentLeads.rows,
-      weeklyConversations: weeklyConversations.rows
+      weeklyConversations: weeklyConversations.rows,
+      monthlyConversations: monthlyConversations.rows
     });
 
   } catch (error) {

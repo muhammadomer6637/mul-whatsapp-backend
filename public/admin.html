@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-  <link rel="stylesheet" href="admin.css?v=3" />
+  <link rel="stylesheet" href="admin.css?v=4" />
 </head>
 <body>
   <div id="loginOverlay" class="login-overlay">
@@ -186,7 +186,11 @@
           <div class="panel-header">
             <div>
               <h3>Weekly Overview</h3>
-              <p>Conversations started and bot vs agent split (last 7 days)</p>
+              <p id="weeklyOverviewSub">Conversations started and bot vs agent split (last 7 days)</p>
+            </div>
+            <div class="seg-group" id="weeklyRangeToggle">
+              <button class="seg-btn active" data-chart-range="week" onclick="setWeeklyChartRange('week', this)">Weekly</button>
+              <button class="seg-btn" data-chart-range="month" onclick="setWeeklyChartRange('month', this)">Monthly</button>
             </div>
           </div>
 
@@ -244,6 +248,7 @@
   <div class="funnel-grid">
 
     <div class="funnel-step funnel-step-1">
+      <div class="funnel-step-num">1</div>
       <div class="funnel-top">
         <span>Registrations</span>
         <strong id="funnelRegistrations">0</strong>
@@ -252,9 +257,11 @@
       <div class="funnel-bar">
         <div class="funnel-fill fill-1"></div>
       </div>
+      <div class="funnel-drop" id="funnelDrop1">Starting point</div>
     </div>
 
     <div class="funnel-step funnel-step-2">
+      <div class="funnel-step-num">2</div>
       <div class="funnel-top">
         <span>Processing Fee</span>
         <strong id="funnelProcessingFee">0</strong>
@@ -263,9 +270,11 @@
       <div class="funnel-bar">
         <div class="funnel-fill fill-2"></div>
       </div>
+      <div class="funnel-drop" id="funnelDrop2">—</div>
     </div>
 
     <div class="funnel-step funnel-step-3">
+      <div class="funnel-step-num">3</div>
       <div class="funnel-top">
         <span>Documents Submitted</span>
         <strong id="funnelDocuments">0</strong>
@@ -274,9 +283,11 @@
       <div class="funnel-bar">
         <div class="funnel-fill fill-3"></div>
       </div>
+      <div class="funnel-drop" id="funnelDrop3">—</div>
     </div>
 
     <div class="funnel-step funnel-step-4">
+      <div class="funnel-step-num">4</div>
       <div class="funnel-top">
         <span>Fee Paid</span>
         <strong id="funnelFeePaid">0</strong>
@@ -285,6 +296,7 @@
       <div class="funnel-bar">
         <div class="funnel-fill fill-4"></div>
       </div>
+      <div class="funnel-drop" id="funnelDrop4">—</div>
     </div>
 
   </div>

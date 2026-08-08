@@ -262,28 +262,33 @@ body {
   width: 100% !important;
 }
 
-.range-toolbar .seg-group {
-  display: flex !important;
-  gap: 3px !important;
-  background: var(--panel-2) !important;
-  border: 1px solid var(--line) !important;
-  border-radius: 11px !important;
-  padding: 3px !important;
+/* Bare (unscoped) on purpose - .seg-group/.seg-btn are new classes with no
+   legacy conflicts, and this exact segmented-control look is reused in the
+   Weekly Overview panel header too, not just the topbar toolbar. */
+.seg-group {
+  display: flex;
+  gap: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 3px;
+  flex-shrink: 0;
 }
 
-.range-toolbar .seg-btn {
-  background: transparent !important;
-  border: none !important;
-  color: var(--muted) !important;
-  font-size: 12px !important;
-  font-weight: 600 !important;
-  padding: 7px 13px !important;
-  border-radius: 8px !important;
+.seg-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
-.range-toolbar .seg-btn.active {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
-  color: #fff !important;
+.seg-btn.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
 }
 
 .range-toolbar .toolbar-right {
@@ -674,7 +679,7 @@ body {
 
 .response-performance-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -2506,6 +2511,36 @@ CALLBACK CENTER
   border:1px solid rgba(255,255,255,0.05);
   border-radius:22px;
   padding:20px;
+  position:relative;
+  display:flex;
+  flex-direction:column;
+}
+
+.funnel-step:not(:last-child)::after{
+  content:"";
+  position:absolute;
+  top:50%;
+  right:-14px;
+  width:20px;
+  height:20px;
+  transform:translateY(-50%) rotate(45deg);
+  border-top:2px solid rgba(134,166,215,0.35);
+  border-right:2px solid rgba(134,166,215,0.35);
+  z-index:2;
+}
+
+.funnel-step-num{
+  width:20px;
+  height:20px;
+  border-radius:6px;
+  background:rgba(86,165,255,0.14);
+  color:#8fc0ff;
+  font-size:10px;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-bottom:10px;
 }
 
 .funnel-top{
@@ -2523,8 +2558,19 @@ CALLBACK CENTER
 
 .funnel-top strong{
   color:#fff;
-  font-size:28px;
-  font-weight:900;
+  font-size:24px;
+  font-weight:700;
+  font-variant-numeric: tabular-nums;
+}
+
+.funnel-drop{
+  margin-top:10px;
+  font-size:11px;
+  color:var(--muted);
+}
+
+.funnel-step:not(.funnel-step-1) .funnel-drop{
+  color:#ff8f9c;
 }
 
 .funnel-bar{

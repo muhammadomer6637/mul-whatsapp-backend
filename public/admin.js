@@ -349,6 +349,20 @@ function prettyInteractionCategory(category) {
   return labels[category] || category;
 }
 
+function interactionCategoryIcon(category) {
+  const icons = {
+    programs: `<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15Z"/>`,
+    fee_structure: `<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>`,
+    scholarships: `<path d="M12 3 2 8l10 5 10-5-10-5ZM2 16l10 5 10-5M2 12l10 5 10-5"/>`,
+    admission_process: `<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>`,
+    why_choose_mul: `<path d="M12 2l2.6 5.9 6.4.6-4.8 4.3 1.4 6.3L12 16l-5.6 3.1 1.4-6.3-4.8-4.3 6.4-.6Z"/>`,
+    other_support: `<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .5c0 1.5-2.2 1.8-2.4 3.3M12 17h.01"/>`,
+    admissions_related: `<path d="M4 12a8 8 0 1 1 3.2 6.4L4 20l1.3-3.6A7.96 7.96 0 0 1 4 12Z"/>`,
+    other: `<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .5c0 1.5-2.2 1.8-2.4 3.3M12 17h.01"/>`
+  };
+  return icons[category] || icons.other;
+}
+
 function renderInteractionStats(rows, type = "bot") {
   if (!rows || rows.length === 0) {
     return `
@@ -361,16 +375,22 @@ function renderInteractionStats(rows, type = "bot") {
   }
 
   const total = rows.reduce((sum, row) => sum + Number(row.count || 0), 0);
-  const cardTypeClass = type === "agent" ? "live" : "performance";
+  const cardTone = type === "agent" ? "cb-tone-success" : "cb-tone-info";
+  const maxCount = Math.max(...rows.map(row => Number(row.count || 0)), 1);
 
   return rows.map(row => {
     const count = Number(row.count || 0);
     const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+    const barWidth = Math.round((count / maxCount) * 100);
 
     return `
-      <div class="stat-card ${cardTypeClass} insight-stat-card">
+      <div class="stat-card ${cardTone} insight-stat-card">
+        <div class="stat-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${interactionCategoryIcon(row.category)}</svg>
+        </div>
         <div class="label">${prettyInteractionCategory(row.category)}</div>
         <div class="value">${count}</div>
+        <div class="ranked-bar-track" style="margin-bottom:6px;"><div class="ranked-bar-fill" style="width:${barWidth}%"></div></div>
         <div class="meta">${percent}% of selected period</div>
       </div>
     `;
@@ -495,7 +515,7 @@ document.getElementById("stats").innerHTML = `
 `;
         markLoaded("stats");
 
-        renderWeeklyOverviewCharts(data.weeklyConversations || [], stats);
+        renderWeeklyOverviewCharts(data.weeklyConversations || [], stats, data.monthlyConversations || []);
 
         const callbackTotalRequests = callback.totalRequests || 0;
         const callbackConverted = callback.converted || 0;
@@ -600,22 +620,34 @@ document.getElementById("stats").innerHTML = `
       </div>
     `;
 
+    const csatPct = csat.total ? Math.round((csat.positive / csat.total) * 100) : null;
+    const csatTone = csatPct === null ? "cb-tone-info" : csatPct >= 80 ? "cb-tone-success" : csatPct >= 50 ? "cb-tone-warn" : "cb-tone-danger";
+
     document.getElementById("responsePerformanceStats").innerHTML = `
-  <div class="stat-card performance">
+  <div class="stat-card cb-tone-info">
+    <div class="stat-icon">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+    </div>
     <div class="label">Avg Chat Response Time</div>
     <div class="value">${formatDuration(responseStats.averageChatResponseSeconds || 0)}</div>
     <div class="meta">Average first response by chat agents</div>
   </div>
 
-  <div class="stat-card performance">
+  <div class="stat-card cb-tone-info">
+    <div class="stat-icon">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3h3l1.5 4-2 1.5a12 12 0 0 0 6.5 6.5l1.5-2 4 1.5v3c0 1-1 2-2 2C11 19.5 4.5 13 4.5 5c0-1 1-2 2-2Z"/></svg>
+    </div>
     <div class="label">Callback Avg Response Time</div>
     <div class="value">${formatDuration(responseStats.averageCallbackResponseSeconds || 0)}</div>
     <div class="meta">Average first action by call agents</div>
   </div>
 
-  <div class="stat-card performance">
-    <div class="label">Customer Satisfaction</div>
-    <div class="value">${csat.total ? `${Math.round((csat.positive / csat.total) * 100)}%` : "No data"}</div>
+  <div class="stat-card ${csatTone}">
+    <div class="stat-icon">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.6 5.9 6.4.6-4.8 4.3 1.4 6.3L12 16l-5.6 3.1 1.4-6.3-4.8-4.3 6.4-.6Z"/></svg>
+    </div>
+    <div class="label">Student Satisfaction</div>
+    <div class="value">${csatPct === null ? "No data" : `${csatPct}%`}</div>
     <div class="meta">${csat.total ? `${csat.positive} positive, ${csat.negative} negative (${csat.total} responses)` : "No CSAT responses in this range"}</div>
   </div>
 `;
@@ -668,6 +700,16 @@ document.querySelector(".fill-2").style.width = `${Math.min(processingWidth, 100
 document.querySelector(".fill-3").style.width = `${Math.min(documentsWidth, 100)}%`;
 document.querySelector(".fill-4").style.width = `${Math.min(feePaidWidth, 100)}%`;
 
+function funnelDropText(previous, current) {
+  if (!previous) return "—";
+  const drop = Math.round(((previous - current) / previous) * 100);
+  return drop <= 0 ? "No drop-off" : `↓ ${drop}% drop-off`;
+}
+
+document.getElementById("funnelDrop2").textContent = funnelDropText(funnelRegistrations, funnelProcessingFee);
+document.getElementById("funnelDrop3").textContent = funnelDropText(funnelProcessingFee, funnelDocuments);
+document.getElementById("funnelDrop4").textContent = funnelDropText(funnelDocuments, funnelFeePaid);
+
     const topProgramsWrap = document.getElementById("topProgramsList");
     const topProgramsTotalChip = document.getElementById("topProgramsTotal");
 
@@ -699,29 +741,29 @@ document.querySelector(".fill-4").style.width = `${Math.min(feePaidWidth, 100)}%
 
 let weeklyConversationsChartInstance = null;
 let botAgentDonutChartInstance = null;
+let lastWeeklyConversations = [];
+let lastMonthlyConversations = [];
+let currentWeeklyChartRange = "week";
 
-function renderWeeklyOverviewCharts(weeklyConversations, stats) {
+function renderConversationsLineChart(conversations) {
   if (typeof Chart === "undefined") return;
-
   const lineCanvas = document.getElementById("weeklyConversationsChart");
-  const donutCanvas = document.getElementById("botAgentDonutChart");
-  if (!lineCanvas || !donutCanvas) return;
+  if (!lineCanvas) return;
 
   if (weeklyConversationsChartInstance) weeklyConversationsChartInstance.destroy();
-  if (botAgentDonutChartInstance) botAgentDonutChartInstance.destroy();
 
   weeklyConversationsChartInstance = new Chart(lineCanvas, {
     type: "line",
     data: {
-      labels: weeklyConversations.map(row => row.label),
+      labels: conversations.map(row => row.label),
       datasets: [{
-        data: weeklyConversations.map(row => row.count),
+        data: conversations.map(row => row.count),
         borderColor: "#56a5ff",
         backgroundColor: "rgba(86,165,255,0.15)",
         fill: true,
         tension: 0.35,
         pointBackgroundColor: "#56a5ff",
-        pointRadius: 3
+        pointRadius: conversations.length > 10 ? 0 : 3
       }]
     },
     options: {
@@ -729,11 +771,40 @@ function renderWeeklyOverviewCharts(weeklyConversations, stats) {
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: "#a8bbdc" }, grid: { color: "rgba(255,255,255,0.06)" } },
+        x: { ticks: { color: "#a8bbdc", autoSkip: true, maxTicksLimit: conversations.length > 10 ? 10 : conversations.length }, grid: { color: "rgba(255,255,255,0.06)" } },
         y: { ticks: { color: "#a8bbdc" }, grid: { color: "rgba(255,255,255,0.06)" }, beginAtZero: true }
       }
     }
   });
+}
+
+function setWeeklyChartRange(range, button) {
+  currentWeeklyChartRange = range;
+  document.querySelectorAll("#weeklyRangeToggle .seg-btn").forEach(btn => btn.classList.remove("active"));
+  if (button) button.classList.add("active");
+
+  const sub = document.getElementById("weeklyOverviewSub");
+  if (sub) {
+    sub.textContent = range === "month"
+      ? "Conversations started and bot vs agent split (last 30 days)"
+      : "Conversations started and bot vs agent split (last 7 days)";
+  }
+
+  renderConversationsLineChart(range === "month" ? lastMonthlyConversations : lastWeeklyConversations);
+}
+
+function renderWeeklyOverviewCharts(weeklyConversations, stats, monthlyConversations = []) {
+  if (typeof Chart === "undefined") return;
+
+  const donutCanvas = document.getElementById("botAgentDonutChart");
+  if (!donutCanvas) return;
+
+  lastWeeklyConversations = weeklyConversations;
+  lastMonthlyConversations = monthlyConversations;
+
+  if (botAgentDonutChartInstance) botAgentDonutChartInstance.destroy();
+
+  renderConversationsLineChart(currentWeeklyChartRange === "month" ? lastMonthlyConversations : lastWeeklyConversations);
 
   const agentRequested = Number(stats.agentChatRequests || 0);
   const botOnly = Math.max(Number(stats.conversationsStarted || 0) - agentRequested, 0);
