@@ -3487,9 +3487,93 @@ const MUL_CANONICAL_PROGRAMS = [
 ];
 const MUL_CANONICAL_PROGRAMS_LOWER = new Set(MUL_CANONICAL_PROGRAMS.map(p => p.toLowerCase()));
 
+// Strip every non-alphanumeric character (not just leading/trailing) and all
+// spaces - "L.L.B", "l l b", "LLB" and "l.l.b" all collapse to the same
+// "llb", so formatting differences alone stop causing false "Other" results.
+function tightClean(str) {
+  return String(str || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// Classic Levenshtein edit distance - how many single-character edits turn
+// a into b. Used below to catch plain spelling mistakes ("criminilogy" for
+// "criminology") that no amount of punctuation-stripping would fix.
+function levenshteinDistance(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const dp = Array.from({ length: m + 1 }, (_, i) => [i, ...new Array(n).fill(0)]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function stringSimilarity(a, b) {
+  const maxLen = Math.max(a.length, b.length);
+  if (!maxLen) return 1;
+  return 1 - levenshteinDistance(a, b) / maxLen;
+}
+
+// "mphil" (joined form, since "M.Phil" loses its period+space and becomes
+// one token during cleaning) is explicitly listed - it's a level prefix
+// shared by ~25 different canonical programs, not a distinguishing word,
+// and was causing "Mphil <garbled text>" leads to false-match whichever
+// M.Phil program happened to come first in the array.
+const PROGRAM_MATCH_STOP_WORDS = new Set(["bs", "ms", "phd", "and", "of", "the", "in", "for", "m", "phil", "mphil", "science", "sciences", "studies"]);
+
+// Significant (non-generic) words from a program name, used for fuzzy
+// word-level matching - e.g. "BS Criminology and Forensic Sciences" ->
+// ["criminology", "forensic"], so a lone typo'd word like "criminilogy"
+// can still be matched against just the word that actually distinguishes
+// that program, not the whole multi-word name.
+function significantProgramWords(str) {
+  return tightClean(str) ? String(str).toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 3 && !PROGRAM_MATCH_STOP_WORDS.has(w)) : [];
+}
+
+// Three tiers, cheapest/most-confident first:
+// 1. Curated alias map (normalizeProgramKey) - exact known phrasing.
+// 2. Punctuation/spacing-blind exact match - "l.l.b" / "LLB" / "L L B".
+// 3. Fuzzy word match - tolerates real typos ("criminilogy", "Bioinfomatics").
+function findMatchingCanonicalProgram(rawProgram) {
+  if (!rawProgram) return null;
+
+  const aliasResult = normalizeProgramKey(rawProgram);
+  const aliasMatch = MUL_CANONICAL_PROGRAMS.find(p => p.toLowerCase() === aliasResult.toLowerCase());
+  if (aliasMatch) return aliasMatch;
+
+  const inputTight = tightClean(rawProgram);
+  if (inputTight) {
+    const tightMatch = MUL_CANONICAL_PROGRAMS.find(p => tightClean(p) === inputTight);
+    if (tightMatch) return tightMatch;
+  }
+
+  const inputWords = significantProgramWords(rawProgram);
+  if (inputWords.length) {
+    let bestMatch = null;
+    let bestScore = 0;
+    for (const canonical of MUL_CANONICAL_PROGRAMS) {
+      const canonicalWords = significantProgramWords(canonical);
+      if (!canonicalWords.length) continue;
+      let matched = 0;
+      inputWords.forEach(iw => {
+        if (canonicalWords.some(cw => stringSimilarity(iw, cw) >= 0.8)) matched++;
+      });
+      const score = matched / inputWords.length;
+      if (score > bestScore) { bestScore = score; bestMatch = canonical; }
+    }
+    if (bestScore >= 0.99) return bestMatch;
+  }
+
+  return null;
+}
+
 function isRecognizedProgram(rawProgram) {
-  const normalized = normalizeProgramKey(rawProgram);
-  return MUL_CANONICAL_PROGRAMS_LOWER.has(normalized.toLowerCase());
+  return !!findMatchingCanonicalProgram(rawProgram);
 }
 
 function normalizeProgramKey(name) {
