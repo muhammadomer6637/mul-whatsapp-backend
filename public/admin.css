@@ -243,38 +243,35 @@ body {
 }
 
 /* ---- Dashboard toolbar redesign ----
+   Segmented range control sits left (aligned under the page title),
+   custom-date + Apply + Export sits right (aligned under the profile
+   chip) - two separate self-contained pill groups, not one joined card,
+   spread apart via justify-content:space-between on .range-toolbar
+   itself (which the legacy block already sets - no fight needed there).
    Uses !important throughout: .range-toolbar/.custom-range-wrap/.date-input/
-   .export-btn/.range-btn already carry several duplicate blocks elsewhere in
-   this file (some also !important), so anything added without !important
-   here would silently lose depending on source order. Added as supplementary
-   classes alongside the originals rather than replacing them, so the
-   existing onclick/id-based JS (setRange, applyCustomRange, exportDashboardData)
-   keeps working unchanged. */
-/* Every rule below is scoped under .toolbar-card (2-class-selector
-   specificity) rather than relying on !important + source order alone -
-   the legacy duplicate blocks are also !important, and several of them
-   appear LATER in this file than a bare-class rule placed here would,
-   so bare classes would silently lose. Scoping under the wrapper wins
-   regardless of where the legacy blocks fall. */
-.range-toolbar.toolbar-card {
-  background: var(--panel-2) !important;
-  border: 1px solid var(--line) !important;
-  border-radius: 16px !important;
-  padding: 12px 14px !important;
-  justify-content: flex-start !important;
-  gap: 20px !important;
+   .export-btn/.range-btn already carry several duplicate blocks elsewhere
+   in this file (some also !important), so anything added without
+   !important here would silently lose depending on source order. Added
+   as supplementary classes alongside the originals rather than replacing
+   them, so the existing onclick/id-based JS (setRange, applyCustomRange,
+   exportDashboardData) keeps working unchanged. Scoped under
+   .range-toolbar (2-class-selector specificity) so it wins regardless of
+   where the legacy blocks fall in the file. */
+.range-toolbar {
+  align-items: center !important;
+  width: 100% !important;
 }
 
-.toolbar-card .seg-group {
+.range-toolbar .seg-group {
   display: flex !important;
   gap: 3px !important;
-  background: rgba(0,0,0,0.18) !important;
+  background: var(--panel-2) !important;
   border: 1px solid var(--line) !important;
   border-radius: 11px !important;
   padding: 3px !important;
 }
 
-.toolbar-card .seg-btn {
+.range-toolbar .seg-btn {
   background: transparent !important;
   border: none !important;
   color: var(--muted) !important;
@@ -284,30 +281,30 @@ body {
   border-radius: 8px !important;
 }
 
-.toolbar-card .seg-btn.active {
+.range-toolbar .seg-btn.active {
   background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
   color: #fff !important;
 }
 
-.toolbar-card .toolbar-right {
+.range-toolbar .toolbar-right {
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
   flex-wrap: wrap !important;
 }
 
-.toolbar-card .range-date-group {
+.range-toolbar .range-date-group {
   display: flex !important;
   align-items: center !important;
   gap: 6px !important;
-  background: rgba(0,0,0,0.18) !important;
+  background: var(--panel-2) !important;
   border: 1px solid var(--line) !important;
   border-radius: 11px !important;
   padding: 0 10px !important;
   color: var(--muted) !important;
 }
 
-.toolbar-card .range-date-input {
+.range-toolbar .range-date-input {
   height: 38px !important;
   min-width: 0 !important;
   width: 116px !important;
@@ -318,12 +315,12 @@ body {
   font-size: 12px !important;
 }
 
-.toolbar-card .range-date-sep {
+.range-toolbar .range-date-sep {
   color: var(--muted) !important;
   font-size: 11px !important;
 }
 
-.toolbar-card .apply-pill-btn {
+.range-toolbar .apply-pill-btn {
   background: var(--panel-2) !important;
   border: 1px solid var(--line) !important;
   color: var(--text) !important;
@@ -334,7 +331,7 @@ body {
   height: auto !important;
 }
 
-.toolbar-card .export-pill-btn {
+.range-toolbar .export-pill-btn {
   display: inline-flex !important;
   align-items: center !important;
   gap: 7px !important;
