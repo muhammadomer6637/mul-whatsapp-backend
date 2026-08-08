@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-  <link rel="stylesheet" href="admin.css?v=5" />
+  <link rel="stylesheet" href="admin.css?v=6" />
 </head>
 <body>
   <div id="loginOverlay" class="login-overlay">
@@ -323,7 +323,73 @@
     </div>
   </div>
 </div>
-        
+
+<div class="panel" id="flowPerformancePanel" style="margin-top: 22px; margin-bottom: 28px;">
+  <div class="panel-header">
+    <div>
+      <h3>Flow Performance</h3>
+      <p>WhatsApp Flow usage and completion in the selected period. Completion-rate % only reflects data from when send-tracking was added onward.</p>
+    </div>
+  </div>
+
+  <div class="flow-perf-block">
+    <div class="flow-perf-block-head">
+      <span class="flow-perf-title">Explore Programs &amp; Fees (Fee Calculator)</span>
+      <span class="panel-total-chip" id="feeCalcRateChip">
+        <span class="n" id="feeCalcRate">0%</span>
+        <span class="l">Completion</span>
+      </span>
+    </div>
+    <div class="stat-cluster-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:14px;">
+      <div class="stat-card cb-tone-info">
+        <div class="stat-card-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>
+        </div>
+        <div class="label">Sent</div>
+        <div class="value" id="feeCalcSentValue">0</div>
+        <div class="meta">Flow messages sent</div>
+      </div>
+      <div class="stat-card cb-tone-success">
+        <div class="stat-card-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </div>
+        <div class="label">Completed</div>
+        <div class="value" id="feeCalcCompletedValue">0</div>
+        <div class="meta">Reached the end screen</div>
+      </div>
+    </div>
+    <div id="feeCalcTopProgramsList" class="program-bars"></div>
+  </div>
+
+  <div class="flow-perf-block" style="margin-top:22px;">
+    <div class="flow-perf-block-head">
+      <span class="flow-perf-title">Talk to an Advisor (Lead Capture)</span>
+      <span class="panel-total-chip" id="leadCaptureRateChip">
+        <span class="n" id="leadCaptureRate">0%</span>
+        <span class="l">Completion</span>
+      </span>
+    </div>
+    <div class="stat-cluster-grid" style="grid-template-columns:repeat(2,1fr);">
+      <div class="stat-card cb-tone-info">
+        <div class="stat-card-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>
+        </div>
+        <div class="label">Sent</div>
+        <div class="value" id="leadCaptureSentValue">0</div>
+        <div class="meta">Flow messages sent</div>
+      </div>
+      <div class="stat-card cb-tone-success">
+        <div class="stat-card-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </div>
+        <div class="label">Completed</div>
+        <div class="value" id="leadCaptureCompletedValue">0</div>
+        <div class="meta">Lead submitted</div>
+      </div>
+    </div>
+  </div>
+</div>
+
         <div class="content-grid">
           <div class="panel panel-large">
             <div class="panel-header">

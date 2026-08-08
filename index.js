@@ -108,6 +108,7 @@ async function getFeeProgramOptions(categoryId) {
 async function sendFeeCalculatorFlow(to) {
   if (!WHATSAPP_FLOW_ID) return;
   try {
+    await saveUserInteraction(to, "flow_sent", "fee_calculator");
     const categories = await getFeeCategoryOptions();
 
     await axios.post(
@@ -151,6 +152,7 @@ async function sendFeeCalculatorFlow(to) {
 async function sendLeadCaptureFlow(to) {
   if (!WHATSAPP_LEAD_FLOW_ID) return false;
   try {
+    await saveUserInteraction(to, "flow_sent", "lead_capture_flow");
     const categories = await getFeeCategoryOptions();
 
     await axios.post(
@@ -5191,7 +5193,11 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       callbackStatuses,
       responseStats,
       callbackResponseStats,
-      csatStats
+      csatStats,
+      feeCalcSent,
+      feeCalcCompleted,
+      leadCaptureSent,
+      leadCaptureCompleted
     ] = await Promise.all([
       pool.query(
         `
@@ -5483,6 +5489,54 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         WHERE ${whereCreated}
         `,
         queryParams
+      ),
+
+      // Flow Performance panel - sent/completed counts only reflect data
+      // from the day flow_sent tracking was added onward (historical sends
+      // were never logged), completion counts go back further since
+      // completions were already logged before this.
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS count
+        FROM user_interactions
+        WHERE interaction_type = 'flow_sent'
+          AND category = 'fee_calculator'
+          AND ${whereCreated}
+        `,
+        queryParams
+      ),
+
+      pool.query(
+        `
+        SELECT category, COUNT(*)::int AS count
+        FROM user_interactions
+        WHERE interaction_type = 'fee_calculator'
+          AND ${whereCreated}
+        GROUP BY category
+        ORDER BY count DESC
+        `,
+        queryParams
+      ),
+
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS count
+        FROM user_interactions
+        WHERE interaction_type = 'flow_sent'
+          AND category = 'lead_capture_flow'
+          AND ${whereCreated}
+        `,
+        queryParams
+      ),
+
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS count
+        FROM user_interactions
+        WHERE interaction_type = 'lead_capture_flow'
+          AND ${whereCreated}
+        `,
+        queryParams
       )
     ]);
 
@@ -5544,7 +5598,19 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       allTimeTopPrograms: allTimeTopPrograms.rows,
       recentLeads: recentLeads.rows,
       weeklyConversations: weeklyConversations.rows,
-      monthlyConversations: monthlyConversations.rows
+      monthlyConversations: monthlyConversations.rows,
+
+      flowPerformance: {
+        feeCalculator: {
+          sent: feeCalcSent.rows[0].count || 0,
+          completed: feeCalcCompleted.rows.reduce((sum, row) => sum + Number(row.count || 0), 0),
+          topPrograms: feeCalcCompleted.rows
+        },
+        leadCapture: {
+          sent: leadCaptureSent.rows[0].count || 0,
+          completed: leadCaptureCompleted.rows[0].count || 0
+        }
+      }
     });
 
   } catch (error) {

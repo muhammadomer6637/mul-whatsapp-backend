@@ -672,7 +672,30 @@ document.getElementById("stats").innerHTML = `
 
 document.getElementById("agentCategoryStats").innerHTML =
   renderInteractionStats(agentCategoryStats, "agent");
-    
+
+    const flowPerf = data.flowPerformance || {};
+    const feeCalc = flowPerf.feeCalculator || { sent: 0, completed: 0, topPrograms: [] };
+    const leadCapture = flowPerf.leadCapture || { sent: 0, completed: 0 };
+
+    document.getElementById("feeCalcSentValue").textContent = feeCalc.sent;
+    document.getElementById("feeCalcCompletedValue").textContent = feeCalc.completed;
+    document.getElementById("feeCalcRate").textContent =
+      feeCalc.sent ? `${Math.round((feeCalc.completed / feeCalc.sent) * 100)}%` : "—";
+
+    document.getElementById("leadCaptureSentValue").textContent = leadCapture.sent;
+    document.getElementById("leadCaptureCompletedValue").textContent = leadCapture.completed;
+    document.getElementById("leadCaptureRate").textContent =
+      leadCapture.sent ? `${Math.round((leadCapture.completed / leadCapture.sent) * 100)}%` : "—";
+
+    const feeCalcProgramsWrap = document.getElementById("feeCalcTopProgramsList");
+    const feeCalcPrograms = (feeCalc.topPrograms || []).map(row => ({ program: row.category, inquiries: Number(row.count || 0) }));
+    if (!feeCalcPrograms.length) {
+      feeCalcProgramsWrap.innerHTML = `<p style="color: var(--muted);">No completions in this range yet.</p>`;
+    } else {
+      const normalizedFeeCalcPrograms = normalizeProgramsForDisplay(feeCalcPrograms);
+      feeCalcProgramsWrap.innerHTML = renderRankedProgramRows(normalizedFeeCalcPrograms, { limit: 5 });
+    }
+
     const funnelRegistrations = Number(funnel.registrations || 0);
 const funnelProcessingFee = Number(funnel.processingFee || 0);
 const funnelDocuments = Number(funnel.documentsSubmitted || 0);

@@ -939,6 +939,20 @@ body {
   margin-top: 2px;
 }
 
+.flow-perf-block-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.flow-perf-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
 .ranked-row {
   display: grid;
   grid-template-columns: 26px 1fr auto;
