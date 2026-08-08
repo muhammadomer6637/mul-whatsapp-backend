@@ -256,11 +256,13 @@ body {
    appear LATER in this file than a bare-class rule placed here would,
    so bare classes would silently lose. Scoping under the wrapper wins
    regardless of where the legacy blocks fall. */
-.toolbar-card {
+.range-toolbar.toolbar-card {
   background: var(--panel-2) !important;
   border: 1px solid var(--line) !important;
   border-radius: 16px !important;
   padding: 12px 14px !important;
+  justify-content: flex-start !important;
+  gap: 20px !important;
 }
 
 .toolbar-card .seg-group {
