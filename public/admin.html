@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-  <link rel="stylesheet" href="admin.css?v=6" />
+  <link rel="stylesheet" href="admin.css?v=7" />
 </head>
 <body>
   <div id="loginOverlay" class="login-overlay">
@@ -428,6 +428,33 @@
             </div>
           </div>
 
+          <div class="stat-cluster-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:18px;">
+            <div class="stat-card cb-tone-info leads-clickable-card" onclick="openLeadsModal('all')">
+              <div class="stat-card-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.2c2.5.3 4.5 2.6 4.5 5.8"/></svg>
+              </div>
+              <div class="label">Total Leads</div>
+              <div class="value" id="totalLeadsValue">0</div>
+              <div class="meta">Captured in selected period · click to view</div>
+            </div>
+            <div class="stat-card cb-tone-success leads-clickable-card" onclick="openLeadsModal('recognized')">
+              <div class="stat-card-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              </div>
+              <div class="label">Recognized Programs</div>
+              <div class="value" id="recognizedLeadsValue">0</div>
+              <div class="meta">Matches a program we offer · click to view</div>
+            </div>
+            <div class="stat-card cb-tone-warn leads-clickable-card" onclick="openLeadsModal('other')">
+              <div class="stat-card-icon">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .5c0 1.5-2.2 1.8-2.4 3.3M12 17h.01"/></svg>
+              </div>
+              <div class="label">Other (Unmatched)</div>
+              <div class="value" id="otherLeadsValue">0</div>
+              <div class="meta">Doesn't match our program list · click to view</div>
+            </div>
+          </div>
+
           <div class="table-wrap">
             <table class="styled-table" id="leadsTable">
               <thead>
@@ -794,7 +821,41 @@
     </button>
   </div>
 </div>
-  
+
+<div id="leadsModal" class="profile-modal hidden">
+  <div class="profile-modal-card">
+    <div class="profile-modal-header">
+      <div>
+        <h2 id="leadsModalTitle">Total Leads</h2>
+        <p id="leadsModalSub">All leads captured in the selected period</p>
+      </div>
+      <button class="profile-close-btn" onclick="closeLeadsModal()">×</button>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="export-btn export-pill-btn" onclick="downloadLeadsCsv()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M6 10l6 6 6-6M5 21h14"/></svg>
+        Download List
+      </button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="styled-table" id="leadsModalTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Program</th>
+            <th>Phone</th>
+            <th>Status</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
   <script src="admin.js"></script>
   <script>

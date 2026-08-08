@@ -9,6 +9,10 @@ let authToken =
   sessionStorage.getItem("mul_nexus_token") ||
   localStorage.getItem("mul_nexus_token");
 let currentAgent = null;
+let allLeadsFull = [];
+let recognizedLeadsFull = [];
+let otherLeadsFull = [];
+let currentLeadsModalType = "all";
 
 function authHeaders(extraHeaders = {}) {
   return {
@@ -747,8 +751,22 @@ document.getElementById("funnelDrop4").textContent = funnelDropText(funnelDocume
       topProgramsWrap.innerHTML = renderRankedProgramRows(normalized, { limit: 6 });
     }
 
+    // data.recentLeads is now the full period-scoped list (up to 3000, see
+    // index.js), not just the latest 10 - split it here so the "Total
+    // Leads / Recognized / Other" stat cards and their download modals
+    // have the full data, while the visible table below still only shows
+    // the freshest 10 like before.
+    const allLeads = data.recentLeads || [];
+    allLeadsFull = allLeads;
+    recognizedLeadsFull = allLeads.filter(lead => isRecognizedProgram(lead.program));
+    otherLeadsFull = allLeads.filter(lead => !isRecognizedProgram(lead.program));
+
+    document.getElementById("totalLeadsValue").textContent = allLeadsFull.length;
+    document.getElementById("recognizedLeadsValue").textContent = recognizedLeadsFull.length;
+    document.getElementById("otherLeadsValue").textContent = otherLeadsFull.length;
+
     const leadsBody = document.querySelector("#leadsTable tbody");
-    leadsBody.innerHTML = data.recentLeads.map(lead => `
+    leadsBody.innerHTML = allLeads.slice(0, 10).map(lead => `
       <tr>
         <td>${escapeHtml(lead.name || "-")}</td>
         <td>${escapeHtml(prettyProgramName(lead.program || "-"))}</td>
@@ -3422,9 +3440,70 @@ function titleCase(str) {
     .join(" ");
 }
 
+// MUL's actual program catalog (sourced from data/eligibility-import.json's
+// "ourProgram" values) - used to classify a lead's program as "Recognized"
+// (matches something we actually offer) vs "Other" (free text that doesn't
+// match anything, either messy typing or a real request for a program we
+// don't have). Deliberately a plain array checked case-insensitively rather
+// than trying to be clever about fuzzy-matching every possible typo - see
+// normalizeProgramKey below for the alias layer that runs first.
+const MUL_CANONICAL_PROGRAMS = [
+  "Accounting & Finance", "Artificial Intelligence", "B.Com (Hons)", "BBA",
+  "BS Accounting & Finance", "BS Artificial Intelligence", "BS Bio Chemistry",
+  "BS Biotechnology", "BS Business Analytics", "BS Chemistry & Industrial Entrepreneurship",
+  "BS Computational Plant Sciences", "BS Computer Science", "BS Criminology and Forensic Sciences",
+  "BS Cyber Security", "BS Data Science", "BS Defense and Strategic Studies",
+  "BS Digital Marketing", "BS Digital Media Communication", "BS E-Commerce",
+  "BS Economics", "BS Economics & Data Science", "BS Economics & Financial Technology",
+  "BS Education", "BS Electrical/Chemical Engineering", "BS Financial Technology",
+  "BS Food Science and Technology", "BS Human Nutrition & Dietetics",
+  "BS Information Management", "BS Information System & Technology Management",
+  "BS Information Technology", "BS International Relations", "BS Islamic Banking & Finance",
+  "BS Islamic Banking & Finance Technology", "BS Mathematics & Data Science",
+  "BS Medical Lab Technology", "BS Multimedia Arts", "BS Peace & Conflict Studies",
+  "BS Political Science", "BS Psychology", "BS Sociology", "BS Software Engineering",
+  "BS Statistics & Data Science", "Bioinformatics", "Business Administration",
+  "Commerce", "Computer Science", "Cyber Security", "Data Science", "Digital Marketing",
+  "Doctor of Pharmacy", "Doctor of Physiotherapy", "Education", "English",
+  "Information System & Technology Management", "Information Technology",
+  "Islamic Banking and Finance", "LLB", "Bachelor of Laws (LLB)",
+  "M.Phil Accounting & Finance", "M.Phil Applied Psychology", "M.Phil Bio Chemistry",
+  "M.Phil Botany", "M.Phil Chemistry", "M.Phil Clinical Nutrition", "M.Phil Computer Science",
+  "M.Phil Economics", "M.Phil Education", "M.Phil English (Linguistics)",
+  "M.Phil English (Literature)", "M.Phil Food Science & Technology",
+  "M.Phil Halal Food Safety Management", "M.Phil International Relations",
+  "M.Phil Library Information Science", "M.Phil Management Science", "M.Phil Mathematics",
+  "M.Phil Peace & Counter Terrorism", "M.Phil Pharmacology", "M.Phil Physics",
+  "M.Phil Political Science", "M.Phil Sociology", "M.Phil Statistics",
+  "M.Phil Theology and Religious Studies", "M.Phil Urdu", "M.Phil Zoology",
+  "MBA Executive", "MBA Professional", "MS Data Science", "MS Islamic Banking & Finance",
+  "Mass Communication", "PhD Bio Chemistry", "PhD Economics", "PhD Education",
+  "PhD English Linguistics", "PhD Food Science & Technology", "PhD International Relations",
+  "PhD Islamic Economics & Finance", "PhD Library & Information Science",
+  "PhD Management Science", "PhD Mass Communication", "PhD Mathematics",
+  "PhD Peace and Counter Terrorism", "PhD Pharmacology", "PhD Political Science",
+  "PhD Sociology", "PhD Urdu", "Political Science", "Psychology", "Sociology",
+  "Software Engineering"
+];
+const MUL_CANONICAL_PROGRAMS_LOWER = new Set(MUL_CANONICAL_PROGRAMS.map(p => p.toLowerCase()));
+
+function isRecognizedProgram(rawProgram) {
+  const normalized = normalizeProgramKey(rawProgram);
+  return MUL_CANONICAL_PROGRAMS_LOWER.has(normalized.toLowerCase());
+}
+
 function normalizeProgramKey(name) {
   if (!name) return "";
-  const raw = String(name).trim().toLowerCase().replace(/\s+/g, " ").replace(/\.$/, "");
+  // Strip leading/trailing junk punctuation first (commas, stray parens,
+  // dashes) - real student-typed leads often carry this from the "Name,
+  // Program" comma-split parsing (e.g. ",,Doctor Of Pharmacy", "Bs Llb)"),
+  // and it was defeating exact alias-map lookups below otherwise.
+  const raw = String(name)
+    .trim()
+    .toLowerCase()
+    .replace(/^[,.\-()\s]+/, "")
+    .replace(/[,.\-()\s]+$/, "")
+    .replace(/\s+/g, " ");
 
   const map = {
     "bscs": "BS Computer Science",
@@ -3561,6 +3640,7 @@ function normalizeProgramKey(name) {
     "pharmacy": "Doctor of Pharmacy",
 
     "llb": "Bachelor of Laws (LLB)",
+    "bs llb": "Bachelor of Laws (LLB)",
     "law": "Bachelor of Laws (LLB)",
     "bachelor of law": "Bachelor of Laws (LLB)",
     "bachelor of laws": "Bachelor of Laws (LLB)",
@@ -3832,6 +3912,67 @@ function closeProfileModal() {
   if (modal) {
     modal.classList.add("hidden");
   }
+}
+
+const LEADS_MODAL_CONFIG = {
+  all: { title: "Total Leads", sub: "All leads captured in the selected period", getRows: () => allLeadsFull, filename: "total-leads" },
+  recognized: { title: "Recognized Programs", sub: "Leads whose program matches something MUL actually offers", getRows: () => recognizedLeadsFull, filename: "recognized-leads" },
+  other: { title: "Other (Unmatched)", sub: "Leads whose typed program didn't match our program list - needs a manual look", getRows: () => otherLeadsFull, filename: "other-unmatched-leads" }
+};
+
+function openLeadsModal(type) {
+  const config = LEADS_MODAL_CONFIG[type] || LEADS_MODAL_CONFIG.all;
+  currentLeadsModalType = type;
+
+  document.getElementById("leadsModalTitle").textContent = config.title;
+  document.getElementById("leadsModalSub").textContent = config.sub;
+
+  const rows = config.getRows();
+  const tbody = document.querySelector("#leadsModalTable tbody");
+  tbody.innerHTML = rows.length
+    ? rows.map(lead => `
+      <tr>
+        <td>${escapeHtml(lead.name || "-")}</td>
+        <td>${escapeHtml(prettyProgramName(lead.program || "-"))}</td>
+        <td>${escapeHtml(lead.phone || "-")}</td>
+        <td><span class="status-chip status-${lead.status}">${formatStatus(lead.status)}</span></td>
+        <td>${formatDateTime(lead.updated_at)}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="5" style="color:var(--muted);">No leads in this category for the selected period.</td></tr>`;
+
+  document.getElementById("leadsModal").classList.remove("hidden");
+}
+
+function closeLeadsModal() {
+  const modal = document.getElementById("leadsModal");
+  if (modal) modal.classList.add("hidden");
+}
+
+function downloadLeadsCsv() {
+  const config = LEADS_MODAL_CONFIG[currentLeadsModalType] || LEADS_MODAL_CONFIG.all;
+  const rows = config.getRows();
+
+  const csvEscape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+  const header = ["Name", "Program", "Phone", "Status", "Updated"].join(",");
+  const body = rows.map(lead => [
+    csvEscape(lead.name || "-"),
+    csvEscape(prettyProgramName(lead.program || "-")),
+    csvEscape(lead.phone || "-"),
+    csvEscape(formatStatus(lead.status)),
+    csvEscape(formatDateTime(lead.updated_at))
+  ].join(",")).join("\n");
+
+  const csv = `${header}\n${body}`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${config.filename}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 async function saveProfile() {

@@ -5360,7 +5360,12 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         LIMIT 300
       `),
 
-      pool.query(`
+      // Scoped to the selected date range (unlike the funnel/all-time queries
+      // below) so the "Total Leads Captured" stat cluster and its download
+      // modals match what the rest of the dashboard is showing. Capped at
+      // 3000 as a safety limit, not a real-world expectation.
+      pool.query(
+        `
         SELECT
           u.name,
           u.program,
@@ -5371,9 +5376,12 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         LEFT JOIN chats c ON c.phone = u.phone
         WHERE u.program IS NOT NULL
           AND TRIM(u.program) <> ''
+          AND ${whereCreated.replace(/created_at/g, "u.created_at")}
         ORDER BY c.updated_at DESC NULLS LAST
-        LIMIT 10
-      `),
+        LIMIT 3000
+        `,
+        queryParams
+      ),
 
       // Deliberately NOT scoped to the date range - this must always show
       // the true overall funnel, not just students who first messaged in

@@ -953,6 +953,16 @@ body {
   color: var(--text);
 }
 
+.leads-clickable-card {
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.leads-clickable-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(86, 165, 255, 0.4);
+}
+
 .ranked-row {
   display: grid;
   grid-template-columns: 26px 1fr auto;
