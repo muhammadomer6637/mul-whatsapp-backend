@@ -3523,23 +3523,66 @@ function stringSimilarity(a, b) {
 // one token during cleaning) is explicitly listed - it's a level prefix
 // shared by ~25 different canonical programs, not a distinguishing word,
 // and was causing "Mphil <garbled text>" leads to false-match whichever
-// M.Phil program happened to come first in the array.
-const PROGRAM_MATCH_STOP_WORDS = new Set(["bs", "ms", "phd", "and", "of", "the", "in", "for", "m", "phil", "mphil", "science", "sciences", "studies"]);
+// M.Phil program happened to come first in the array. Also includes
+// generic filler/connector words real leads carry around the actual
+// program name ("Llb Program", "Bs Statistics With Data Science",
+// "Mba Non Business Graduate") - these don't hurt matching accuracy
+// (see canonical-word-coverage scoring below) but keeping them out of
+// the *canonical* side's significant-word set matters.
+const PROGRAM_MATCH_STOP_WORDS = new Set([
+  "bs", "ms", "phd", "and", "or", "of", "the", "in", "for", "m", "phil", "mphil",
+  "science", "sciences", "studies", "with", "program", "programme", "course",
+  "degree", "non", "but", "one", "only", "how", "who", "why", "not", "you",
+  "apply", "applying", "admission", "through", "graduate", "guide", "about"
+]);
 
 // Significant (non-generic) words from a program name, used for fuzzy
 // word-level matching - e.g. "BS Criminology and Forensic Sciences" ->
 // ["criminology", "forensic"], so a lone typo'd word like "criminilogy"
 // can still be matched against just the word that actually distinguishes
-// that program, not the whole multi-word name.
+// that program, not the whole multi-word name. Threshold is length > 2
+// (not > 3) so 3-letter acronym-only names like "LLB"/"BBA" and
+// abbreviations like "lab" (Medical Lab Technology) still count.
 function significantProgramWords(str) {
-  return tightClean(str) ? String(str).toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 3 && !PROGRAM_MATCH_STOP_WORDS.has(w)) : [];
+  return tightClean(str) ? String(str).toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2 && !PROGRAM_MATCH_STOP_WORDS.has(w)) : [];
 }
 
-// Three tiers, cheapest/most-confident first:
+// Which canonical significant words are unique to exactly one program -
+// gates the single-keyword fallback tier below so a generic word shared
+// by several programs ("business" appears in both "Business
+// Administration" and "BS Business Analytics") never anchors a guess on
+// its own.
+const CANONICAL_WORD_PROGRAM_COUNT = {};
+MUL_CANONICAL_PROGRAMS.forEach(p => {
+  significantProgramWords(p).forEach(w => {
+    CANONICAL_WORD_PROGRAM_COUNT[w] = (CANONICAL_WORD_PROGRAM_COUNT[w] || 0) + 1;
+  });
+});
+function isDistinctiveProgramWord(word) {
+  return (CANONICAL_WORD_PROGRAM_COUNT[word] || 0) <= 1;
+}
+
+// Exact match, or one is a prefix of the other (min length 3 - catches
+// "lab"/"laboratory", "tech"/"technology" style abbreviation without
+// needing a hand-maintained list of every such pair), or a fuzzy typo
+// match.
+function wordsMatch(a, b) {
+  if (a === b) return true;
+  if (a.length >= 3 && b.length >= 3 && (a.startsWith(b) || b.startsWith(a))) return true;
+  return stringSimilarity(a, b) >= 0.8;
+}
+
+// Single-string match against the canonical list, cheapest/most-confident
+// tier first:
 // 1. Curated alias map (normalizeProgramKey) - exact known phrasing.
 // 2. Punctuation/spacing-blind exact match - "l.l.b" / "LLB" / "L L B".
-// 3. Fuzzy word match - tolerates real typos ("criminilogy", "Bioinfomatics").
-function findMatchingCanonicalProgram(rawProgram) {
+// 3. Canonical-word-coverage fuzzy match: does the input contain
+//    (exactly, as a prefix/abbreviation, or as a typo) every one of that
+//    program's own distinguishing words? Scored against the CANONICAL
+//    name's word count, not the input's - so extra words the student
+//    typed around the real program name ("Llb Program", "Doctor Of
+//    Pharmacy Through Pwwf") no longer sink an otherwise-clean match.
+function matchSingleProgramString(rawProgram) {
   if (!rawProgram) return null;
 
   const aliasResult = normalizeProgramKey(rawProgram);
@@ -3556,17 +3599,68 @@ function findMatchingCanonicalProgram(rawProgram) {
   if (inputWords.length) {
     let bestMatch = null;
     let bestScore = 0;
+    let bestMatchedCount = 0;
     for (const canonical of MUL_CANONICAL_PROGRAMS) {
       const canonicalWords = significantProgramWords(canonical);
       if (!canonicalWords.length) continue;
-      let matched = 0;
-      inputWords.forEach(iw => {
-        if (canonicalWords.some(cw => stringSimilarity(iw, cw) >= 0.8)) matched++;
-      });
-      const score = matched / inputWords.length;
-      if (score > bestScore) { bestScore = score; bestMatch = canonical; }
+      const matched = canonicalWords.filter(cw => inputWords.some(iw => wordsMatch(iw, cw))).length;
+      const score = matched / canonicalWords.length;
+      // On a tied score, prefer whichever canonical name matched MORE
+      // distinguishing words in absolute terms - e.g. input "M Phill
+      // Applied Psychology" fully covers both "BS Psychology" (1 word)
+      // and "M.Phil Applied Psychology" (2 words); the latter is the
+      // more specific/confident read and should win the tie.
+      if (score > bestScore || (score === bestScore && matched > bestMatchedCount)) {
+        bestScore = score;
+        bestMatch = canonical;
+        bestMatchedCount = matched;
+      }
     }
-    if (bestScore >= 0.99) return bestMatch;
+    if (bestScore >= 1) return bestMatch;
+
+    // Full canonical-coverage (above) needs every distinguishing word of a
+    // multi-word program name present - but a lead sometimes types just
+    // ONE keyword, mistyped, and nothing else ("criminilogy" for the full
+    // "BS Criminology and Forensic Sciences"). This narrow fallback only
+    // fires for short inputs (<=2 significant words) matching a single
+    // long (7+ char) canonical keyword at a high similarity bar, so it
+    // doesn't start firing on short/common words buried in an unrelated
+    // sentence.
+    if (inputWords.length <= 2) {
+      let bestKeywordScore = 0;
+      let bestKeywordMatch = null;
+      for (const canonical of MUL_CANONICAL_PROGRAMS) {
+        for (const cw of significantProgramWords(canonical)) {
+          if (cw.length < 7 || !isDistinctiveProgramWord(cw)) continue;
+          for (const iw of inputWords) {
+            if (iw.length < 7) continue;
+            const sim = stringSimilarity(iw, cw);
+            if (sim > bestKeywordScore) { bestKeywordScore = sim; bestKeywordMatch = canonical; }
+          }
+        }
+      }
+      if (bestKeywordScore >= 0.85) return bestKeywordMatch;
+    }
+  }
+
+  return null;
+}
+
+// Real leads sometimes list several programs in one field
+// ("Bs Computer Science,bs Cyber Security,bs Ai", "Bba, Bbit") - if the
+// whole string doesn't match anything, try each comma/semicolon-separated
+// piece on its own before giving up.
+function findMatchingCanonicalProgram(rawProgram) {
+  if (!rawProgram) return null;
+
+  const wholeMatch = matchSingleProgramString(rawProgram);
+  if (wholeMatch) return wholeMatch;
+
+  if (/[,;]/.test(rawProgram)) {
+    for (const piece of rawProgram.split(/[,;]/)) {
+      const pieceMatch = matchSingleProgramString(piece.trim());
+      if (pieceMatch) return pieceMatch;
+    }
   }
 
   return null;
