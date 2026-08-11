@@ -5195,7 +5195,8 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       callbackResponseStats,
       csatStats,
       feeCalcSent,
-      feeCalcCompleted,
+      feeCalcCompletedTotal,
+      feeCalcCompletedByProgram,
       leadCaptureSent,
       leadCaptureCompleted
     ] = await Promise.all([
@@ -5499,18 +5500,24 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      // Flow Performance panel. "Completed" was already being logged before
-      // "sent" tracking was added, so a naive completed/sent ratio would
-      // compare two different populations and never mean anything (could
-      // even show >100%). Fixed by also floor-ing the completed queries at
-      // the timestamp of that flow's very first logged "sent" - whatever
-      // that turns out to be, since it's the actual moment both sides of
-      // the ratio became comparable, not a hardcoded date. COALESCE'd to
-      // NOW() so a flow with zero sends yet reports 0 completions instead
-      // of matching everything before a NULL cutoff.
+      // Flow Performance panel. Counts DISTINCT PHONE, not raw event rows -
+      // sendFeeCalculatorFlow fires every time a student hits option 1/2
+      // OR types anything containing "fee" (smart-keyword redirect), so
+      // one engaged-but-confused student asking about fees repeatedly was
+      // inflating "Sent" many times over versus how many actual people saw
+      // it, making the completion rate look far worse than reality.
+      // "Completed" was also already being logged before "sent" tracking
+      // was added, so a naive completed/sent ratio would compare two
+      // different populations and never mean anything (could even show
+      // >100%). Fixed by also floor-ing the completed queries at the
+      // timestamp of that flow's very first logged "sent" - whatever that
+      // turns out to be, since it's the actual moment both sides of the
+      // ratio became comparable, not a hardcoded date. COALESCE'd to NOW()
+      // so a flow with zero sends yet reports 0 completions instead of
+      // matching everything before a NULL cutoff.
       pool.query(
         `
-        SELECT COUNT(*)::int AS count
+        SELECT COUNT(DISTINCT phone)::int AS count
         FROM user_interactions
         WHERE interaction_type = 'flow_sent'
           AND category = 'fee_calculator'
@@ -5519,6 +5526,27 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
+      pool.query(
+        `
+        SELECT COUNT(DISTINCT phone)::int AS count
+        FROM user_interactions
+        WHERE interaction_type = 'fee_calculator'
+          AND ${whereCreated}
+          AND created_at >= COALESCE(
+            (SELECT MIN(created_at) FROM user_interactions WHERE interaction_type = 'flow_sent' AND category = 'fee_calculator'),
+            NOW()
+          )
+        `,
+        queryParams
+      ),
+
+      // Same completed rows, but grouped by which program they checked -
+      // feeds the "Top Programs Checked" list, so this one stays a count
+      // of check-events per program rather than unique-phone-per-program
+      // (a student re-checking the same program later is still a genuine
+      // repeat interest signal for that ranking, unlike the raw Sent count
+      // above which was inflated by the same person triggering it without
+      // ever engaging).
       pool.query(
         `
         SELECT category, COUNT(*)::int AS count
@@ -5537,7 +5565,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
 
       pool.query(
         `
-        SELECT COUNT(*)::int AS count
+        SELECT COUNT(DISTINCT phone)::int AS count
         FROM user_interactions
         WHERE interaction_type = 'flow_sent'
           AND category = 'lead_capture_flow'
@@ -5548,7 +5576,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
 
       pool.query(
         `
-        SELECT COUNT(*)::int AS count
+        SELECT COUNT(DISTINCT phone)::int AS count
         FROM user_interactions
         WHERE interaction_type = 'lead_capture_flow'
           AND ${whereCreated}
@@ -5624,8 +5652,8 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       flowPerformance: {
         feeCalculator: {
           sent: feeCalcSent.rows[0].count || 0,
-          completed: feeCalcCompleted.rows.reduce((sum, row) => sum + Number(row.count || 0), 0),
-          topPrograms: feeCalcCompleted.rows
+          completed: feeCalcCompletedTotal.rows[0].count || 0,
+          topPrograms: feeCalcCompletedByProgram.rows
         },
         leadCapture: {
           sent: leadCaptureSent.rows[0].count || 0,
