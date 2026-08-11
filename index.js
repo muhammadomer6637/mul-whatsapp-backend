@@ -5257,12 +5257,22 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
+      // Was COUNT(DISTINCT phone) FROM chats WHERE agent_requested=true -
+      // but that flag only gets set once a name+program is already on
+      // file (see the "agent_category" handler around line 3526), so a
+      // first-time student who asked for an agent but hasn't given their
+      // name/program yet was silently missing from this count while still
+      // correctly appearing in agentCategoryStats below (logged
+      // unconditionally the moment they ask). Switched to the same
+      // interaction-log source so this total and the Agent Request
+      // Insights breakdown can never disagree - they're now literally the
+      // same query, one grouped and one not.
       pool.query(
         `
         SELECT COUNT(DISTINCT phone)::int AS count
-        FROM chats
-        WHERE agent_requested = true
-          AND ${whereCreated.replaceAll("created_at", "updated_at")}
+        FROM user_interactions
+        WHERE interaction_type = 'agent_category'
+          AND ${whereCreated}
         `,
         queryParams
       ),
