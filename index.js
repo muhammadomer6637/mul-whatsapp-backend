@@ -5299,12 +5299,24 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
+      // Was COUNT(DISTINCT phone) per category, which double-counts anyone
+      // who requested an agent under BOTH categories in the same period
+      // (e.g. "Other" once, "Admissions Related" another time) - they'd
+      // show up in each category's distinct-phone tally, so the two
+      // category counts summed to more than the single-source overall
+      // total above. Picks each phone's most recent category choice in
+      // the range first (DISTINCT ON), so categories are mutually
+      // exclusive per phone and this always sums to exactly that total.
       pool.query(
         `
-        SELECT category, COUNT(DISTINCT phone)::int AS count
-        FROM user_interactions
-        WHERE interaction_type = 'agent_category'
-          AND ${whereCreated}
+        SELECT category, COUNT(*)::int AS count
+        FROM (
+          SELECT DISTINCT ON (phone) phone, category
+          FROM user_interactions
+          WHERE interaction_type = 'agent_category'
+            AND ${whereCreated}
+          ORDER BY phone, created_at DESC
+        ) latest_choice
         GROUP BY category
         ORDER BY count DESC, category ASC
         `,
