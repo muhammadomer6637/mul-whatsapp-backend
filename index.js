@@ -108,7 +108,6 @@ async function getFeeProgramOptions(categoryId) {
 async function sendFeeCalculatorFlow(to) {
   if (!WHATSAPP_FLOW_ID) return;
   try {
-    await saveUserInteraction(to, "flow_sent", "fee_calculator");
     const categories = await getFeeCategoryOptions();
 
     await axios.post(
@@ -143,6 +142,13 @@ async function sendFeeCalculatorFlow(to) {
         }
       }
     );
+
+    // Logged only after the WhatsApp API call actually succeeds - this
+    // used to run before the send attempt, so a failed delivery (network
+    // error, rejected token, rate limit) still counted as "Sent" on the
+    // Flow Performance panel, inflating the denominator with flows the
+    // student never actually saw.
+    await saveUserInteraction(to, "flow_sent", "fee_calculator");
   } catch (error) {
     console.error("Send fee calculator flow error:", error.response?.data || error.message);
     recordSendFailure();
@@ -152,7 +158,6 @@ async function sendFeeCalculatorFlow(to) {
 async function sendLeadCaptureFlow(to) {
   if (!WHATSAPP_LEAD_FLOW_ID) return false;
   try {
-    await saveUserInteraction(to, "flow_sent", "lead_capture_flow");
     const categories = await getFeeCategoryOptions();
 
     await axios.post(
@@ -187,6 +192,10 @@ async function sendLeadCaptureFlow(to) {
         }
       }
     );
+
+    // Logged only after the WhatsApp API call actually succeeds - see the
+    // matching comment in sendFeeCalculatorFlow above.
+    await saveUserInteraction(to, "flow_sent", "lead_capture_flow");
     return true;
   } catch (error) {
     console.error("Send lead capture flow error:", error.response?.data || error.message);
