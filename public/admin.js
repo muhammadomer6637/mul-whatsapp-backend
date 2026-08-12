@@ -3450,7 +3450,7 @@ function titleCase(str) {
 const MUL_CANONICAL_PROGRAMS = [
   // Confirmed by the user 2026-08-11 - added after the fact, wasn't in the
   // original data/eligibility-import.json-sourced list below.
-  "BS Aesthetics and Cosmetology",
+  "BS Aesthetics and Cosmetology", "ADP Digital Marketing",
   "Accounting & Finance", "Artificial Intelligence", "B.Com (Hons)", "BBA",
   "BS Accounting & Finance", "BS Artificial Intelligence", "BS Bio Chemistry",
   "BS Biotechnology", "BS Business Analytics", "BS Chemistry & Industrial Entrepreneurship",
@@ -3700,10 +3700,17 @@ function normalizeProgramKey(name) {
   // Strip leading/trailing junk punctuation first (commas, stray parens,
   // dashes) - real student-typed leads often carry this from the "Name,
   // Program" comma-split parsing (e.g. ",,Doctor Of Pharmacy", "Bs Llb)"),
-  // and it was defeating exact alias-map lookups below otherwise.
+  // and it was defeating exact alias-map lookups below otherwise. Parens
+  // ANYWHERE (not just leading/trailing) become a space too - a stray "("
+  // stuck directly to a word with no space ("Bs(doctor Of Physical
+  // Therapy") was silently joining into one "bsdoctor" token. No alias
+  // key uses parens, so this is safe; periods/hyphens are deliberately
+  // left alone mid-string since several alias keys ("l.l.b", "pharm-d")
+  // depend on them.
   const raw = String(name)
     .trim()
     .toLowerCase()
+    .replace(/[()]/g, " ")
     .replace(/^[,.\-()\s]+/, "")
     .replace(/[,.\-()\s]+$/, "")
     .replace(/\s+/g, " ");
@@ -3948,7 +3955,31 @@ function normalizeProgramKey(name) {
     "physical therapy": "Doctor of Physiotherapy",
 
     "bs physcology": "BS Psychology",
-    "physcology": "BS Psychology"
+    "physcology": "BS Psychology",
+
+    // Batch added 2026-08-11 (second round) - user gave the exact intended
+    // match in parentheses for each of these.
+    "bsc electrical engineering": "BS Electrical/Chemical Engineering",
+    "bs electrical engineering": "BS Electrical/Chemical Engineering",
+
+    "bs nutrition": "BS Human Nutrition & Dietetics",
+
+    "adp digital marking": "ADP Digital Marketing",
+    "adp digital marketing": "ADP Digital Marketing",
+
+    "bssc": "BS Computer Science",
+
+    "bs doctor of physical therapy": "Doctor of Physiotherapy",
+
+    "bsaf": "BS Accounting & Finance",
+
+    "mphil pct": "M.Phil Peace & Counter Terrorism",
+    "pct": "M.Phil Peace & Counter Terrorism",
+
+    "bs ai program": "BS Artificial Intelligence",
+    "bs ai": "BS Artificial Intelligence",
+    "ai program": "BS Artificial Intelligence",
+    "bs al": "BS Artificial Intelligence"
   };
 
   return map[raw] || titleCase(raw);
