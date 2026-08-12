@@ -3448,6 +3448,9 @@ function titleCase(str) {
 // than trying to be clever about fuzzy-matching every possible typo - see
 // normalizeProgramKey below for the alias layer that runs first.
 const MUL_CANONICAL_PROGRAMS = [
+  // Confirmed by the user 2026-08-11 - added after the fact, wasn't in the
+  // original data/eligibility-import.json-sourced list below.
+  "BS Aesthetics and Cosmetology",
   "Accounting & Finance", "Artificial Intelligence", "B.Com (Hons)", "BBA",
   "BS Accounting & Finance", "BS Artificial Intelligence", "BS Bio Chemistry",
   "BS Biotechnology", "BS Business Analytics", "BS Chemistry & Industrial Entrepreneurship",
@@ -3544,7 +3547,10 @@ const PROGRAM_MATCH_STOP_WORDS = new Set([
 // (not > 3) so 3-letter acronym-only names like "LLB"/"BBA" and
 // abbreviations like "lab" (Medical Lab Technology) still count.
 function significantProgramWords(str) {
-  return tightClean(str) ? String(str).toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2 && !PROGRAM_MATCH_STOP_WORDS.has(w)) : [];
+  // Non-alphanumeric characters become a SPACE, not nothing - "Bs(doctor"
+  // used to collapse into one joined "bsdoctor" token (no word boundary
+  // where the "(" was), silently hiding "doctor" as a separate word.
+  return tightClean(str) ? String(str).toLowerCase().replace(/[^a-z0-9]/g, " ").split(/\s+/).filter(w => w.length > 2 && !PROGRAM_MATCH_STOP_WORDS.has(w)) : [];
 }
 
 // Which canonical significant words are unique to exactly one program -
@@ -3582,7 +3588,7 @@ function wordsMatch(a, b) {
 //    name's word count, not the input's - so extra words the student
 //    typed around the real program name ("Llb Program", "Doctor Of
 //    Pharmacy Through Pwwf") no longer sink an otherwise-clean match.
-function matchSingleProgramString(rawProgram) {
+function matchSingleProgramString(rawProgram, allowFuzzy = true) {
   if (!rawProgram) return null;
 
   const aliasResult = normalizeProgramKey(rawProgram);
@@ -3594,6 +3600,8 @@ function matchSingleProgramString(rawProgram) {
     const tightMatch = MUL_CANONICAL_PROGRAMS.find(p => tightClean(p) === inputTight);
     if (tightMatch) return tightMatch;
   }
+
+  if (!allowFuzzy) return null;
 
   const inputWords = significantProgramWords(rawProgram);
   if (inputWords.length) {
@@ -3647,23 +3655,40 @@ function matchSingleProgramString(rawProgram) {
 }
 
 // Real leads sometimes list several programs in one field
-// ("Bs Computer Science,bs Cyber Security,bs Ai", "Bba, Bbit") - if the
-// whole string doesn't match anything, try each comma/semicolon-separated
-// piece on its own before giving up.
+// ("Bs Computer Science,bs Cyber Security,bs Ai", "Bba, Bbit",
+// "Dpt & D-pharm", "Bscs Or Bsit"). Ordered cheapest/safest first:
+// 1. Exact-only (alias/tightClean, no fuzzy) on the whole string - if it's
+//    a clean known phrasing, or IS a real canonical name that happens to
+//    contain "&"/"and" ("BS Accounting & Finance"), this resolves it
+//    immediately without ever risking a split or a fuzzy guess.
+// 2. Split into pieces (comma/semicolon, then " or ", then "&"/" and " as
+//    a last-resort separator) and fully match each piece (alias +
+//    tightClean + fuzzy) - catches genuine multi-program fields.
+// 3. Fuzzy match on the whole string, last resort. This is deliberately
+//    LAST, not first like earlier versions - running fuzzy word-coverage
+//    across an unsplit multi-part string risks a wrong cross-match (e.g.
+//    "Dpt & D-pharm" fuzzy-matched "M.Phil Pharmacology" via "pharm" as a
+//    stray prefix hit before splitting ever got a chance to try "Dpt" and
+//    "D-pharm" as their own clean pieces first).
 function findMatchingCanonicalProgram(rawProgram) {
   if (!rawProgram) return null;
 
-  const wholeMatch = matchSingleProgramString(rawProgram);
-  if (wholeMatch) return wholeMatch;
+  const exactWhole = matchSingleProgramString(rawProgram, false);
+  if (exactWhole) return exactWhole;
 
-  if (/[,;]/.test(rawProgram)) {
-    for (const piece of rawProgram.split(/[,;]/)) {
+  const trySplit = (regex) => {
+    if (!regex.test(rawProgram)) return null;
+    for (const piece of rawProgram.split(regex)) {
       const pieceMatch = matchSingleProgramString(piece.trim());
       if (pieceMatch) return pieceMatch;
     }
-  }
+    return null;
+  };
 
-  return null;
+  const splitMatch = trySplit(/[,;]/) || trySplit(/\s+or\s+/i) || trySplit(/\s*&\s*|\s+and\s+/i);
+  if (splitMatch) return splitMatch;
+
+  return matchSingleProgramString(rawProgram);
 }
 
 function isRecognizedProgram(rawProgram) {
@@ -3814,6 +3839,9 @@ function normalizeProgramKey(name) {
     "pharmd": "Doctor of Pharmacy",
     "pharm-d": "Doctor of Pharmacy",
     "pharm d": "Doctor of Pharmacy",
+    "d pharm": "Doctor of Pharmacy",
+    "d-pharm": "Doctor of Pharmacy",
+    "dpharm": "Doctor of Pharmacy",
     "doctor of pharmacy": "Doctor of Pharmacy",
     "pharmacy": "Doctor of Pharmacy",
 
@@ -3845,14 +3873,96 @@ function normalizeProgramKey(name) {
 
     "phd economics": "PhD Economics",
     "phd education": "PhD Education",
-    "phd mass communication": "PhD Mass Communication"
+    "phd mass communication": "PhD Mass Communication",
+
+    // Batch added 2026-08-11 from a week of real "Other" leads the user
+    // reviewed by hand - each of these is a genuine match to a program we
+    // offer, just phrased/abbreviated in a way the fuzzy tiers didn't
+    // reliably catch (short abbreviations like "ir"/"mlt", or a level
+    // prefix + bare keyword with nothing else for the word-coverage tiers
+    // to work with).
+    "mphil linguistics": "M.Phil English (Linguistics)",
+    "mphill linguistics": "M.Phil English (Linguistics)",
+    "m.phil linguistics": "M.Phil English (Linguistics)",
+    "phd linguistics": "PhD English Linguistics",
+    "linguistics": "M.Phil English (Linguistics)",
+
+    "bs ir": "BS International Relations",
+    "ir": "BS International Relations",
+    "mphil ir": "M.Phil International Relations",
+    "phd ir": "PhD International Relations",
+
+    "chemical engineering": "BS Electrical/Chemical Engineering",
+    "bsc chemical engineering": "BS Electrical/Chemical Engineering",
+    "bs chemical engineering": "BS Electrical/Chemical Engineering",
+    "bsc electrical": "BS Electrical/Chemical Engineering",
+    "electrical engineering": "BS Electrical/Chemical Engineering",
+
+    "bs law": "Bachelor of Laws (LLB)",
+
+    "bs human nutrition and dietician": "BS Human Nutrition & Dietetics",
+    "human nutrition and dietician": "BS Human Nutrition & Dietetics",
+    "bs hnd": "BS Human Nutrition & Dietetics",
+    "hnd": "BS Human Nutrition & Dietetics",
+
+    "bs mlt": "BS Medical Lab Technology",
+    "mlt": "BS Medical Lab Technology",
+
+    "bs accounts and finance": "BS Accounting & Finance",
+    "bs accounting and financial": "BS Accounting & Finance",
+    "bs accounting and finance": "BS Accounting & Finance",
+    "accounts and finance": "BS Accounting & Finance",
+
+    "mphil biochem": "M.Phil Bio Chemistry",
+    "mphill biochem": "M.Phil Bio Chemistry",
+    "biochem": "M.Phil Bio Chemistry",
+
+    "ms food science": "M.Phil Food Science & Technology",
+    "phd food sci": "PhD Food Science & Technology",
+    "mphil in food sciences": "M.Phil Food Science & Technology",
+    "mphil food science": "M.Phil Food Science & Technology",
+
+    "bs media and communication studies": "Mass Communication",
+    "bs media and communications": "Mass Communication",
+    "media and communication": "Mass Communication",
+
+    "bscs": "BS Computer Science",
+    "bsit": "BS Information Technology",
+    "bs cs 5th semester": "BS Computer Science",
+
+    "emba": "MBA Executive",
+
+    "pharm d": "Doctor of Pharmacy",
+    "pharmd": "Doctor of Pharmacy",
+    "pharm.d": "Doctor of Pharmacy",
+    "pham d": "Doctor of Pharmacy",
+
+    "bsenglish": "English",
+
+    "mphil criminolology": "BS Criminology and Forensic Sciences",
+    "mphil criminology": "BS Criminology and Forensic Sciences",
+    "m.phill linguistics": "M.Phil English (Linguistics)",
+
+    "bs doctor of physical therapy": "Doctor of Physiotherapy",
+    "doctor of physical therapy": "Doctor of Physiotherapy",
+    "physical therapy": "Doctor of Physiotherapy",
+
+    "bs physcology": "BS Psychology",
+    "physcology": "BS Psychology"
   };
 
   return map[raw] || titleCase(raw);
 }
 
 function prettyProgramName(name) {
-  return normalizeProgramKey(name);
+  // Show the actual canonical program name wherever a match is found
+  // (leads table/modal, chat list, chat header, CSV export - every call
+  // site of this function) instead of just a title-cased version of
+  // whatever the student typed. Falls back to the old behavior
+  // (normalizeProgramKey's smaller alias map + titleCase) for genuinely
+  // unmatched/"Other" programs, so those still display cleanly even
+  // though there's no canonical name to show.
+  return findMatchingCanonicalProgram(name) || normalizeProgramKey(name);
 }
 
 function normalizeProgramsForDisplay(programs) {
