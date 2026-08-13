@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-  <link rel="stylesheet" href="admin.css?v=8" />
+  <link rel="stylesheet" href="admin.css?v=9" />
 </head>
 <body>
   <div id="loginOverlay" class="login-overlay">
@@ -569,29 +569,11 @@
   <div class="panel">
     <div class="panel-header">
       <div>
-        <h3>Agent Management</h3>
-        <p>Create and manage admission support agents</p>
+        <h3>Team Members</h3>
+        <p>Everyone with access to this admin panel</p>
       </div>
-    </div>
-
-    <div class="agent-create-form">
-      <input type="text" id="newAgentName" placeholder="Agent Name" />
-      <input type="text" id="newAgentUsername" placeholder="Username" />
-      <input type="password" id="newAgentPassword" placeholder="Password" />
-
-      <select id="newAgentRole">
-        <option value="chat_agent">Chat Agent</option>
-        <option value="call_agent">Call Agent</option>
-        <option value="admin">Admin</option>
-      </select>
-
-      <label class="checkbox-row">
-        <input type="checkbox" id="newAgentDashboardAccess" />
-        Dashboard Access
-      </label>
-
-      <button class="primary-btn" onclick="createAgent()">
-        Create Agent
+      <button class="primary-btn" onclick="openCreateAgentModal()">
+        + Create Agent
       </button>
     </div>
 

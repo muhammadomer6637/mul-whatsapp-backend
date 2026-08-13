@@ -2929,28 +2929,6 @@ rgba(86,165,255,.18);
    AGENT MANAGEMENT
 ========================= */
 
-.agent-create-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
-  margin-top: 20px;
-}
-
-.agent-create-form input,
-.agent-create-form select {
-  background: #111c31;
-  border: 1px solid rgba(255,255,255,0.06);
-  color: #fff;
-  padding: 12px 14px;
-  border-radius: 12px;
-  outline: none;
-}
-
-.agent-create-form input:focus,
-.agent-create-form select:focus {
-  border-color: #2563eb;
-}
-
 .checkbox-row {
   display: flex;
   align-items: center;

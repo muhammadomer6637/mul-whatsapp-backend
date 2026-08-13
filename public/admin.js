@@ -3016,20 +3016,76 @@ async function loadAgents() {
   }
 }
 
-async function createAgent() {
-  const name = document.getElementById("newAgentName").value.trim();
+function openCreateAgentModal() {
+  const overlay = document.createElement("div");
+  overlay.className = "confirm-modal-overlay";
+  overlay.innerHTML = `
+    <div class="confirm-modal-card">
+      <p style="font-weight:700; font-size:16px;">Create agent</p>
 
-  const username = document.getElementById("newAgentUsername").value.trim();
+      <label class="field-label">Agent Name</label>
+      <input id="newAgentName" class="prompt-input" type="text" placeholder="e.g. Ali Raza" />
 
-  const password = document.getElementById("newAgentPassword").value.trim();
+      <label class="field-label">Username</label>
+      <input id="newAgentUsername" class="prompt-input" type="text" placeholder="e.g. ali" />
 
-  const role = document.getElementById("newAgentRole").value;
+      <label class="field-label">Password</label>
+      <input id="newAgentPassword" class="prompt-input" type="password" placeholder="Minimum 6 characters" />
 
-  const can_view_dashboard =
-    document.getElementById("newAgentDashboardAccess").checked;
+      <label class="field-label">Role</label>
+      <select id="newAgentRole" class="prompt-input">
+        <option value="chat_agent">Chat Agent</option>
+        <option value="call_agent">Call Agent</option>
+        <option value="admin">Admin</option>
+      </select>
+
+      <label class="field-toggle-row">
+        <span>Dashboard access</span>
+        <label class="switch">
+          <input type="checkbox" id="newAgentDashboardAccess" />
+          <span class="slider"></span>
+        </label>
+      </label>
+
+      <div class="confirm-modal-actions">
+        <button class="ghost-btn" data-action="cancel">Cancel</button>
+        <button class="primary-btn" data-action="create">Create Agent</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  overlay.querySelector("#newAgentName").focus();
+
+  overlay.addEventListener("click", async (event) => {
+    const action = event.target.dataset.action;
+    if (!action) return;
+
+    if (action === "cancel") {
+      overlay.remove();
+      return;
+    }
+
+    if (action === "create") {
+      await createAgent(overlay);
+    }
+  });
+}
+
+async function createAgent(overlay) {
+  const name = overlay.querySelector("#newAgentName").value.trim();
+  const username = overlay.querySelector("#newAgentUsername").value.trim();
+  const password = overlay.querySelector("#newAgentPassword").value.trim();
+  const role = overlay.querySelector("#newAgentRole").value;
+  const can_view_dashboard = overlay.querySelector("#newAgentDashboardAccess").checked;
 
   if (!name || !username || !password) {
     notify("Please fill all required fields", "warning");
+    return;
+  }
+
+  if (password.length < 6) {
+    notify("Password must be at least 6 characters", "warning");
     return;
   }
 
@@ -3058,12 +3114,7 @@ async function createAgent() {
     }
 
     notify("Agent created successfully", "success");
-
-    document.getElementById("newAgentName").value = "";
-    document.getElementById("newAgentUsername").value = "";
-    document.getElementById("newAgentPassword").value = "";
-    document.getElementById("newAgentDashboardAccess").checked = false;
-
+    overlay.remove();
     loadAgents();
 
   } catch (error) {
