@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-  <link rel="stylesheet" href="admin.css?v=7" />
+  <link rel="stylesheet" href="admin.css?v=8" />
 </head>
 <body>
   <div id="loginOverlay" class="login-overlay">
@@ -755,6 +755,7 @@
       <button class="profile-close-btn" onclick="closeProfileModal()">×</button>
     </div>
 
+    <div class="profile-modal-body">
     <div class="profile-form-grid">
       <div>
         <label>Full Name</label>
@@ -819,6 +820,7 @@
     <button class="primary-btn" onclick="changeOwnPassword()">
       Change Password
     </button>
+    </div>
   </div>
 </div>
 
@@ -832,6 +834,7 @@
       <button class="profile-close-btn" onclick="closeLeadsModal()">×</button>
     </div>
 
+    <div class="profile-modal-body">
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
       <button class="export-btn export-pill-btn" onclick="downloadLeadsCsv()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M6 10l6 6 6-6M5 21h14"/></svg>
@@ -852,6 +855,7 @@
         </thead>
         <tbody></tbody>
       </table>
+    </div>
     </div>
   </div>
 </div>

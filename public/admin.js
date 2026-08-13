@@ -4268,6 +4268,52 @@ function closeLeadsModal() {
   if (modal) modal.classList.add("hidden");
 }
 
+// ---- System-wide popup close: Esc key + backdrop click ----
+// Covers #profileModal, #leadsModal, and every dynamically-built
+// .confirm-modal-overlay dialog (quick reply, fee category/program,
+// edit agent, customConfirm, customPrompt).
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+
+  const leadsModal = document.getElementById("leadsModal");
+  if (leadsModal && !leadsModal.classList.contains("hidden")) {
+    closeLeadsModal();
+    return;
+  }
+
+  const profileModal = document.getElementById("profileModal");
+  if (profileModal && !profileModal.classList.contains("hidden")) {
+    closeProfileModal();
+    return;
+  }
+
+  // Dynamically-created dialogs: click their own Cancel button so any
+  // pending promise (customConfirm/customPrompt) resolves correctly
+  // instead of leaving the caller awaiting forever.
+  const overlay = document.querySelector(".confirm-modal-overlay");
+  if (overlay) {
+    const cancelBtn = overlay.querySelector('[data-action="cancel"]');
+    if (cancelBtn) cancelBtn.click();
+    else overlay.remove();
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (event.target.id === "profileModal") {
+    closeProfileModal();
+    return;
+  }
+  if (event.target.id === "leadsModal") {
+    closeLeadsModal();
+    return;
+  }
+  if (event.target.classList && event.target.classList.contains("confirm-modal-overlay")) {
+    const cancelBtn = event.target.querySelector('[data-action="cancel"]');
+    if (cancelBtn) cancelBtn.click();
+    else event.target.remove();
+  }
+});
+
 function downloadLeadsCsv() {
   const config = LEADS_MODAL_CONFIG[currentLeadsModalType] || LEADS_MODAL_CONFIG.all;
   const rows = config.getRows();
