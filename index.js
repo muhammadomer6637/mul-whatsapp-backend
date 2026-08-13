@@ -525,7 +525,11 @@ async function updateUserDetails(
         program = COALESCE($3, program),
         mode = COALESCE($4, mode),
         awaiting_lead = COALESCE($5, awaiting_lead),
-        awaiting_callback_lead = COALESCE($6, awaiting_callback_lead)
+        awaiting_callback_lead = COALESCE($6, awaiting_callback_lead),
+        program_captured_at = CASE
+          WHEN $3 IS NOT NULL AND TRIM($3) <> '' THEN NOW()
+          ELSE program_captured_at
+        END
       WHERE phone = $1
       `,
       [phone, name, program, mode, awaitingLead, awaitingCallbackLead]
@@ -5396,6 +5400,14 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // below) so the "Total Leads Captured" stat cluster and its download
       // modals match what the rest of the dashboard is showing. Capped at
       // 3000 as a safety limit, not a real-world expectation.
+      //
+      // Date-scoped by COALESCE(program_captured_at, created_at) - i.e. when
+      // this lead's name/program was actually captured, not u.created_at
+      // (which is just the phone's very first-ever contact with the bot,
+      // possibly months earlier). program_captured_at is NULL for every row
+      // written before this column existed, so historical leads fall back
+      // to the old created_at behaviour unchanged - only newly-captured/
+      // updated leads going forward use the more accurate date.
       pool.query(
         `
         SELECT
@@ -5408,7 +5420,10 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         LEFT JOIN chats c ON c.phone = u.phone
         WHERE u.program IS NOT NULL
           AND TRIM(u.program) <> ''
-          AND ${whereCreated.replace(/created_at/g, "u.created_at")}
+          AND ${whereCreated.replace(
+            /created_at/g,
+            "COALESCE(u.program_captured_at, u.created_at)"
+          )}
         ORDER BY c.updated_at DESC NULLS LAST
         LIMIT 3000
         `,
@@ -5867,6 +5882,27 @@ app.listen(3000, async () => {
     console.log("✅ 24h follow-up columns ensured in DB");
   } catch (err) {
     console.error("❌ 24h follow-up columns error:", err.message);
+  }
+
+  // 🔥 LEAD-CAPTURE-DATE COLUMN AUTO ADD
+  // Recent Leads used to be date-filtered by users.created_at (the phone's
+  // very first-ever contact with the bot), not by when their name/program
+  // was actually captured - a returning student who first texted months
+  // ago but only gave their program details today was invisible from
+  // today's/this week's Leads numbers, even though "Agent Request
+  // Insights" (scoped by the request's own date) correctly counted them.
+  // This column is purely additive and NULL for all existing rows, so
+  // historical numbers/behaviour are completely unaffected until a lead's
+  // program is next captured/updated - no backfill, no data at risk.
+  try {
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS program_captured_at TIMESTAMPTZ NULL;
+    `);
+
+    console.log("✅ program_captured_at column ensured in DB");
+  } catch (err) {
+    console.error("❌ program_captured_at column error:", err.message);
   }
 
   // 🔥 START 24H FOLLOW-UP CHECKER
