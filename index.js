@@ -9,6 +9,7 @@ const multer = require("multer");
 const pool = require("./db/db");
 const { testConnection } = require("./db/db");
 const initDb = require("./db/initDb");
+const { findMatchingCanonicalProgramStrict } = require("./lib/programMatcher");
 
 const app = express();
 app.use(express.json());
@@ -1062,30 +1063,10 @@ function isAdOpenerMessage(rawText) {
   return false;
 }
 
-// A short, curated list of common program names/abbreviations actually seen
-// in real student messages - deliberately NOT the full fuzzy program-catalog
-// matcher used on the admin dashboard (that lives in admin.js, is much
-// heavier, and is a separate future step). This just catches the common
-// case of a student naming a program with nothing else in the message.
-const BARE_PROGRAM_HINTS = [
-  "llb", "bba", "mba", "dpt", "d.pt", "pharm-d", "pharmd", "pharm d",
-  "mphil", "mphill", "m.phil", "phd", "ph.d", "bscs", "bs cs", "msc", "bsc",
-  "bs ai", "bs cyber security", "bs accounting", "bs nutrition",
-  "bs criminology", "adp", "llm", "d pharmacy", "doctor of pharmacy",
-  "bs computer science", "bs software engineering", "bs artificial intelligence"
-];
-
-function escapeRegExpLiteral(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-// Word-boundary regexes, not plain .includes() - a naive substring check on
-// a short hint like "llm" would false-positive on ordinary English words
-// (e.g. "enrollment" contains "llm").
-const BARE_PROGRAM_HINT_RES = BARE_PROGRAM_HINTS.map(
-  hint => new RegExp(`\\b${escapeRegExpLiteral(hint).replace(/\s+/g, "\\s+")}\\b`, "i")
-);
-
+// Full fuzzy program-catalog matcher, ported from the admin dashboard's
+// lead classifier (see lib/programMatcher.js) - catches typos, abbreviations
+// and extra filler words ("Pharm D ka Kya merit he", "Uzma Shoukat,
+// M.phil"), not just a fixed list of exact spellings.
 function isBareProgramMention(rawText) {
   const clean = String(rawText || "").trim();
   if (!clean) return false;
@@ -1093,7 +1074,7 @@ function isBareProgramMention(rawText) {
   // sentence that merely mentions a program name in passing.
   if (clean.split(/\s+/).length > 8) return false;
 
-  return BARE_PROGRAM_HINT_RES.some(re => re.test(clean));
+  return !!findMatchingCanonicalProgramStrict(clean);
 }
 
 function welcomeMessage() {
