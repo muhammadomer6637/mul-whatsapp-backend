@@ -4220,6 +4220,40 @@ function exportDashboardData() {
     });
 }
 
+// One-off diagnostic export (System Health tab, admin-only): most recent
+// incoming student text messages as CSV, for reviewing real conversation
+// content directly instead of relying on database access.
+function exportRawMessages() {
+  fetch(`${BASE}/api/admin/export-messages`, {
+    headers: authHeaders()
+  })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error("Export failed");
+      }
+      return response.blob();
+    })
+    .then(blob => {
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      link.href = downloadUrl;
+      link.download = `mul-nexus-raw-messages-export-${today}.csv`;
+
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    })
+    .catch(error => {
+      console.error("Export raw messages error:", error);
+      notify("Export failed. Please try again.", "error");
+    });
+}
+
 // =========================
 // MY PROFILE
 // =========================

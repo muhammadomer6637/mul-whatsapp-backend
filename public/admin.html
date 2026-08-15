@@ -696,9 +696,14 @@
                 <h3>System Health</h3>
                 <p>Live status of the database, WhatsApp connection, and background jobs</p>
               </div>
-              <button class="refresh-btn" onclick="loadSystemHealth()">
-                Refresh
-              </button>
+              <div style="display:flex; gap:10px;">
+                <button class="ghost-btn" onclick="exportRawMessages()" title="Download the most recent incoming student messages as CSV, for reviewing real conversation content">
+                  Export Raw Messages
+                </button>
+                <button class="refresh-btn" onclick="loadSystemHealth()">
+                  Refresh
+                </button>
+              </div>
             </div>
 
             <div id="systemHealthGrid" class="stats-grid"></div>

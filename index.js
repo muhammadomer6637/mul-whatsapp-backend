@@ -5816,6 +5816,63 @@ app.get("/api/export-leads", authenticateAgent, async (req, res) => {
   }
 });
 
+// One-off diagnostic export: raw incoming student text messages, most
+// recent first. Admin-only, read-only - built so real conversation
+// content can be reviewed directly (e.g. to see how students actually
+// phrase things vs what the bot's menu/keyword logic expects) without
+// needing separate database access.
+app.get("/api/admin/export-messages", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 5000, 20000);
+
+    const result = await pool.query(
+      `
+      SELECT m.phone, m.text, m.created_at, u.name, u.program
+      FROM messages m
+      LEFT JOIN users u ON u.phone = m.phone
+      WHERE m.sender = 'user'
+        AND m.type = 'text'
+        AND m.text IS NOT NULL
+        AND m.text <> ''
+      ORDER BY m.created_at DESC
+      LIMIT $1
+      `,
+      [limit]
+    );
+
+    const headers = ["Date", "Phone", "Name", "Program", "Message"];
+
+    const rows = result.rows.map(row => [
+      row.created_at ? new Date(row.created_at).toLocaleString("en-GB") : "",
+      row.phone || "",
+      row.name || "",
+      row.program || "",
+      row.text || ""
+    ]);
+
+    const csv = [
+      headers.join(","),
+      ...rows.map(r =>
+        r.map(value => `"${String(value).replaceAll('"', '""')}"`).join(",")
+      )
+    ].join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="mul-nexus-raw-messages-export.csv"`
+    );
+
+    return res.send(csv);
+  } catch (error) {
+    console.error("GET /api/admin/export-messages error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to export messages"
+    });
+  }
+});
+
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
