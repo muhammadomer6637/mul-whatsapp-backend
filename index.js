@@ -992,6 +992,110 @@ function splitIntoChunks(items, size = 12) {
   return chunks;
 }
 
+// Real incoming-message data (5000-message audit, Aug 2026) showed a lot of
+// free text falling into a handful of recurring, recognizable patterns that
+// the old fee/scholarship/admission/agent keyword buckets never covered -
+// greetings, plain acknowledgments, ad-click openers, bare program names,
+// challan/payment problems, percentage/eligibility questions, deadline
+// questions, and job/career inquiries. These helpers detect those patterns
+// without needing any external AI - just normalized string matching against
+// real spelling variants seen in production.
+
+function isGreetingOnly(rawText) {
+  // Guard first: every real menu code contains a digit (1a, 6k, 4b...) and
+  // no genuine greeting does. Without this, digit-stripping below could
+  // collapse a real code down to a letter that coincidentally matches.
+  if (/\d/.test(String(rawText || "").trim())) return false;
+
+  const clean = String(rawText || "").toLowerCase().replace(/[^a-z؀-ۿ]/g, "");
+  if (!clean) return false;
+
+  const knownGreetings = [
+    "hi", "hii", "hiii", "hiiii", "hello", "hellooo", "hey", "heyy", "heyyy",
+    "hlo", "hy", "hyy", "hola",
+    "salam", "salaam", "assalam", "aoa", "aoaa",
+    "assalamoalaikum", "assalamualaikum", "asalamualaikum", "asalamoalaikum",
+    "asslamoalaikum", "asslamoalikum", "assalamoalikum", "assalamalikum",
+    "assalamualikum", "asalamalaikum", "assalamalaikum", "aslamualaikum",
+    "salamualaikum", "walaikumassalam", "waalaikumassalam", "wasalam"
+  ];
+  if (knownGreetings.includes(clean)) return true;
+
+  // Short pure Arabic-script message (e.g. "السلام علیکم") - our keyword
+  // matching only ever checks Roman/English substrings, so this script is
+  // otherwise completely invisible to it. Most such short messages here are
+  // greetings, so treat them as one rather than dead-ending silently.
+  const trimmed = String(rawText || "").trim();
+  if (trimmed && /^[؀-ۿ\s!؟.,]+$/.test(trimmed) && trimmed.length <= 30) {
+    return true;
+  }
+
+  return false;
+}
+
+function isAcknowledgmentOnly(rawText) {
+  // Same digit-guard as isGreetingOnly - "6k" must never collapse to "k"
+  // and get mistaken for the filler word "k".
+  if (/\d/.test(String(rawText || "").trim())) return false;
+
+  const clean = String(rawText || "").toLowerCase().replace(/[^a-z]/g, "");
+  if (!clean) return false;
+
+  const knownFillers = [
+    "ok", "okk", "okkk", "okay", "okey", "okie", "k", "kk",
+    "yes", "yep", "yup", "sure", "great", "greatthanks", "thanks", "thankyou",
+    "thanku", "thnx", "tysm", "gotit", "noted", "done", "fine", "alright",
+    "cool", "nice", "good", "gud", "understood", "welcome"
+  ];
+  return knownFillers.includes(clean);
+}
+
+// Generic ad/lead-form auto-fill openers (Meta "Send Message" click-to-chat
+// buttons pre-fill these verbatim - not something the student typed
+// themselves, so it should behave like a fresh MENU trigger, not an
+// unrecognized message).
+function isAdOpenerMessage(rawText) {
+  const trimmed = String(rawText || "").trim().toLowerCase();
+  if (!trimmed) return false;
+  if (trimmed === "hello! can i get more info on this?") return true;
+  if (trimmed.startsWith("hello! i filled out your form")) return true;
+  return false;
+}
+
+// A short, curated list of common program names/abbreviations actually seen
+// in real student messages - deliberately NOT the full fuzzy program-catalog
+// matcher used on the admin dashboard (that lives in admin.js, is much
+// heavier, and is a separate future step). This just catches the common
+// case of a student naming a program with nothing else in the message.
+const BARE_PROGRAM_HINTS = [
+  "llb", "bba", "mba", "dpt", "d.pt", "pharm-d", "pharmd", "pharm d",
+  "mphil", "mphill", "m.phil", "phd", "ph.d", "bscs", "bs cs", "msc", "bsc",
+  "bs ai", "bs cyber security", "bs accounting", "bs nutrition",
+  "bs criminology", "adp", "llm", "d pharmacy", "doctor of pharmacy",
+  "bs computer science", "bs software engineering", "bs artificial intelligence"
+];
+
+function escapeRegExpLiteral(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Word-boundary regexes, not plain .includes() - a naive substring check on
+// a short hint like "llm" would false-positive on ordinary English words
+// (e.g. "enrollment" contains "llm").
+const BARE_PROGRAM_HINT_RES = BARE_PROGRAM_HINTS.map(
+  hint => new RegExp(`\\b${escapeRegExpLiteral(hint).replace(/\s+/g, "\\s+")}\\b`, "i")
+);
+
+function isBareProgramMention(rawText) {
+  const clean = String(rawText || "").trim();
+  if (!clean) return false;
+  // Keep this narrow - only short messages, so it doesn't fire on a long
+  // sentence that merely mentions a program name in passing.
+  if (clean.split(/\s+/).length > 8) return false;
+
+  return BARE_PROGRAM_HINT_RES.some(re => re.test(clean));
+}
+
 function welcomeMessage() {
   return `Assalamu Alaikum 👋
 
@@ -3296,6 +3400,22 @@ Please wait, our admission representative will message you shortly.`,
     }
     let lowerText = text?.toLowerCase();
 
+// Small formatting near-misses ("1b more" instead of "1b-more", a stray
+// trailing period on a bare code like "7.") shouldn't fall all the way
+// through to the generic fallback - normalize before any matching happens.
+if (lowerText) {
+  let normalizedCode = lowerText.trim();
+  normalizedCode = normalizedCode.replace(
+    /^([1-6][a-l])\s+more(?:[\s-]*(\d+))?$/i,
+    (m, base, n) => (n ? `${base}-more-${n}` : `${base}-more`)
+  );
+  normalizedCode = normalizedCode.replace(/^([0-9][a-l]?)[.\s]+$/i, "$1");
+  if (normalizedCode !== lowerText) {
+    lowerText = normalizedCode;
+    text = normalizedCode;
+  }
+}
+
 // =========================
 // SMART KEYWORD DETECTION
 // Bot mode only
@@ -3308,6 +3428,21 @@ const isAwaitingLeadDetails =
   !!currentUserForKeyword?.awaiting_callback_lead;
 
 if (currentModeForKeyword !== "agent" && !isAwaitingLeadDetails) {
+  // Order matters below: the narrow/whole-message checks (greeting, pure
+  // acknowledgment, ad-opener, bare program name) go first since they're
+  // low false-positive-risk and don't overlap with the broader keyword
+  // buckets. The new narrow topic buckets (challan, job, percentage,
+  // deadline) go last, after the original four, so they never steal a
+  // message that already matches an established, proven route.
+
+  if (isGreetingOnly(text) || isAdOpenerMessage(text)) {
+    text = "__greeting__";
+  } else if (isAcknowledgmentOnly(text)) {
+    text = "__filler__";
+  } else if (isBareProgramMention(text)) {
+    text = "__program_mention__";
+  }
+
   if (
     lowerText &&
     (
@@ -3317,7 +3452,12 @@ if (currentModeForKeyword !== "agent" && !isAwaitingLeadDetails) {
       lowerText.includes("tuition fee") ||
       lowerText.includes("semester fee") ||
       lowerText.includes("charges") ||
-      lowerText.includes("cost")
+      lowerText.includes("cost") ||
+      lowerText.includes("kharcha") ||
+      lowerText.includes("kharcha kitna") ||
+      lowerText.includes("paisay kitne") ||
+      lowerText.includes("paise kitne") ||
+      lowerText.includes("fees kitni")
     )
   ) {
     text = "2";
@@ -3332,7 +3472,8 @@ if (currentModeForKeyword !== "agent" && !isAwaitingLeadDetails) {
       lowerText.includes("discount") ||
       lowerText.includes("fee concession") ||
       lowerText.includes("merit scholarship") ||
-      lowerText.includes("need based")
+      lowerText.includes("need based") ||
+      lowerText.includes("wazifa")
     )
   ) {
     text = "3";
@@ -3347,7 +3488,9 @@ if (currentModeForKeyword !== "agent" && !isAwaitingLeadDetails) {
       lowerText.includes("registration") ||
       lowerText.includes("how to apply") ||
       lowerText.includes("documents") ||
-      lowerText.includes("requirements")
+      lowerText.includes("requirements") ||
+      lowerText.includes("dakhla") ||
+      lowerText.includes("dakhila")
     )
   ) {
     text = "4";
@@ -3361,10 +3504,88 @@ if (currentModeForKeyword !== "agent" && !isAwaitingLeadDetails) {
       lowerText.includes("advisor") ||
       lowerText.includes("counselor") ||
       lowerText.includes("human") ||
-      lowerText.includes("call me")
+      lowerText.includes("call me") ||
+      lowerText.includes("insaan") ||
+      lowerText.includes("banda") ||
+      lowerText.includes("koi hai")
     )
   ) {
     text = "7";
+  }
+
+  // Challan/payment problems are account-specific - the bot has no way to
+  // look up or fix a real payment record, so route straight to an agent
+  // the same way option 7 does, instead of the generic fallback.
+  if (
+    lowerText &&
+    (lowerText.includes("challan") || lowerText.includes("voucher")) &&
+    (
+      lowerText.includes("paid") ||
+      lowerText.includes("pending") ||
+      lowerText.includes("number") ||
+      lowerText.includes("date") ||
+      lowerText.includes("issue") ||
+      lowerText.includes("wrong") ||
+      lowerText.includes("forgot") ||
+      lowerText.includes("forget") ||
+      lowerText.includes("showing") ||
+      lowerText.includes("#") ||
+      /\d/.test(lowerText)
+    )
+  ) {
+    text = "7";
+  }
+
+  if (
+    lowerText &&
+    (
+      lowerText.includes("job") ||
+      lowerText.includes("vacancy") ||
+      lowerText.includes("vacancies") ||
+      lowerText.includes("hiring") ||
+      lowerText.includes("recruit") ||
+      lowerText.includes("career opportunit")
+    )
+  ) {
+    text = "__job_inquiry__";
+  }
+
+  if (
+    lowerText &&
+    (
+      lowerText.includes("percentage") ||
+      lowerText.includes("percent") ||
+      lowerText.includes("cgpa") ||
+      lowerText.includes("eligib") ||
+      lowerText.includes("kitne number") ||
+      lowerText.includes("kitny number") ||
+      lowerText.includes("kitny bnty") ||
+      lowerText.includes("kitne bnty") ||
+      lowerText.includes("marks chahiye") ||
+      lowerText.includes("marks required")
+    )
+  ) {
+    text = "__percentage_query__";
+  }
+
+  if (
+    lowerText &&
+    (
+      lowerText.includes("deadline") ||
+      lowerText.includes("last date") ||
+      lowerText.includes("kab tak") ||
+      lowerText.includes("kab shuru") ||
+      lowerText.includes("kab start") ||
+      lowerText.includes("classes start") ||
+      lowerText.includes("class start") ||
+      lowerText.includes("zero semester") ||
+      lowerText.includes("how many days") ||
+      lowerText.includes("kitne din") ||
+      lowerText.includes("further process") ||
+      lowerText.includes("application kab")
+    )
+  ) {
+    text = "__deadline_query__";
   }
 }
 
@@ -3730,6 +3951,16 @@ To get help, please type MENU and choose option 7️⃣ (Chat with Admissions Ad
     }
 
     // AUTO MENU FOR FIRST MESSAGE
+    //
+    // Note: userStates is in-memory only, so "first message" really means
+    // "first message since the last server restart/deploy" for every
+    // student, not just genuinely-new ones - this gate fires far more
+    // often in practice than the name suggests. The new pseudo-codes from
+    // the smart-keyword detection above (__filler__, __program_mention__,
+    // __job_inquiry__, __percentage_query__, __deadline_query__) are
+    // allow-listed here too, so a returning student isn't sent the generic
+    // welcome menu instead of the tailored reply just because the server
+    // happened to restart recently.
     if (!userStates[from].hasInteracted) {
       userStates[from].hasInteracted = true;
 
@@ -3739,7 +3970,9 @@ To get help, please type MENU and choose option 7️⃣ (Chat with Admissions Ad
           "1a", "1b", "1c", "1d",
           "5a", "5b", "5c", "5d", "5e",
           "6a", "6b", "6c", "6d", "6e", "6f", "6g", "6h", "6i", "6j", "6k", "6l",
-          "apply"
+          "apply",
+          "__filler__", "__program_mention__", "__job_inquiry__",
+          "__percentage_query__", "__deadline_query__"
         ].includes(lowerText)
       ) {
         await sendTextMessage(from, welcomeMessage());
@@ -4279,11 +4512,134 @@ Our team will contact you shortly.`
   return res.sendStatus(200);
 }
 
+if (lowerText === "__greeting__") {
+  userStates[from].currentMenu = "main";
+  userStates[from].previousMenu = "main";
+  userStates[from].hasInteracted = true;
+
+  await sendTextMessage(from, welcomeMessage());
+  return res.sendStatus(200);
+}
+
+if (lowerText === "__filler__") {
+  userStates[from].hasInteracted = true;
+
+  await sendTextMessage(
+    from,
+    `👍 You're welcome! If you have any other questions, just type MENU to see all options, or 7️⃣ to talk to our Admissions Advisor.`
+  );
+  return res.sendStatus(200);
+}
+
+if (lowerText === "__program_mention__") {
+  userStates[from].hasInteracted = true;
+
+  const existingUserForProgram = await pool.query(
+    "SELECT name, program FROM users WHERE phone = $1",
+    [from]
+  );
+
+  if (
+    existingUserForProgram.rows.length > 0 &&
+    existingUserForProgram.rows[0].name &&
+    existingUserForProgram.rows[0].program
+  ) {
+    userStates[from].currentMenu = "agent";
+
+    await updateUserDetails(from, { mode: "agent" });
+    await upsertChat(from, "Program interest forwarded to agent", "agent_waiting");
+
+    await pool.query(
+      "UPDATE chats SET agent_requested = true WHERE phone = $1",
+      [from]
+    );
+    await pool.query(
+      `
+      UPDATE chats
+      SET agent_waiting_started_at = NOW(), agent_taken_at = NULL, agent_response_seconds = NULL
+      WHERE phone = $1
+      `,
+      [from]
+    );
+
+    await sendTextMessage(
+      from,
+      "Thank you for your interest! Connecting you with an admissions representative. Please wait a moment...",
+      "agent_waiting"
+    );
+  } else {
+    userStates[from].awaitingLead = true;
+    userStates[from].currentMenu = "agent";
+
+    await updateUserDetails(from, { mode: "agent", awaitingLead: true });
+
+    const flowSent = await sendLeadCaptureFlow(from);
+    if (flowSent) {
+      return res.sendStatus(200);
+    }
+
+    await sendTextMessage(
+      from,
+      `Thanks for your interest! Please share your details in this format:
+
+Your Name, Interested Program
+
+⚠️ Please add comma ( , ) between your name and program.
+
+Example:
+Ali, BS Computer Science`
+    );
+  }
+
+  return res.sendStatus(200);
+}
+
+if (lowerText === "__job_inquiry__") {
+  userStates[from].hasInteracted = true;
+
+  await sendTextMessage(
+    from,
+    `This WhatsApp number is for admissions inquiries only. 🎓
+
+For career and job opportunities at Minhaj University Lahore, please visit our official website:
+https://www.mul.edu.pk/
+
+💡 Type MENU anytime for admissions information.`
+  );
+  return res.sendStatus(200);
+}
+
+if (lowerText === "__percentage_query__") {
+  userStates[from].hasInteracted = true;
+
+  await sendTextMessage(
+    from,
+    `Eligibility criteria (required percentage/marks) is different for every program. 📋
+
+1️⃣ Type 1 to see Programs Offered and their eligibility details, or
+7️⃣ Type 7 to talk directly to our Admissions Advisor for a precise answer.`
+  );
+  return res.sendStatus(200);
+}
+
+if (lowerText === "__deadline_query__") {
+  userStates[from].hasInteracted = true;
+
+  await sendTextMessage(
+    from,
+    `For admission deadlines and process details: 🗓️
+
+4️⃣ Type 4 to see the Admission Process, or
+7️⃣ Type 7 to talk directly to our Admissions Advisor for exact dates.`
+  );
+  return res.sendStatus(200);
+}
+
 await sendTextMessage(
   from,
   `Assalamu Alaikum 👋
 
-I couldn't understand your selection.
+We want to help, but we're not quite sure what you're looking for. 🙂
 
 Please choose one of the following options:
 
@@ -4297,6 +4653,8 @@ Please choose one of the following options:
 8️⃣ Request a Call Back
 
 📌 Please reply with the number of your choice.
+
+💬 Or type 7 anytime to talk directly to a real Admissions Advisor.
 
 💡 Type MENU anytime to see these options again.`
 );
