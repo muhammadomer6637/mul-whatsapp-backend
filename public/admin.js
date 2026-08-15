@@ -2592,6 +2592,10 @@ function openFeeProgramModal(id = null, categoryId = null) {
       <label class="field-label">Eligibility Criteria</label>
       <textarea id="feeProgramEligibility" class="prompt-input" rows="3" placeholder="e.g. Intermediate (12 years of Education). Minimum 45% marks. Interview.">${existing?.eligibility_criteria ? escapeHtml(existing.eligibility_criteria) : ""}</textarea>
 
+      <label class="field-label">Keywords / Alternate Names</label>
+      <textarea id="feeProgramKeywords" class="prompt-input" rows="2" placeholder="e.g. bscs, bs cs, computer science, cs">${existing?.keywords ? escapeHtml(existing.keywords) : ""}</textarea>
+      <p style="font-size:11px; color:var(--muted); margin:-14px 0 20px;">Comma-separated. The WhatsApp bot uses these to recognize this program from a student's message (typos, abbreviations, short forms) and answer with its fee/eligibility directly.</p>
+
       <div class="confirm-modal-actions">
         <button class="ghost-btn" data-action="cancel">Cancel</button>
         <button class="primary-btn" data-action="save">Save</button>
@@ -2624,6 +2628,7 @@ async function saveFeeProgram(id, overlay) {
   const admissionFee = overlay.querySelector("#feeProgramAdmissionFee").value;
   const totalFee = overlay.querySelector("#feeProgramTotalFee").value;
   const eligibilityCriteria = overlay.querySelector("#feeProgramEligibility").value.trim();
+  const keywords = overlay.querySelector("#feeProgramKeywords").value.trim();
 
   if (!programName) {
     notify("Program name is required", "warning");
@@ -2636,7 +2641,8 @@ async function saveFeeProgram(id, overlay) {
     patternType,
     admissionFee: admissionFee ? Number(admissionFee) : null,
     totalFee: totalFee ? Number(totalFee) : null,
-    eligibilityCriteria: eligibilityCriteria || null
+    eligibilityCriteria: eligibilityCriteria || null,
+    keywords: keywords || null
   };
 
   if (patternType === "quarterly") {

@@ -9,7 +9,13 @@ const multer = require("multer");
 const pool = require("./db/db");
 const { testConnection } = require("./db/db");
 const initDb = require("./db/initDb");
-const { findMatchingCanonicalProgramStrict } = require("./lib/programMatcher");
+const {
+  findMatchingCanonicalProgramStrict,
+  tightClean: pmTightClean,
+  stringSimilarity: pmStringSimilarity,
+  significantProgramWords: pmSignificantWords,
+  escapeRegExpLiteral: pmEscapeRegExp
+} = require("./lib/programMatcher");
 
 const app = express();
 app.use(express.json());
@@ -91,6 +97,176 @@ function formatPkr(amount) {
   return typeof amount === "number" ? `PKR ${amount.toLocaleString("en-PK")}` : "N/A";
 }
 
+// ============================================================
+// FEE PROGRAM CATALOG MATCHING
+// Recognizes a program by name/keyword directly against the live
+// fee_programs table (Settings > Fee Structure - admin-editable "Keywords
+// / Alternate Names" field), so the bot can answer a fee/eligibility
+// question - or a bare program mention like "BSSC" - with real numbers
+// straight in the chat, instead of only pointing at the generic PDF.
+// Deliberately NOT the same engine as lib/programMatcher.js's static
+// MUL_CANONICAL_PROGRAMS list: that list is for classifying leads and
+// doesn't know which programs actually have fee data published, or what
+// an admin has typed as a keyword for a specific program today.
+// ============================================================
+
+async function getActiveFeeProgramCatalog() {
+  const result = await pool.query(
+    `
+    SELECT id, program_name, keywords, pattern_type, admission_fee,
+           per_instalment_amount, total_instalments, early_semester_amount,
+           later_semester_amount, total_fee, eligibility_criteria
+    FROM fee_programs
+    WHERE active = true
+    `
+  );
+  return result.rows;
+}
+
+function feeProgramPhrases(row) {
+  const phrases = [row.program_name];
+  if (row.keywords) {
+    for (const k of row.keywords.split(",")) {
+      const trimmed = k.trim();
+      if (trimmed) phrases.push(trimmed);
+    }
+  }
+  return phrases.filter(p => pmTightClean(p).length >= 2);
+}
+
+// Tier 1: does any known phrase (program name or an admin-added keyword)
+// for any program appear as a whole word/phrase in the message? Word-
+// boundary matched, not a plain substring check, for the same reason
+// isBareProgramMention needed it earlier ("llm" inside "enrollment").
+// Longer phrases are checked first so a specific match ("bs ai") wins over
+// an accidental shorter one.
+function matchFeeProgramConfident(rawText, catalog) {
+  const candidates = [];
+  for (const row of catalog) {
+    for (const phrase of feeProgramPhrases(row)) {
+      candidates.push({ row, phrase });
+    }
+  }
+  candidates.sort((a, b) => b.phrase.length - a.phrase.length);
+
+  for (const { row, phrase } of candidates) {
+    const re = new RegExp(`\\b${pmEscapeRegExp(phrase).replace(/\s+/g, "\\s+")}\\b`, "i");
+    if (re.test(rawText)) return row;
+  }
+  return null;
+}
+
+// Tier 2: no exact phrase found - loose fuzzy fallback for a typo'd
+// program name ("BSSC" if it weren't already a known keyword). Threshold
+// is deliberately high (0.82) since this only runs after we already know
+// the message looks like a fee question or a bare program mention, not on
+// arbitrary free text.
+function matchFeeProgramFuzzy(rawText, catalog) {
+  const inputWords = pmSignificantWords(rawText);
+  if (!inputWords.length) return null;
+
+  let best = null;
+  let bestScore = 0;
+  for (const row of catalog) {
+    for (const phrase of feeProgramPhrases(row)) {
+      const phraseWords = pmSignificantWords(phrase);
+      // Same lesson as lib/programMatcher.js's strict mode: a phrase with
+      // only one significant word ("BS E-Commerce" -> just "commerce")
+      // lets an ordinary similarly-spelled English word ("commence")
+      // false-match it. Require at least two words for this fuzzy path -
+      // single-word phrases still match fine via the exact/confident tier
+      // above, just not through typo-tolerant fuzzy matching.
+      if (phraseWords.length < 2) continue;
+
+      for (const pw of phraseWords) {
+        if (pw.length < 4) continue;
+        for (const iw of inputWords) {
+          if (iw.length < 4) continue;
+          const score = pmStringSimilarity(iw, pw);
+          if (score > bestScore) { bestScore = score; best = row; }
+        }
+      }
+    }
+  }
+  return bestScore >= 0.82 ? best : null;
+}
+
+// Combined lookup: { row, confident } or null if nothing usable found at
+// all (caller decides the fallback for that case).
+function matchFeeProgramFromCatalog(rawText, catalog) {
+  const confidentMatch = matchFeeProgramConfident(rawText, catalog);
+  if (confidentMatch) return { row: confidentMatch, confident: true };
+
+  const fuzzyMatch = matchFeeProgramFuzzy(rawText, catalog);
+  if (fuzzyMatch) return { row: fuzzyMatch, confident: false };
+
+  return null;
+}
+
+function buildFeeProgramAnswer(row) {
+  const feeLines = [];
+  if (row.admission_fee != null) {
+    feeLines.push(`Admission Fee: Approx ${formatPkr(Number(row.admission_fee))}`);
+  }
+  if (row.pattern_type === "quarterly") {
+    if (row.per_instalment_amount != null) {
+      const count = row.total_instalments ? ` × ${row.total_instalments} instalments` : "";
+      feeLines.push(`Per Instalment: Approx ${formatPkr(Number(row.per_instalment_amount))}${count}`);
+    }
+  } else {
+    if (row.early_semester_amount != null) {
+      feeLines.push(`1st & 2nd Semester: Approx ${formatPkr(Number(row.early_semester_amount))} each`);
+    }
+    if (row.later_semester_amount != null) {
+      feeLines.push(`Later Semesters: Approx ${formatPkr(Number(row.later_semester_amount))} each`);
+    }
+  }
+  if (row.total_fee != null) {
+    feeLines.push(`Total Fee Package: Approx ${formatPkr(Number(row.total_fee))}`);
+  }
+
+  const feeBlock = feeLines.length
+    ? `💰 ${feeLines.join("\n")}`
+    : `💰 Fee details for this program aren't published yet - please check with our admissions advisor.`;
+
+  const eligibilityBlock = row.eligibility_criteria
+    ? `\n\n📋 Eligibility: ${row.eligibility_criteria}`
+    : "";
+
+  return `🎓 ${row.program_name}
+
+${feeBlock}${eligibilityBlock}
+
+For more details, you can chat with our admission advisor (during office hours: Mon–Fri, 9:00 AM – 4:30 PM). Type 7 anytime.`;
+}
+
+// Sends the matched program's answer (confident, or hedged with a "did you
+// mean" for a fuzzy match) and returns true - or returns false without
+// sending anything if there was no match at all, so the caller can decide
+// its own fallback (generic Fee Structure PDF for a fee question, an
+// apology + program list for a bare program-name mention that didn't
+// resolve to anything real).
+async function sendFeeProgramMatchReply(from, match) {
+  if (!match) return false;
+
+  await saveUserInteraction(from, "bot_info", "fee_structure");
+
+  if (match.confident) {
+    await sendTextMessage(from, buildFeeProgramAnswer(match.row));
+  } else {
+    await sendTextMessage(
+      from,
+      `Mujhe lagta hai ap *${match.row.program_name}* ke baray mein poochna chahte hain:
+
+${buildFeeProgramAnswer(match.row)}
+
+Agar yeh sahi nahi hai, 1️⃣ dabayen humare offered programs ki poori list dekhne ke liye.`
+    );
+  }
+
+  return true;
+}
+
 async function getFeeCategoryOptions() {
   const result = await pool.query(
     "SELECT id, label FROM fee_categories WHERE active = true ORDER BY display_order ASC, label ASC"
@@ -154,6 +330,32 @@ async function sendFeeCalculatorFlow(to) {
     console.error("Send fee calculator flow error:", error.response?.data || error.message);
     recordSendFailure();
   }
+}
+
+// The full Fee Structure PDF + Fee Calculator Flow - what option 2 always
+// showed. Extracted into its own function so the new per-program fee
+// answer (matchFeeProgramFromCatalog below) can fall back to this exact
+// same thing when a "fee" question doesn't clearly name one of our actual
+// programs, instead of duplicating it.
+async function sendGenericFeeStructure(from) {
+  const pdfUrl = `${BASE_URL}/files/Fee%20Structure%20Fall%202026.pdf`;
+  await saveUserInteraction(from, "bot_info", "fee_structure");
+  await sendReplyButtons(
+    from,
+    `💰 Fee Structure – Fall 2026
+
+Please find attached the complete fee structure.`,
+    [{ id: "main_menu", title: "Main Menu" }]
+  );
+
+  await sendDocumentMessage(
+    from,
+    pdfUrl,
+    "Fee Structure Fall 2026.pdf",
+    "MUL Fee Structure Fall 2026"
+  );
+
+  await sendFeeCalculatorFlow(from);
 }
 
 async function sendLeadCaptureFlow(to) {
@@ -2811,7 +3013,7 @@ app.post("/api/fee-programs", authenticateAgent, requireAdmin, async (req, res) 
     const {
       categoryId, programName, patternType, admissionFee, totalFee,
       perInstalmentAmount, totalInstalments, earlySemesterAmount, laterSemesterAmount,
-      eligibilityCriteria
+      eligibilityCriteria, keywords
     } = req.body;
 
     const isQuarterly = patternType === "quarterly";
@@ -2822,9 +3024,9 @@ app.post("/api/fee-programs", authenticateAgent, requireAdmin, async (req, res) 
         category_id, program_name, pattern_type,
         admission_fee, per_instalment_amount, total_instalments,
         early_semester_amount, later_semester_amount, total_fee,
-        eligibility_criteria
+        eligibility_criteria, keywords
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
       `,
       [
@@ -2837,7 +3039,8 @@ app.post("/api/fee-programs", authenticateAgent, requireAdmin, async (req, res) 
         isQuarterly ? null : (earlySemesterAmount || null),
         isQuarterly ? null : (laterSemesterAmount || null),
         totalFee || null,
-        eligibilityCriteria || null
+        eligibilityCriteria || null,
+        (keywords || "").trim() || null
       ]
     );
 
@@ -2863,7 +3066,7 @@ app.put("/api/fee-programs/:id", authenticateAgent, requireAdmin, async (req, re
     const {
       categoryId, programName, patternType, admissionFee, totalFee,
       perInstalmentAmount, totalInstalments, earlySemesterAmount, laterSemesterAmount,
-      eligibilityCriteria
+      eligibilityCriteria, keywords
     } = req.body;
 
     const isQuarterly = patternType === "quarterly";
@@ -2880,8 +3083,9 @@ app.put("/api/fee-programs/:id", authenticateAgent, requireAdmin, async (req, re
         early_semester_amount = $7,
         later_semester_amount = $8,
         total_fee = $9,
-        eligibility_criteria = $10
-      WHERE id = $11
+        eligibility_criteria = $10,
+        keywords = $11
+      WHERE id = $12
       RETURNING *
       `,
       [
@@ -2895,6 +3099,7 @@ app.put("/api/fee-programs/:id", authenticateAgent, requireAdmin, async (req, re
         isQuarterly ? null : (laterSemesterAmount || null),
         totalFee || null,
         eligibilityCriteria || null,
+        (keywords || "").trim() || null,
         id
       ]
     );
@@ -3416,6 +3621,11 @@ Please wait, our admission representative will message you shortly.`,
     if (type === "interactive" && msg.interactive?.type === "button_reply") {
       text = msg.interactive.button_reply.id || "";
     }
+    // Preserved because the smart-keyword block below rewrites `text` into
+    // a short code/pseudo-code ("2", "__fee_query__"...) - the fee-program
+    // catalog matcher further down needs the student's actual wording to
+    // work with, not the code it got rewritten into.
+    const originalIncomingText = text;
     let lowerText = text?.toLowerCase();
 
 // Small formatting near-misses ("1b more" instead of "1b-more", a stray
@@ -3478,7 +3688,12 @@ if (currentModeForKeyword !== "agent" && !isAwaitingLeadDetails) {
       lowerText.includes("fees kitni")
     )
   ) {
-    text = "2";
+    // Was a plain "2" (generic Fee Structure PDF + Flow) before - now
+    // routed through the fee-program catalog matcher first, so a message
+    // that names a specific program ("BS CS ki fee kya hai") gets that
+    // program's real fee/eligibility directly; the handler falls back to
+    // the exact old behaviour when no program is identifiable.
+    text = "__fee_query__";
   }
 
   if (
@@ -4008,7 +4223,7 @@ To get help, please type MENU and choose option 7️⃣ (Chat with Admissions Ad
           "6a", "6b", "6c", "6d", "6e", "6f", "6g", "6h", "6i", "6j", "6k", "6l",
           "apply",
           "__filler__", "__program_mention__", "__job_inquiry__",
-          "__percentage_query__", "__deadline_query__"
+          "__percentage_query__", "__deadline_query__", "__fee_query__"
         ].includes(lowerText)
       ) {
         await sendTextMessage(from, welcomeMessage());
@@ -4250,24 +4465,7 @@ Please wait, our admission representative will message you shortly.`,
       userStates[from].currentMenu = "fee";
       userStates[from].hasInteracted = true;
 
-     const pdfUrl = `${BASE_URL}/files/Fee%20Structure%20Fall%202026.pdf`;
-      await saveUserInteraction(from, "bot_info", "fee_structure");
-      await sendReplyButtons(
-        from,
-        `💰 Fee Structure – Fall 2026
-
-Please find attached the complete fee structure.`,
-        [{ id: "main_menu", title: "Main Menu" }]
-      );
-
-      await sendDocumentMessage(
-        from,
-        pdfUrl,
-        "Fee Structure Fall 2026.pdf",
-        "MUL Fee Structure Fall 2026"
-      );
-
-      await sendFeeCalculatorFlow(from);
+      await sendGenericFeeStructure(from);
 
       return res.sendStatus(200);
     }
@@ -4566,69 +4764,42 @@ if (lowerText === "__filler__") {
   return res.sendStatus(200);
 }
 
+if (lowerText === "__fee_query__") {
+  userStates[from].hasInteracted = true;
+
+  const feeCatalogForQuery = await getActiveFeeProgramCatalog();
+  const feeMatch = matchFeeProgramFromCatalog(originalIncomingText, feeCatalogForQuery);
+
+  const handled = await sendFeeProgramMatchReply(from, feeMatch);
+  if (!handled) {
+    // No specific program identifiable - same PDF + Fee Calculator Flow
+    // this bucket always showed before.
+    userStates[from].previousMenu = "main";
+    userStates[from].currentMenu = "fee";
+    await sendGenericFeeStructure(from);
+  }
+
+  return res.sendStatus(200);
+}
+
+// A bare program name/interest with no explicit "fee" wording ("LLB",
+// "Now I'm interested in D pharmacy") is treated the same way - it's
+// almost always the shortest possible form of "tell me about this
+// program", and fee is the first thing a student wants to know. This
+// replaces the previous behaviour of immediately pushing into lead
+// capture/agent handoff for every bare mention regardless of what the
+// student actually asked for.
 if (lowerText === "__program_mention__") {
   userStates[from].hasInteracted = true;
 
-  const existingUserForProgram = await pool.query(
-    "SELECT name, program FROM users WHERE phone = $1",
-    [from]
-  );
+  const feeCatalogForMention = await getActiveFeeProgramCatalog();
+  const mentionMatch = matchFeeProgramFromCatalog(originalIncomingText, feeCatalogForMention);
 
-  if (
-    existingUserForProgram.rows.length > 0 &&
-    existingUserForProgram.rows[0].name &&
-    existingUserForProgram.rows[0].program
-  ) {
-    const agentAvailableForProgram = await isAgentAvailable();
-    if (!agentAvailableForProgram) {
-      await sendTextMessage(from, agentUnavailableMessage());
-      return res.sendStatus(200);
-    }
-
-    userStates[from].currentMenu = "agent";
-
-    await updateUserDetails(from, { mode: "agent" });
-    await upsertChat(from, "Program interest forwarded to agent", "agent_waiting");
-
-    await pool.query(
-      "UPDATE chats SET agent_requested = true WHERE phone = $1",
-      [from]
-    );
-    await pool.query(
-      `
-      UPDATE chats
-      SET agent_waiting_started_at = NOW(), agent_taken_at = NULL, agent_response_seconds = NULL
-      WHERE phone = $1
-      `,
-      [from]
-    );
-
+  const handled = await sendFeeProgramMatchReply(from, mentionMatch);
+  if (!handled) {
     await sendTextMessage(
       from,
-      "Thank you for your interest! Connecting you with an admissions representative. Please wait a moment...",
-      "agent_waiting"
-    );
-  } else {
-    userStates[from].awaitingLead = true;
-    userStates[from].currentMenu = "agent";
-
-    await updateUserDetails(from, { mode: "agent", awaitingLead: true });
-
-    const flowSent = await sendLeadCaptureFlow(from);
-    if (flowSent) {
-      return res.sendStatus(200);
-    }
-
-    await sendTextMessage(
-      from,
-      `Thanks for your interest! Please share your details in this format:
-
-Your Name, Interested Program
-
-⚠️ Please add comma ( , ) between your name and program.
-
-Example:
-Ali, BS Computer Science`
+      `Maazrat, hamare paas is naam ka koi program nahi mila. 1️⃣ dabayen humare offered programs ki poori list dekhne ke liye, ya 7️⃣ dabayen humaray Advisor se seedha baat karne ke liye.`
     );
   }
 
@@ -6359,6 +6530,51 @@ app.listen(3000, async () => {
     console.log("✅ program_captured_at column ensured in DB");
   } catch (err) {
     console.error("❌ program_captured_at column error:", err.message);
+  }
+
+  // 🔥 FEE PROGRAM KEYWORDS COLUMN AUTO ADD + ONE-TIME BEST-EFFORT SEED
+  // Admin-editable alternate names/spellings per program (Settings > Fee
+  // Structure), used by the bot to recognize a program from free text
+  // ("BSSC", "computer science", a typo) and answer fee/eligibility
+  // directly. Purely additive column; the one-time seed only fills rows
+  // where keywords is still NULL, using the existing alias map (built up
+  // over many rounds of real "Other" lead data) as a head start - it never
+  // overwrites anything an admin has already typed in.
+  try {
+    await pool.query(`
+      ALTER TABLE fee_programs
+      ADD COLUMN IF NOT EXISTS keywords TEXT NULL;
+    `);
+
+    const { PROGRAM_ALIAS_MAP } = require("./lib/programMatcher");
+    const aliasesByCanonical = {};
+    for (const [alias, canonical] of Object.entries(PROGRAM_ALIAS_MAP)) {
+      const key = canonical.toLowerCase();
+      if (!aliasesByCanonical[key]) aliasesByCanonical[key] = new Set();
+      aliasesByCanonical[key].add(alias);
+    }
+
+    const unseededPrograms = await pool.query(
+      "SELECT id, program_name FROM fee_programs WHERE keywords IS NULL"
+    );
+
+    let seededCount = 0;
+    for (const row of unseededPrograms.rows) {
+      const aliases = aliasesByCanonical[row.program_name.toLowerCase()];
+      if (!aliases || !aliases.size) continue;
+
+      await pool.query(
+        "UPDATE fee_programs SET keywords = $1 WHERE id = $2",
+        [[...aliases].join(", "), row.id]
+      );
+      seededCount++;
+    }
+
+    console.log(
+      `✅ fee_programs.keywords column ensured in DB (seeded ${seededCount} of ${unseededPrograms.rows.length} unseeded programs from the existing alias map)`
+    );
+  } catch (err) {
+    console.error("❌ fee_programs.keywords column error:", err.message);
   }
 
   // 🔥 START 24H FOLLOW-UP CHECKER
