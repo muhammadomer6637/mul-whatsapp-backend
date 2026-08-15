@@ -326,6 +326,28 @@ async function isAgentAvailable() {
   }
 }
 
+// Only option 7 ("Chat with Admissions Advisor") used to check this before
+// telling a student "connecting you" - every other path into agent_waiting
+// (option 1, option 2, typed "Name, Program", the Lead Capture WhatsApp
+// Flow, "yes" re-engagement, and the program-mention auto-detection) skipped
+// it entirely, so a student contacting outside support hours got a
+// "please wait a moment" that nobody was ever coming to answer, with the
+// bot itself now silenced (mode="agent") - a real dead end. This shared
+// message + the isAgentAvailable() check are now used consistently at
+// every one of those entry points.
+function agentUnavailableMessage() {
+  return `Thank you for contacting Minhaj University Lahore.
+
+Our representatives are currently unavailable as this inquiry has been received outside our support hours.
+
+🕘 Support Hours:
+Monday to Friday: 09:00 AM – 04:30 PM
+
+For immediate information, you may continue exploring the available menu options.
+
+Thank you for your patience.`;
+}
+
 // Track agent category selection
 // admissions | other
 // per user
@@ -3316,10 +3338,14 @@ app.post("/webhook", async (req, res) => {
           const alreadyActive = chatStatusResult.rows[0]?.status === "agent_active";
 
           if (!alreadyActive) {
+            const agentAvailableForFlow = await isAgentAvailable();
+
+            // Save their details either way - useful either way, only the
+            // live-queue/mode and the message shown differ by availability.
             await updateUserDetails(from, {
               name: leadName,
               program: finalProgram,
-              mode: "agent",
+              mode: agentAvailableForFlow ? "agent" : "bot",
               awaitingLead: false
             });
 
@@ -3327,6 +3353,17 @@ app.post("/webhook", async (req, res) => {
               "UPDATE users SET name = $2, program = $3 WHERE phone = $1",
               [from, leadName, finalProgram]
             );
+
+            if (!agentAvailableForFlow) {
+              if (userStates[from]) {
+                userStates[from].awaitingLead = false;
+                userStates[from].previousMenu = "main";
+                userStates[from].currentMenu = "main";
+                userStates[from].hasInteracted = true;
+              }
+              await sendTextMessage(from, agentUnavailableMessage());
+              return res.sendStatus(200);
+            }
 
             await upsertChat(from, `Lead: ${leadName} - ${finalProgram}`, "agent_waiting");
 
@@ -3636,6 +3673,12 @@ userStates[from].lastSeenAt = Date.now();
 // FOLLOW-UP RESPONSE HANDLING
 // =========================
 if (lowerText === "yes" && chatForCallback?.status !== "agent_active") {
+  const agentAvailableForReengage = await isAgentAvailable();
+  if (!agentAvailableForReengage) {
+    await sendTextMessage(from, agentUnavailableMessage());
+    return res.sendStatus(200);
+  }
+
   userStates[from].currentMenu = "agent";
 
   await updateUserDetails(from, { mode: "agent" });
@@ -3752,11 +3795,16 @@ if (userStates[from]?.currentMenu === "agent_category") {
       existingUser.rows[0].name &&
       existingUser.rows[0].program
     ) {
-      
+      const agentAvailableForAdmissions = await isAgentAvailable();
+      if (!agentAvailableForAdmissions) {
+        await sendTextMessage(from, agentUnavailableMessage());
+        return res.sendStatus(200);
+      }
+
       userStates[from].currentMenu = "agent";
 
       await updateUserDetails(from, { mode: "agent" });
-      
+
       await upsertChat(from, "Admissions query forwarded to agent", "agent_waiting");
 
       await pool.query(
@@ -3823,6 +3871,13 @@ If comma is missing, your request may not be forwarded correctly.`
   if (lowerText === "2") {
     userStates[from].agentType = "other";
     await saveUserInteraction(from, "agent_category", "other");
+
+    const agentAvailableForOther = await isAgentAvailable();
+    if (!agentAvailableForOther) {
+      await sendTextMessage(from, agentUnavailableMessage());
+      return res.sendStatus(200);
+    }
+
     userStates[from].currentMenu = "agent";
 
     await updateUserDetails(from, { mode: "agent" });
@@ -4044,15 +4099,19 @@ To get help, please type MENU and choose option 7️⃣ (Chat with Admissions Ad
         program
       });
 
+      const agentAvailableForLead = await isAgentAvailable();
+
       userStates[from].awaitingLead = false;
       userStates[from].previousMenu = "main";
-      userStates[from].currentMenu = "agent_waiting";
       userStates[from].hasInteracted = true;
 
+      // Save their details either way - that's real, useful data an agent
+      // can follow up on later even if nobody's available right now. Only
+      // the live-queue/mode and the message shown differ by availability.
       await updateUserDetails(from, {
         name: cleanName,
         program,
-        mode: "agent",
+        mode: agentAvailableForLead ? "agent" : "bot",
         awaitingLead: false
       });
 
@@ -4065,7 +4124,15 @@ await pool.query(
   `,
   [from, cleanName, program]
 );
-      
+
+      if (!agentAvailableForLead) {
+        userStates[from].currentMenu = "main";
+        await sendTextMessage(from, agentUnavailableMessage());
+        return res.sendStatus(200);
+      }
+
+      userStates[from].currentMenu = "agent_waiting";
+
       await upsertChat(from, `Lead: ${cleanName} - ${program}`, "agent_waiting");
 
       await pool.query(
@@ -4388,20 +4455,7 @@ if (lowerText === "7") {
   const available = await isAgentAvailable();
 
   if (!available) {
-    await sendTextMessage(
-      from,
-      `Thank you for contacting Minhaj University Lahore.
-
-Our representatives are currently unavailable as this inquiry has been received outside our support hours.
-
-🕘 Support Hours:
-Monday to Friday: 09:00 AM – 04:30 PM
-
-For immediate information, you may continue exploring the available menu options.
-
-Thank you for your patience.`
-    );
-
+    await sendTextMessage(from, agentUnavailableMessage());
     return res.sendStatus(200);
   }
 
@@ -4525,6 +4579,12 @@ if (lowerText === "__program_mention__") {
     existingUserForProgram.rows[0].name &&
     existingUserForProgram.rows[0].program
   ) {
+    const agentAvailableForProgram = await isAgentAvailable();
+    if (!agentAvailableForProgram) {
+      await sendTextMessage(from, agentUnavailableMessage());
+      return res.sendStatus(200);
+    }
+
     userStates[from].currentMenu = "agent";
 
     await updateUserDetails(from, { mode: "agent" });
