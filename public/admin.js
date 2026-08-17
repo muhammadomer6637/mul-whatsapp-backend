@@ -3515,7 +3515,7 @@ const MUL_CANONICAL_PROGRAMS = [
   "BS Cyber Security", "BS Data Science", "BS Defense and Strategic Studies",
   "BS Digital Marketing", "BS Digital Media Communication", "BS E-Commerce",
   "BS Economics", "BS Economics & Data Science", "BS Economics & Financial Technology",
-  "BS Education", "BS Electrical/Chemical Engineering", "BS Financial Technology",
+  "BS Education", "BS Chemical Engineering", "BS Electrical Engineering", "BS Financial Technology",
   "BS Food Science and Technology", "BS Human Nutrition & Dietetics",
   "BS Information Management", "BS Information System & Technology Management",
   "BS Information Technology", "BS International Relations", "BS Islamic Banking & Finance",
@@ -3956,11 +3956,14 @@ function normalizeProgramKey(name) {
     "mphil ir": "M.Phil International Relations",
     "phd ir": "PhD International Relations",
 
-    "chemical engineering": "BS Electrical/Chemical Engineering",
-    "bsc chemical engineering": "BS Electrical/Chemical Engineering",
-    "bs chemical engineering": "BS Electrical/Chemical Engineering",
-    "bsc electrical": "BS Electrical/Chemical Engineering",
-    "electrical engineering": "BS Electrical/Chemical Engineering",
+    "chemical engineering": "BS Chemical Engineering",
+    "bsc chemical engineering": "BS Chemical Engineering",
+    "bs chemical engineering": "BS Chemical Engineering",
+    "b.sc chemical engineering": "BS Chemical Engineering",
+
+    "electrical engineering": "BS Electrical Engineering",
+    "bsc electrical": "BS Electrical Engineering",
+    "b.sc electrical engineering": "BS Electrical Engineering",
 
     "bs law": "Bachelor of Laws (LLB)",
 
@@ -4016,8 +4019,8 @@ function normalizeProgramKey(name) {
 
     // Batch added 2026-08-11 (second round) - user gave the exact intended
     // match in parentheses for each of these.
-    "bsc electrical engineering": "BS Electrical/Chemical Engineering",
-    "bs electrical engineering": "BS Electrical/Chemical Engineering",
+    "bsc electrical engineering": "BS Electrical Engineering",
+    "bs electrical engineering": "BS Electrical Engineering",
 
     "bs nutrition": "BS Human Nutrition & Dietetics",
 
