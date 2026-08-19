@@ -415,13 +415,16 @@ async function sendLeadCaptureFlow(to) {
   }
 }
 
-// Reuses the same LEAD_CATEGORY/LEAD_PROGRAM screens as the Lead Capture
-// Flow (same category->program cascade, already proven working) - the
-// Registration Flow in Meta Business Suite is a duplicate of that Flow
-// with one added field (Email) on the final screen. WHATSAPP_REGISTRATION_FLOW_ID
-// is a separate Flow ID; if it isn't set yet, this returns false and the
-// caller falls back to the plain admission.mul.edu.pk link exactly as
-// before - zero risk shipping this ahead of the Flow being created.
+// Uses its own screens (REG_CATEGORY -> REG_PROGRAM), kept fully separate
+// from the Lead Capture Flow's LEAD_CATEGORY/LEAD_PROGRAM - a distinct Flow
+// in Meta Business Suite with its own Flow ID, not shared or derived at
+// runtime (built by duplicating the Lead Capture Flow as a starting point
+// and renaming its screens, since the category->program cascade logic is
+// identical, but the two are otherwise fully independent from here on).
+// WHATSAPP_REGISTRATION_FLOW_ID is a separate env var; if it isn't set yet,
+// this returns false and the caller falls back to the plain
+// admission.mul.edu.pk link exactly as before - zero risk shipping this
+// ahead of the Flow being created.
 async function sendRegistrationFlow(to) {
   if (!WHATSAPP_REGISTRATION_FLOW_ID) return false;
   try {
@@ -445,7 +448,7 @@ async function sendRegistrationFlow(to) {
               flow_cta: "Register Now",
               flow_action: "navigate",
               flow_action_payload: {
-                screen: "LEAD_CATEGORY",
+                screen: "REG_CATEGORY",
                 data: { categories }
               }
             }
@@ -3602,6 +3605,19 @@ app.post("/api/whatsapp-flow", async (req, res) => {
       responsePayload = {
         screen: "LEAD_PROGRAM",
         data: { category: categoryId, programs }
+      };
+    } else if (action === "data_exchange" && screen === "REG_CATEGORY") {
+      // Separate, independent screens from the Lead Capture Flow above -
+      // deliberately no "Other" fallback option here (unlike LEAD_CATEGORY):
+      // a registration submitted to MUL's real admissions system needs an
+      // actual, valid program, not free text a human would resolve later.
+      const categoryId = data?.category;
+      responsePayload = {
+        screen: "REG_PROGRAM",
+        data: {
+          category: categoryId,
+          programs: await getFeeProgramOptions(categoryId)
+        }
       };
     } else {
       responsePayload = { screen: "CATEGORY", data: { categories: await getFeeCategoryOptions() } };
