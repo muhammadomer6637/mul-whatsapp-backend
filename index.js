@@ -16,6 +16,7 @@ const {
   significantProgramWords: pmSignificantWords,
   escapeRegExpLiteral: pmEscapeRegExp
 } = require("./lib/programMatcher");
+const { getMulProgramId } = require("./lib/mulProgramIds");
 
 const app = express();
 app.use(express.json());
@@ -509,8 +510,22 @@ async function submitMulRegistration({ phone, fullName, email, category, program
   const idempotencyKey = `WA-${phone}-${Date.now()}`;
   let result;
 
+  // cms.mul.edu.pk rejects a plain program name ("BS Data Science") with
+  // "Validation failed" - confirmed by direct testing - it needs the same
+  // numeric id (e.g. "292,0") the real registration.php form itself sends.
+  // If we can't confidently resolve one, don't guess and don't call the
+  // API at all - a wrong-but-"successful"-looking submission would be
+  // worse than an honest local failure here.
+  const mulProgramId = getMulProgramId(program, category);
+
   if (!MUL_REGISTRATION_API_KEY) {
     result = { success: false, reference: null, error: "MUL_REGISTRATION_API_KEY not configured" };
+  } else if (!mulProgramId) {
+    result = {
+      success: false,
+      reference: null,
+      error: `No MUL program id mapping found for "${program}" in category "${category}"`
+    };
   } else {
     try {
       const response = await axios.post(
@@ -520,7 +535,7 @@ async function submitMulRegistration({ phone, fullName, email, category, program
           mobile_number: phone,
           email,
           category,
-          program,
+          program: mulProgramId,
           source_of_information: "whatsapp"
         },
         {
