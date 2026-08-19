@@ -502,6 +502,20 @@ async function getFeeCategoryLabel(categoryId) {
   return result.rows[0]?.label || "";
 }
 
+// WhatsApp gives us the phone in international format with no leading "+"
+// (e.g. "923001234567"). The one manual test that actually succeeded used
+// local Pakistani format ("03001234567") - every automated submission
+// since (still sending the raw WhatsApp format) has failed with
+// "Validation failed", so cms.mul.edu.pk's mobile_number field very likely
+// only accepts the local 03xxxxxxxxx form.
+function formatPhoneForMul(waPhone) {
+  const digits = String(waPhone || "").replace(/\D/g, "");
+  if (digits.startsWith("92") && digits.length === 12) {
+    return "0" + digits.slice(2);
+  }
+  return digits;
+}
+
 // Submits a completed registration to MUL's own admissions system
 // (cms.mul.edu.pk, provided by MUL IT). Always saves a local copy in
 // mul_registrations regardless of the outcome - if MUL's side has any
@@ -532,7 +546,7 @@ async function submitMulRegistration({ phone, fullName, email, category, program
         MUL_REGISTRATION_API_URL,
         {
           full_name: fullName,
-          mobile_number: phone,
+          mobile_number: formatPhoneForMul(phone),
           email,
           category,
           program: mulProgramId,
