@@ -40,6 +40,14 @@ const ADMIN_RECOVERY_KEY = process.env.ADMIN_RECOVERY_KEY;
 const WHATSAPP_FLOW_PRIVATE_KEY = (process.env.WHATSAPP_FLOW_PRIVATE_KEY || "").replace(/\\n/g, "\n");
 const WHATSAPP_FLOW_ID = process.env.WHATSAPP_FLOW_ID;
 const WHATSAPP_LEAD_FLOW_ID = process.env.WHATSAPP_LEAD_FLOW_ID;
+const WHATSAPP_REGISTRATION_FLOW_ID = process.env.WHATSAPP_REGISTRATION_FLOW_ID;
+// MUL's own admissions CMS API (cms.mul.edu.pk) - submits a completed
+// registration directly, provided by MUL IT. Kept as an env var, never in
+// source, same as every other secret in this file.
+const MUL_REGISTRATION_API_URL =
+  process.env.MUL_REGISTRATION_API_URL ||
+  "https://cms.mul.edu.pk/api/v2/wa/wa-mulnexus-registration.php";
+const MUL_REGISTRATION_API_KEY = process.env.MUL_REGISTRATION_API_KEY;
 
 // WhatsApp Flows data-exchange encryption (Meta's spec: RSA-OAEP-SHA256 for
 // the AES key, AES-128-GCM for the payload, response IV is the bitwise
@@ -405,6 +413,151 @@ async function sendLeadCaptureFlow(to) {
     recordSendFailure();
     return false;
   }
+}
+
+// Reuses the same LEAD_CATEGORY/LEAD_PROGRAM screens as the Lead Capture
+// Flow (same category->program cascade, already proven working) - the
+// Registration Flow in Meta Business Suite is a duplicate of that Flow
+// with one added field (Email) on the final screen. WHATSAPP_REGISTRATION_FLOW_ID
+// is a separate Flow ID; if it isn't set yet, this returns false and the
+// caller falls back to the plain admission.mul.edu.pk link exactly as
+// before - zero risk shipping this ahead of the Flow being created.
+async function sendRegistrationFlow(to) {
+  if (!WHATSAPP_REGISTRATION_FLOW_ID) return false;
+  try {
+    const categories = await getFeeCategoryOptions();
+
+    await axios.post(
+      `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "flow",
+          header: { type: "text", text: "Complete Your Registration" },
+          body: { text: "Register for admission directly here - no need to visit the website." },
+          action: {
+            name: "flow",
+            parameters: {
+              flow_message_version: "3",
+              flow_id: WHATSAPP_REGISTRATION_FLOW_ID,
+              flow_cta: "Register Now",
+              flow_action: "navigate",
+              flow_action_payload: {
+                screen: "LEAD_CATEGORY",
+                data: { categories }
+              }
+            }
+          }
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    await saveUserInteraction(to, "flow_sent", "registration_flow");
+    return true;
+  } catch (error) {
+    console.error("Send registration flow error:", error.response?.data || error.message);
+    recordSendFailure();
+    return false;
+  }
+}
+
+// Every "Apply Now" entry point in the bot should offer the real
+// registration Flow first, and only fall back to the plain website link if
+// the Flow isn't configured yet or fails to send - never a dead end.
+async function offerRegistrationFlow(from) {
+  const flowSent = await sendRegistrationFlow(from);
+  if (!flowSent) {
+    await sendTextMessage(from, applyNowMessage());
+  }
+}
+
+// MUL's Fee Categories are stored as free-text labels ("Associate Degree
+// Programs (ADP)", "BS Programs"...) but cms.mul.edu.pk's registration API
+// expects one of its own fixed short codes (adp/bs/mphil/phd/course) - this
+// maps by keyword rather than an exact-string table so small label wording
+// differences don't silently break every submission.
+function mapCategoryLabelToMulCode(categoryLabel) {
+  const lower = String(categoryLabel || "").toLowerCase();
+  if (lower.includes("associate") || lower.includes("adp")) return "adp";
+  if (lower.includes("m.phil") || lower.includes("mphil") || lower.includes("ms ") || lower.includes(" ms")) return "mphil";
+  if (lower.includes("ph.d") || lower.includes("phd") || lower.includes("doctor of philosophy")) return "phd";
+  if (lower.includes("short") || lower.includes("diploma") || lower.includes("course")) return "course";
+  return "bs";
+}
+
+async function getFeeCategoryLabel(categoryId) {
+  const result = await pool.query("SELECT label FROM fee_categories WHERE id = $1", [categoryId]);
+  return result.rows[0]?.label || "";
+}
+
+// Submits a completed registration to MUL's own admissions system
+// (cms.mul.edu.pk, provided by MUL IT). Always saves a local copy in
+// mul_registrations regardless of the outcome - if MUL's side has any
+// issue, the data isn't lost, and an admin can see/resubmit it.
+async function submitMulRegistration({ phone, fullName, email, category, program }) {
+  const idempotencyKey = `WA-${phone}-${Date.now()}`;
+  let result;
+
+  if (!MUL_REGISTRATION_API_KEY) {
+    result = { success: false, reference: null, error: "MUL_REGISTRATION_API_KEY not configured" };
+  } else {
+    try {
+      const response = await axios.post(
+        MUL_REGISTRATION_API_URL,
+        {
+          full_name: fullName,
+          mobile_number: phone,
+          email,
+          category,
+          program,
+          source_of_information: "whatsapp"
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": MUL_REGISTRATION_API_KEY,
+            "Idempotency-Key": idempotencyKey
+          },
+          timeout: 15000
+        }
+      );
+
+      result = {
+        success: !!response.data?.success,
+        reference: response.data?.reference || null,
+        error: response.data?.success ? null : (response.data?.message || "Unknown response")
+      };
+    } catch (error) {
+      result = {
+        success: false,
+        reference: null,
+        error: error.response?.data?.message || error.message
+      };
+    }
+  }
+
+  try {
+    await pool.query(
+      `
+      INSERT INTO mul_registrations
+        (phone, full_name, email, category, program, idempotency_key, mul_success, mul_reference, mul_error)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `,
+      [phone, fullName, email, category, program, idempotencyKey, result.success, result.reference, result.error]
+    );
+  } catch (dbError) {
+    console.error("mul_registrations insert error:", dbError.message);
+  }
+
+  return result;
 }
 
 async function getFeeResult(categoryId, programName) {
@@ -1316,6 +1469,7 @@ How may we assist you today?
 6️⃣ Other Support Offices
 7️⃣ Chat with Admissions Advisor
 8️⃣ Request a Call Back
+9️⃣ Apply Now
 
 📌 Please reply with the number of your choice.
 
@@ -1324,6 +1478,7 @@ Send 1 for Programs
 Send 2 for Fee Structure
 Send 7 to connect with an Admissions Advisor
 Send 8 to request a call back
+Send 9 to apply now
 
 💡 Type MENU anytime to see these options again.`;
 }
@@ -3519,15 +3674,59 @@ app.post("/webhook", async (req, res) => {
     }
 
     // WhatsApp Flow completion ("nfm_reply"). Handled in isolation, before
-    // the bot state machine below ever sees this message. Two flows share
-    // this branch: the Fee Calculator (no "name" field in its payload -
-    // just logged for analytics) and the Lead Capture flow (has "name" -
-    // treated as a real lead, same handoff as the typed "Name, Program"
-    // path further down).
+    // the bot state machine below ever sees this message. Three flows share
+    // this branch, told apart by which fields are present: the Fee
+    // Calculator (no "name" field - just logged for analytics), the
+    // Registration Flow (has "name" AND "email" - submits straight to
+    // MUL's admissions system), and the Lead Capture flow (has "name" but
+    // no "email" - treated as a lead, same handoff as the typed
+    // "Name, Program" path further down). The Registration Flow is a
+    // duplicate of the Lead Capture Flow in Meta Business Suite with one
+    // added field (Email) - "does this payload have an email" is what
+    // separates the two, not the Flow ID.
     if (msg.type === "interactive" && msg.interactive?.type === "nfm_reply") {
       try {
         const flowResponse = JSON.parse(msg.interactive.nfm_reply?.response_json || "{}");
         const leadName = (flowResponse.name || "").trim();
+        const leadEmail = (flowResponse.email || "").trim();
+
+        if (leadName && leadEmail) {
+          const finalProgram = (flowResponse.other_program || "").trim()
+            || flowResponse.program
+            || "Not specified";
+          const categoryLabel = await getFeeCategoryLabel(flowResponse.category);
+          const mulCategory = mapCategoryLabelToMulCode(categoryLabel);
+
+          await saveUserInteraction(from, "registration_flow", finalProgram);
+
+          const registrationResult = await submitMulRegistration({
+            phone: from,
+            fullName: leadName,
+            email: leadEmail,
+            category: mulCategory,
+            program: finalProgram
+          });
+
+          await updateUserDetails(from, { name: leadName, program: finalProgram });
+
+          if (registrationResult.success) {
+            await sendTextMessage(
+              from,
+              `✅ Thank you, ${leadName}! Your registration for *${finalProgram}* has been submitted successfully.
+
+Reference: ${registrationResult.reference || "N/A"}
+
+Our admissions team will be in touch. You can also type MENU anytime for more information.`
+            );
+          } else {
+            await sendTextMessage(
+              from,
+              `We received your details, but weren't able to submit your registration automatically due to a technical issue. Our team has been notified and your information is saved - please type 7️⃣ to speak with an Admissions Advisor so we can complete it for you.`
+            );
+          }
+
+          return res.sendStatus(200);
+        }
 
         if (leadName) {
           const finalProgram = (flowResponse.other_program || "").trim()
@@ -3716,10 +3915,7 @@ if (currentModeForKeyword !== "agent" && !isAwaitingLeadDetails) {
     lowerText &&
     (
       lowerText.includes("admission") ||
-      lowerText.includes("apply") ||
-      lowerText.includes("apply online") ||
       lowerText.includes("registration") ||
-      lowerText.includes("how to apply") ||
       lowerText.includes("documents") ||
       lowerText.includes("requirements") ||
       lowerText.includes("dakhla") ||
@@ -3727,6 +3923,24 @@ if (currentModeForKeyword !== "agent" && !isAwaitingLeadDetails) {
     )
   ) {
     text = "4";
+  }
+
+  // Clear apply-INTENT phrasing (not just admission-process info-seeking)
+  // goes straight to the registration flow, not the generic Admission
+  // Process menu - runs after the bucket above so it wins on overlap
+  // ("how to apply" would otherwise land on text="4").
+  if (
+    lowerText &&
+    (
+      lowerText === "apply" ||
+      lowerText.includes("apply online") ||
+      lowerText.includes("how to apply") ||
+      lowerText.includes("want to apply") ||
+      lowerText.includes("apply karna") ||
+      lowerText.includes("apply kaise")
+    )
+  ) {
+    text = "__apply_now__";
   }
 
   if (
@@ -4217,13 +4431,13 @@ To get help, please type MENU and choose option 7️⃣ (Chat with Admissions Ad
 
       if (
         ![
-          "1", "2", "3", "4", "5", "6", "7",
+          "1", "2", "3", "4", "5", "6", "7", "8", "9",
           "1a", "1b", "1c", "1d",
           "5a", "5b", "5c", "5d", "5e",
           "6a", "6b", "6c", "6d", "6e", "6f", "6g", "6h", "6i", "6j", "6k", "6l",
           "apply",
           "__filler__", "__program_mention__", "__job_inquiry__",
-          "__percentage_query__", "__deadline_query__", "__fee_query__"
+          "__percentage_query__", "__deadline_query__", "__fee_query__", "__apply_now__"
         ].includes(lowerText)
       ) {
         await sendTextMessage(from, welcomeMessage());
@@ -4253,7 +4467,11 @@ To get help, please type MENU and choose option 7️⃣ (Chat with Admissions Ad
       return res.sendStatus(200);
     }
 
-    if (lowerText === "back" || lowerText === "9") {
+    // "9" used to double as a hidden "back" shortcut alongside the word
+    // "back" - now that 9 is the main menu's "Apply Now" option, that
+    // numeric alias is dropped (never advertised anywhere, so nothing
+    // user-visible breaks). The word "back" still works exactly as before.
+    if (lowerText === "back") {
       const prev = userStates[from].previousMenu || "main";
 
       if (prev === "programs") {
@@ -4298,8 +4516,9 @@ To get help, please type MENU and choose option 7️⃣ (Chat with Admissions Ad
       return res.sendStatus(200);
     }
 
-    if (lowerText === "apply") {
-      await sendTextMessage(from, applyNowMessage());
+    if (lowerText === "apply" || lowerText === "9" || lowerText === "__apply_now__") {
+      userStates[from].hasInteracted = true;
+      await offerRegistrationFlow(from);
       return res.sendStatus(200);
     }
 
@@ -4527,9 +4746,27 @@ Get Admission Fee challan and pay in Account Office or affiliated banks.`,
       userStates[from].currentMenu = "4b";
       userStates[from].hasInteracted = true;
 
-      await sendReplyButtons(
-        from,
-        `🌐 Online Admission
+      const flowSentFor4b = await sendRegistrationFlow(from);
+
+      if (flowSentFor4b) {
+        await sendReplyButtons(
+          from,
+          `🌐 Online Admission
+
+You can register directly here on WhatsApp - no need to visit the website.
+
+Once registered, you'll get an admission processing challan. Pay it through online banking or an affiliated bank, and your status will update within 24 hours. After that, upload your documents and agree to the terms - your application will then be submitted.
+
+It may take 24 to 48 hours for processing.`,
+          [
+            { id: "back", title: "Back" },
+            { id: "main_menu", title: "Main Menu" }
+          ]
+        );
+      } else {
+        await sendReplyButtons(
+          from,
+          `🌐 Online Admission
 
 For Apply Online please visit:
 https://admission.mul.edu.pk/
@@ -4544,11 +4781,12 @@ Once status changes from Pending to Paid, upload your documents and agree to ter
 Your application will be submitted successfully.
 You will receive admission fee challan once your admission application is accepted.
 It may take 24 to 48 hours for processing.`,
-        [
-          { id: "back", title: "Back" },
-          { id: "main_menu", title: "Main Menu" }
-        ]
-      );
+          [
+            { id: "back", title: "Back" },
+            { id: "main_menu", title: "Main Menu" }
+          ]
+        );
+      }
 
       return res.sendStatus(200);
     }
@@ -4863,6 +5101,7 @@ Please choose one of the following options:
 6️⃣ Other Support Offices
 7️⃣ Chat with Admissions Advisor
 8️⃣ Request a Call Back
+9️⃣ Apply Now
 
 📌 Please reply with the number of your choice.
 
@@ -6575,6 +6814,36 @@ app.listen(3000, async () => {
     );
   } catch (err) {
     console.error("❌ fee_programs.keywords column error:", err.message);
+  }
+
+  // 🔥 MUL REGISTRATION SUBMISSIONS TABLE AUTO CREATE
+  // Our own copy of every WhatsApp-registration attempt, independent of
+  // whatever happens on MUL's cms.mul.edu.pk side - so if their system has
+  // an issue, or an admin needs to double-check/resubmit something, the
+  // data still exists here regardless.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS mul_registrations (
+        id SERIAL PRIMARY KEY,
+        phone VARCHAR(30) NOT NULL,
+        full_name TEXT,
+        email TEXT,
+        category TEXT,
+        program TEXT,
+        idempotency_key TEXT,
+        mul_success BOOLEAN,
+        mul_reference TEXT,
+        mul_error TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_mul_registrations_phone ON mul_registrations (phone);
+    `);
+
+    console.log("✅ mul_registrations table ensured in DB");
+  } catch (err) {
+    console.error("❌ mul_registrations table error:", err.message);
   }
 
   // 🔥 START 24H FOLLOW-UP CHECKER
