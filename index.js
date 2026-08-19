@@ -6698,6 +6698,59 @@ app.get("/api/admin/export-messages", authenticateAgent, requireAdmin, async (re
   }
 });
 
+// One-off diagnostic export: every MUL admissions registration submission
+// attempt (success or failure), with the exact error text saved by
+// submitMulRegistration() - built for the same reason as export-messages
+// above, Railway's own Postgres "Data" tab query browser has repeatedly
+// been unreliable this session.
+app.get("/api/admin/export-registrations", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT phone, full_name, email, category, program, mul_success, mul_reference, mul_error, created_at
+      FROM mul_registrations
+      ORDER BY created_at DESC
+      LIMIT 2000
+      `
+    );
+
+    const headers = ["Date", "Phone", "Name", "Email", "Category", "Program", "Success", "Reference", "Error"];
+
+    const rows = result.rows.map(row => [
+      row.created_at ? new Date(row.created_at).toLocaleString("en-GB") : "",
+      row.phone || "",
+      row.full_name || "",
+      row.email || "",
+      row.category || "",
+      row.program || "",
+      row.mul_success ? "Yes" : "No",
+      row.mul_reference || "",
+      row.mul_error || ""
+    ]);
+
+    const csv = [
+      headers.join(","),
+      ...rows.map(r =>
+        r.map(value => `"${String(value).replaceAll('"', '""')}"`).join(",")
+      )
+    ].join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="mul-nexus-registration-attempts-export.csv"`
+    );
+
+    return res.send(csv);
+  } catch (error) {
+    console.error("GET /api/admin/export-registrations error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to export registration attempts"
+    });
+  }
+});
+
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
