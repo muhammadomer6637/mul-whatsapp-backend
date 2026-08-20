@@ -4012,6 +4012,7 @@ function normalizeProgramKey(name) {
 
     "bs doctor of physical therapy": "Doctor of Physiotherapy",
     "doctor of physical therapy": "Doctor of Physiotherapy",
+    "doctor of physical therapy dpt": "Doctor of Physiotherapy",
     "physical therapy": "Doctor of Physiotherapy",
 
     "bs physcology": "BS Psychology",

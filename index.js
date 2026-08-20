@@ -3763,6 +3763,14 @@ Reference: ${registrationResult.reference || "N/A"}
 
 Our admissions team will be in touch. You can also type MENU anytime for more information.`
             );
+          } else if ((registrationResult.error || "").toLowerCase().includes("already been submitted")) {
+            // Not our failure - MUL's own duplicate check. A different,
+            // accurate message instead of implying a technical problem on
+            // our end.
+            await sendTextMessage(
+              from,
+              `It looks like a registration already exists for this email address. If this was you, our admissions team can look up your existing application - please type 7️⃣ to speak with an Admissions Advisor. If you meant to use a different email, please try registering again with that one.`
+            );
           } else {
             await sendTextMessage(
               from,
