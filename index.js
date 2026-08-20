@@ -427,7 +427,11 @@ async function sendLeadCaptureFlow(to) {
 // admission.mul.edu.pk link exactly as before - zero risk shipping this
 // ahead of the Flow being created.
 async function sendRegistrationFlow(to) {
-  if (!WHATSAPP_REGISTRATION_FLOW_ID) return false;
+  // Both need to be present - offering the Flow with no API key configured
+  // would let a student fill in the whole form only to hit a guaranteed
+  // failure at submission (real scenario: only MUL_REGISTRATION_API_KEY
+  // got removed while pausing this feature, Flow ID was left in place).
+  if (!WHATSAPP_REGISTRATION_FLOW_ID || !MUL_REGISTRATION_API_KEY) return false;
   try {
     const categories = await getFeeCategoryOptions();
 
