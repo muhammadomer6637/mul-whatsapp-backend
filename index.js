@@ -49,6 +49,11 @@ const MUL_REGISTRATION_API_URL =
   process.env.MUL_REGISTRATION_API_URL ||
   "https://cms.mul.edu.pk/api/v2/wa/wa-mulnexus-registration.php";
 const MUL_REGISTRATION_API_KEY = process.env.MUL_REGISTRATION_API_KEY;
+// registration.php's "Source of Information" dropdown value for MUL IT's
+// dedicated "WhatsApp - MUL Nexus" option (confirmed live on
+// admission.mul.edu.pk). An env var, not hardcoded, in case MUL ever
+// renumbers their dropdown options - no redeploy needed to fix it then.
+const MUL_SOURCE_OF_INFORMATION_WHATSAPP = process.env.MUL_SOURCE_OF_INFORMATION_WHATSAPP || "16";
 
 // WhatsApp Flows data-exchange encryption (Meta's spec: RSA-OAEP-SHA256 for
 // the AES key, AES-128-GCM for the payload, response IV is the bitwise
@@ -554,7 +559,13 @@ async function submitMulRegistration({ phone, fullName, email, category, program
           email,
           category,
           program: mulProgramId,
-          source_of_information: "whatsapp"
+          // MUL IT added a dedicated "WhatsApp - MUL Nexus" option to the
+          // real registration.php dropdown (value "16", confirmed live) -
+          // we'd been sending the literal string "whatsapp" before this
+          // existed. Kept as a named constant since this is exactly the
+          // kind of value MUL could renumber if their dropdown options
+          // ever get reordered/edited.
+          source_of_information: MUL_SOURCE_OF_INFORMATION_WHATSAPP
         },
         {
           headers: {
