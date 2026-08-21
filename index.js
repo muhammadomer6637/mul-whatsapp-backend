@@ -6823,6 +6823,58 @@ app.get("/api/admin/export-registrations", authenticateAgent, requireAdmin, asyn
   }
 });
 
+// One-off diagnostic export: every fee_programs row alongside whether it
+// currently has a working MUL numeric-id mapping (lib/mulProgramIds.js) -
+// built to audit this properly in one pass instead of reacting to one
+// missing program at a time as real students hit it live.
+app.get("/api/admin/export-fee-programs", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT fp.program_name, fp.keywords, fp.active, fc.label AS category_label
+      FROM fee_programs fp
+      JOIN fee_categories fc ON fc.id = fp.category_id
+      ORDER BY fc.label ASC, fp.program_name ASC
+      `
+    );
+
+    const headers = ["Category", "Program Name", "Keywords", "Active", "MUL ID Mapped?"];
+
+    const rows = result.rows.map(row => {
+      const mulCategory = mapCategoryLabelToMulCode(row.category_label);
+      const mulId = getMulProgramId(row.program_name, mulCategory);
+      return [
+        row.category_label || "",
+        row.program_name || "",
+        row.keywords || "",
+        row.active === false ? "No" : "Yes",
+        mulId ? `Yes (${mulId})` : "MISSING"
+      ];
+    });
+
+    const csv = [
+      headers.join(","),
+      ...rows.map(r =>
+        r.map(value => `"${String(value).replaceAll('"', '""')}"`).join(",")
+      )
+    ].join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="mul-nexus-fee-programs-mapping-export.csv"`
+    );
+
+    return res.send(csv);
+  } catch (error) {
+    console.error("GET /api/admin/export-fee-programs error:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Failed to export fee programs"
+    });
+  }
+});
+
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });

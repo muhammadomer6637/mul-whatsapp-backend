@@ -4299,6 +4299,40 @@ function exportRegistrationAttempts() {
     });
 }
 
+// Every Fee Structure program with a flag for whether it currently has a
+// working MUL registration id mapping - built to audit this in one pass
+// instead of reacting one missing program at a time.
+function exportFeePrograms() {
+  fetch(`${BASE}/api/admin/export-fee-programs`, {
+    headers: authHeaders()
+  })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error("Export failed");
+      }
+      return response.blob();
+    })
+    .then(blob => {
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      link.href = downloadUrl;
+      link.download = `mul-nexus-fee-programs-mapping-export-${today}.csv`;
+
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    })
+    .catch(error => {
+      console.error("Export fee programs error:", error);
+      notify("Export failed. Please try again.", "error");
+    });
+}
+
 // =========================
 // MY PROFILE
 // =========================
