@@ -13,6 +13,7 @@ let allLeadsFull = [];
 let recognizedLeadsFull = [];
 let otherLeadsFull = [];
 let currentLeadsModalType = "all";
+let registrationFailedFull = [];
 
 function authHeaders(extraHeaders = {}) {
   return {
@@ -698,6 +699,24 @@ document.getElementById("agentCategoryStats").innerHTML =
     } else {
       const normalizedFeeCalcPrograms = normalizeProgramsForDisplay(feeCalcPrograms);
       feeCalcProgramsWrap.innerHTML = renderRankedProgramRows(normalizedFeeCalcPrograms, { limit: 5 });
+    }
+
+    const regPerf = data.registrationPerformance || { total: 0, successful: 0, failed: 0, topPrograms: [], failedAttempts: [] };
+    registrationFailedFull = regPerf.failedAttempts || [];
+
+    document.getElementById("registrationTotalValue").textContent = regPerf.total;
+    document.getElementById("registrationSuccessValue").textContent = regPerf.successful;
+    document.getElementById("registrationFailedValue").textContent = regPerf.failed;
+    document.getElementById("registrationRate").textContent =
+      regPerf.total ? `${Math.round((regPerf.successful / regPerf.total) * 100)}%` : "—";
+
+    const registrationProgramsWrap = document.getElementById("registrationTopProgramsList");
+    const registrationPrograms = (regPerf.topPrograms || []).map(row => ({ program: row.program, inquiries: Number(row.count || 0) }));
+    if (!registrationPrograms.length) {
+      registrationProgramsWrap.innerHTML = `<p style="color: var(--muted);">No successful registrations in this range yet.</p>`;
+    } else {
+      const normalizedRegistrationPrograms = normalizeProgramsForDisplay(registrationPrograms);
+      registrationProgramsWrap.innerHTML = renderRankedProgramRows(normalizedRegistrationPrograms, { limit: 5 });
     }
 
     const funnelRegistrations = Number(funnel.registrations || 0);
@@ -4445,6 +4464,12 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  const registrationFailedModal = document.getElementById("registrationFailedModal");
+  if (registrationFailedModal && !registrationFailedModal.classList.contains("hidden")) {
+    closeRegistrationFailedModal();
+    return;
+  }
+
   const profileModal = document.getElementById("profileModal");
   if (profileModal && !profileModal.classList.contains("hidden")) {
     closeProfileModal();
@@ -4469,6 +4494,10 @@ document.addEventListener("click", (event) => {
   }
   if (event.target.id === "leadsModal") {
     closeLeadsModal();
+    return;
+  }
+  if (event.target.id === "registrationFailedModal") {
+    closeRegistrationFailedModal();
     return;
   }
   if (event.target.classList && event.target.classList.contains("confirm-modal-overlay")) {
@@ -4498,6 +4527,54 @@ function downloadLeadsCsv() {
   const a = document.createElement("a");
   a.href = url;
   a.download = `${config.filename}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function openRegistrationFailedModal() {
+  document.getElementById("registrationFailedModalSub").textContent =
+    `${registrationFailedFull.length} failed attempt${registrationFailedFull.length === 1 ? "" : "s"} in the selected period`;
+
+  const tbody = document.querySelector("#registrationFailedModalTable tbody");
+  tbody.innerHTML = registrationFailedFull.length
+    ? registrationFailedFull.map(r => `
+      <tr>
+        <td>${escapeHtml(r.name || "-")}</td>
+        <td>${escapeHtml(r.phone || "-")}</td>
+        <td>${escapeHtml(prettyProgramName(r.program || "-"))}</td>
+        <td>${escapeHtml(r.error || "-")}</td>
+        <td>${formatDateTime(r.created_at)}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="5" style="color:var(--muted);">No failed attempts in this period.</td></tr>`;
+
+  document.getElementById("registrationFailedModal").classList.remove("hidden");
+}
+
+function closeRegistrationFailedModal() {
+  const modal = document.getElementById("registrationFailedModal");
+  if (modal) modal.classList.add("hidden");
+}
+
+function downloadRegistrationFailedCsv() {
+  const csvEscape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+  const header = ["Name", "Phone", "Program", "Error", "Date"].join(",");
+  const body = registrationFailedFull.map(r => [
+    csvEscape(r.name || "-"),
+    csvEscape(r.phone || "-"),
+    csvEscape(prettyProgramName(r.program || "-")),
+    csvEscape(r.error || "-"),
+    csvEscape(formatDateTime(r.created_at))
+  ].join(",")).join("\n");
+
+  const csv = `${header}\n${body}`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `failed-registrations-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

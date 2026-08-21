@@ -6108,7 +6108,10 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       feeCalcCompletedTotal,
       feeCalcCompletedByProgram,
       leadCaptureSent,
-      leadCaptureCompleted
+      leadCaptureCompleted,
+      registrationTotals,
+      registrationTopPrograms,
+      registrationFailedAttempts
     ] = await Promise.all([
       pool.query(
         `
@@ -6529,6 +6532,55 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
           )
         `,
         queryParams
+      ),
+
+      // Registration Performance panel - sourced from mul_registrations
+      // (our own audit log of every submission attempt to MUL's live
+      // registration API), not user_interactions, since it's the only
+      // place that records success/failure and the actual MUL-side error
+      // text per attempt.
+      pool.query(
+        `
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE mul_success)::int AS successful,
+          COUNT(*) FILTER (WHERE NOT mul_success)::int AS failed
+        FROM mul_registrations
+        WHERE ${whereCreated}
+        `,
+        queryParams
+      ),
+
+      // Top programs among SUCCESSFUL registrations only - a failed
+      // attempt (e.g. a program that couldn't be mapped to MUL's id) isn't
+      // a genuine signal of program demand the same way a completed one is.
+      pool.query(
+        `
+        SELECT program, COUNT(*)::int AS count
+        FROM mul_registrations
+        WHERE mul_success = true
+          AND ${whereCreated}
+        GROUP BY program
+        ORDER BY count DESC
+        LIMIT 10
+        `,
+        queryParams
+      ),
+
+      // Full failed-attempt list for the "Failed" stat card's modal -
+      // same pattern as recentLeads below (send the full period-scoped
+      // list once, filter/paginate client-side) rather than a second
+      // round-trip endpoint.
+      pool.query(
+        `
+        SELECT full_name AS name, phone, program, mul_error AS error, created_at
+        FROM mul_registrations
+        WHERE mul_success = false
+          AND ${whereCreated}
+        ORDER BY created_at DESC
+        LIMIT 500
+        `,
+        queryParams
       )
     ]);
 
@@ -6602,6 +6654,14 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
           sent: leadCaptureSent.rows[0].count || 0,
           completed: leadCaptureCompleted.rows[0].count || 0
         }
+      },
+
+      registrationPerformance: {
+        total: registrationTotals.rows[0].total || 0,
+        successful: registrationTotals.rows[0].successful || 0,
+        failed: registrationTotals.rows[0].failed || 0,
+        topPrograms: registrationTopPrograms.rows,
+        failedAttempts: registrationFailedAttempts.rows
       }
     });
 
