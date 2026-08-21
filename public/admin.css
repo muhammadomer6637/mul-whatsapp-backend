@@ -1158,6 +1158,12 @@ body {
   border: 1px solid rgba(47,125,246,0.25);
 }
 
+.status-failed {
+  background: rgba(255,98,118,0.12);
+  color: #ff96a4;
+  border: 1px solid rgba(255,98,118,0.25);
+}
+
 .status-active,
 .status-bot {
   background: rgba(24,195,126,0.12);

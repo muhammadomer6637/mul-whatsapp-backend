@@ -6111,7 +6111,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       leadCaptureCompleted,
       registrationTotals,
       registrationTopPrograms,
-      registrationFailedAttempts
+      registrationAttempts
     ] = await Promise.all([
       pool.query(
         `
@@ -6567,18 +6567,17 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      // Full failed-attempt list for the "Failed" stat card's modal -
-      // same pattern as recentLeads below (send the full period-scoped
-      // list once, filter/paginate client-side) rather than a second
-      // round-trip endpoint.
+      // Full period-scoped attempt list (both successful and failed) for
+      // the three stat cards' modals - same pattern as recentLeads below
+      // (send the full list once, split/filter client-side into
+      // Total/Successful/Failed) rather than three separate round-trips.
       pool.query(
         `
-        SELECT full_name AS name, phone, program, mul_error AS error, created_at
+        SELECT full_name AS name, phone, program, mul_success AS success, mul_error AS error, created_at
         FROM mul_registrations
-        WHERE mul_success = false
-          AND ${whereCreated}
+        WHERE ${whereCreated}
         ORDER BY created_at DESC
-        LIMIT 500
+        LIMIT 2000
         `,
         queryParams
       )
@@ -6661,7 +6660,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         successful: registrationTotals.rows[0].successful || 0,
         failed: registrationTotals.rows[0].failed || 0,
         topPrograms: registrationTopPrograms.rows,
-        failedAttempts: registrationFailedAttempts.rows
+        attempts: registrationAttempts.rows
       }
     });
 

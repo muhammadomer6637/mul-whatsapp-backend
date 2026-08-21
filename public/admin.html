@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-  <link rel="stylesheet" href="admin.css?v=9" />
+  <link rel="stylesheet" href="admin.css?v=10" />
 </head>
 <body>
   <div id="loginOverlay" class="login-overlay">
@@ -403,23 +403,23 @@
   </div>
 
   <div class="stat-cluster-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px;">
-    <div class="stat-card cb-tone-info">
+    <div class="stat-card cb-tone-info" style="cursor:pointer;" onclick="openRegistrationModal('total')" title="Click to see every attempt">
       <div class="stat-card-icon">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>
       </div>
       <div class="label">Total Attempts</div>
       <div class="value" id="registrationTotalValue">0</div>
-      <div class="meta">Submitted to MUL</div>
+      <div class="meta">Tap to see all →</div>
     </div>
-    <div class="stat-card cb-tone-success">
+    <div class="stat-card cb-tone-success" style="cursor:pointer;" onclick="openRegistrationModal('successful')" title="Click to see who registered">
       <div class="stat-card-icon">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
       </div>
       <div class="label">Successful</div>
       <div class="value" id="registrationSuccessValue">0</div>
-      <div class="meta">Accepted by MUL</div>
+      <div class="meta">Tap to see list →</div>
     </div>
-    <div class="stat-card cb-tone-danger" id="registrationFailedCard" style="cursor:pointer;" onclick="openRegistrationFailedModal()" title="Click to see why each one failed">
+    <div class="stat-card cb-tone-danger" style="cursor:pointer;" onclick="openRegistrationModal('failed')" title="Click to see why each one failed">
       <div class="stat-card-icon">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
       </div>
@@ -898,31 +898,32 @@
   </div>
 </div>
 
-<div id="registrationFailedModal" class="profile-modal hidden">
+<div id="registrationModal" class="profile-modal hidden">
   <div class="profile-modal-card">
     <div class="profile-modal-header">
       <div>
-        <h2>Failed Registrations</h2>
-        <p id="registrationFailedModalSub">Attempts that MUL's system rejected in the selected period</p>
+        <h2 id="registrationModalTitle">Registration Attempts</h2>
+        <p id="registrationModalSub">All registration attempts in the selected period</p>
       </div>
-      <button class="profile-close-btn" onclick="closeRegistrationFailedModal()">×</button>
+      <button class="profile-close-btn" onclick="closeRegistrationModal()">×</button>
     </div>
 
     <div class="profile-modal-body">
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-      <button class="export-btn export-pill-btn" onclick="downloadRegistrationFailedCsv()">
+      <button class="export-btn export-pill-btn" onclick="downloadRegistrationCsv()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M6 10l6 6 6-6M5 21h14"/></svg>
         Download List
       </button>
     </div>
 
     <div class="table-wrap">
-      <table class="styled-table" id="registrationFailedModalTable">
+      <table class="styled-table" id="registrationModalTable">
         <thead>
           <tr>
             <th>Name</th>
             <th>Phone</th>
             <th>Program</th>
+            <th>Status</th>
             <th>Error</th>
             <th>Date</th>
           </tr>

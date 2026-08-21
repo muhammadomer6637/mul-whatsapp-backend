@@ -13,7 +13,10 @@ let allLeadsFull = [];
 let recognizedLeadsFull = [];
 let otherLeadsFull = [];
 let currentLeadsModalType = "all";
+let registrationAttemptsFull = [];
+let registrationSuccessfulFull = [];
 let registrationFailedFull = [];
+let currentRegistrationModalType = "total";
 
 function authHeaders(extraHeaders = {}) {
   return {
@@ -701,8 +704,10 @@ document.getElementById("agentCategoryStats").innerHTML =
       feeCalcProgramsWrap.innerHTML = renderRankedProgramRows(normalizedFeeCalcPrograms, { limit: 5 });
     }
 
-    const regPerf = data.registrationPerformance || { total: 0, successful: 0, failed: 0, topPrograms: [], failedAttempts: [] };
-    registrationFailedFull = regPerf.failedAttempts || [];
+    const regPerf = data.registrationPerformance || { total: 0, successful: 0, failed: 0, topPrograms: [], attempts: [] };
+    registrationAttemptsFull = regPerf.attempts || [];
+    registrationSuccessfulFull = registrationAttemptsFull.filter(r => r.success);
+    registrationFailedFull = registrationAttemptsFull.filter(r => !r.success);
 
     document.getElementById("registrationTotalValue").textContent = regPerf.total;
     document.getElementById("registrationSuccessValue").textContent = regPerf.successful;
@@ -4464,9 +4469,9 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  const registrationFailedModal = document.getElementById("registrationFailedModal");
-  if (registrationFailedModal && !registrationFailedModal.classList.contains("hidden")) {
-    closeRegistrationFailedModal();
+  const registrationModal = document.getElementById("registrationModal");
+  if (registrationModal && !registrationModal.classList.contains("hidden")) {
+    closeRegistrationModal();
     return;
   }
 
@@ -4496,8 +4501,8 @@ document.addEventListener("click", (event) => {
     closeLeadsModal();
     return;
   }
-  if (event.target.id === "registrationFailedModal") {
-    closeRegistrationFailedModal();
+  if (event.target.id === "registrationModal") {
+    closeRegistrationModal();
     return;
   }
   if (event.target.classList && event.target.classList.contains("confirm-modal-overlay")) {
@@ -4533,38 +4538,54 @@ function downloadLeadsCsv() {
   URL.revokeObjectURL(url);
 }
 
-function openRegistrationFailedModal() {
-  document.getElementById("registrationFailedModalSub").textContent =
-    `${registrationFailedFull.length} failed attempt${registrationFailedFull.length === 1 ? "" : "s"} in the selected period`;
+const REGISTRATION_MODAL_CONFIG = {
+  total: { title: "All Registration Attempts", sub: "Every attempt submitted to MUL in the selected period", getRows: () => registrationAttemptsFull, filename: "all-registration-attempts" },
+  successful: { title: "Successful Registrations", sub: "Accepted by MUL's system in the selected period", getRows: () => registrationSuccessfulFull, filename: "successful-registrations" },
+  failed: { title: "Failed Registrations", sub: "Attempts that MUL's system rejected in the selected period", getRows: () => registrationFailedFull, filename: "failed-registrations" }
+};
 
-  const tbody = document.querySelector("#registrationFailedModalTable tbody");
-  tbody.innerHTML = registrationFailedFull.length
-    ? registrationFailedFull.map(r => `
+function openRegistrationModal(type) {
+  const config = REGISTRATION_MODAL_CONFIG[type] || REGISTRATION_MODAL_CONFIG.total;
+  currentRegistrationModalType = type;
+
+  document.getElementById("registrationModalTitle").textContent = config.title;
+  const rows = config.getRows();
+  document.getElementById("registrationModalSub").textContent =
+    `${config.sub} · ${rows.length} record${rows.length === 1 ? "" : "s"}`;
+
+  const tbody = document.querySelector("#registrationModalTable tbody");
+  tbody.innerHTML = rows.length
+    ? rows.map(r => `
       <tr>
         <td>${escapeHtml(r.name || "-")}</td>
         <td>${escapeHtml(r.phone || "-")}</td>
         <td>${escapeHtml(prettyProgramName(r.program || "-"))}</td>
+        <td><span class="status-chip status-${r.success ? "active" : "failed"}">${r.success ? "Successful" : "Failed"}</span></td>
         <td>${escapeHtml(r.error || "-")}</td>
         <td>${formatDateTime(r.created_at)}</td>
       </tr>
     `).join("")
-    : `<tr><td colspan="5" style="color:var(--muted);">No failed attempts in this period.</td></tr>`;
+    : `<tr><td colspan="6" style="color:var(--muted);">No records in this category for the selected period.</td></tr>`;
 
-  document.getElementById("registrationFailedModal").classList.remove("hidden");
+  document.getElementById("registrationModal").classList.remove("hidden");
 }
 
-function closeRegistrationFailedModal() {
-  const modal = document.getElementById("registrationFailedModal");
+function closeRegistrationModal() {
+  const modal = document.getElementById("registrationModal");
   if (modal) modal.classList.add("hidden");
 }
 
-function downloadRegistrationFailedCsv() {
+function downloadRegistrationCsv() {
+  const config = REGISTRATION_MODAL_CONFIG[currentRegistrationModalType] || REGISTRATION_MODAL_CONFIG.total;
+  const rows = config.getRows();
+
   const csvEscape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
-  const header = ["Name", "Phone", "Program", "Error", "Date"].join(",");
-  const body = registrationFailedFull.map(r => [
+  const header = ["Name", "Phone", "Program", "Status", "Error", "Date"].join(",");
+  const body = rows.map(r => [
     csvEscape(r.name || "-"),
     csvEscape(r.phone || "-"),
     csvEscape(prettyProgramName(r.program || "-")),
+    csvEscape(r.success ? "Successful" : "Failed"),
     csvEscape(r.error || "-"),
     csvEscape(formatDateTime(r.created_at))
   ].join(",")).join("\n");
@@ -4574,7 +4595,7 @@ function downloadRegistrationFailedCsv() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `failed-registrations-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `${config.filename}-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
