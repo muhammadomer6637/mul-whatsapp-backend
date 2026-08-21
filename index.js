@@ -3769,19 +3769,39 @@ app.post("/webhook", async (req, res) => {
 
           await updateUserDetails(from, { name: leadName, program: finalProgram });
 
+          const registrationErrorLower = (registrationResult.error || "").toLowerCase();
+
           if (registrationResult.success) {
+            // No reference number shown here - it's a CMS-generated
+            // tracking id with nothing the student can actually do with
+            // it (they don't log in with it, nowhere asks for it later).
+            // The real next step is their email for account access.
             await sendTextMessage(
               from,
-              `✅ Thank you, ${leadName}! Your registration for *${finalProgram}* has been submitted successfully.
+              `✅ Your registration is confirmed, ${leadName}!
 
-Reference: ${registrationResult.reference || "N/A"}
+📧 Please check your email - you will receive your Username and Password from Minhaj University Lahore.
 
-Our admissions team will be in touch. You can also type MENU anytime for more information.`
+Next steps:
+1️⃣ Sign in at admission.mul.edu.pk
+2️⃣ Update your profile and pay the admission processing fee
+3️⃣ After paying, add your education details and upload your documents
+4️⃣ Accept the rules & regulations - and you're done!
+
+Our admissions team will review your application and issue your Admission Fee challan once it's accepted.
+
+💡 Type MENU anytime for more information.`
             );
-          } else if ((registrationResult.error || "").toLowerCase().includes("already been submitted")) {
-            // Not our failure - MUL's own duplicate check. A different,
-            // accurate message instead of implying a technical problem on
-            // our end.
+          } else if (registrationErrorLower.includes("mobile") && registrationErrorLower.includes("already")) {
+            // MUL's own duplicate check, keyed on mobile number (confirmed
+            // via real testing - the actual error text says "mobile
+            // number", not "email", even though it can read either way
+            // depending on what MUL's system happens to flag).
+            await sendTextMessage(
+              from,
+              `It looks like a registration already exists for this mobile number. If this was you, our admissions team can look up your existing application - please type 7️⃣ to speak with an Admissions Advisor.`
+            );
+          } else if (registrationErrorLower.includes("email") && registrationErrorLower.includes("already")) {
             await sendTextMessage(
               from,
               `It looks like a registration already exists for this email address. If this was you, our admissions team can look up your existing application - please type 7️⃣ to speak with an Admissions Advisor. If you meant to use a different email, please try registering again with that one.`
