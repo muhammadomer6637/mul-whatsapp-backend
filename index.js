@@ -3825,18 +3825,40 @@ Our admissions team will review your application and issue your Admission Fee ch
 💡 Type MENU anytime for more information.`
             );
           } else if (registrationErrorLower.includes("mobile") && registrationErrorLower.includes("already")) {
-            // MUL's own duplicate check, keyed on mobile number (confirmed
-            // via real testing - the actual error text says "mobile
-            // number", not "email", even though it can read either way
-            // depending on what MUL's system happens to flag).
+            // MUL's own duplicate check, keyed on mobile number - confirmed
+            // via our own mul_registrations log (2026-08-22): the same
+            // phone, once it has one successful registration on file, gets
+            // this exact error on every later attempt even with a
+            // different email each time. Genuinely MUL-side, not us.
             await sendTextMessage(
               from,
-              `It looks like a registration already exists for this mobile number. If this was you, our admissions team can look up your existing application - please type 7️⃣ to speak with an Admissions Advisor.`
+              `It looks like a registration already exists for this mobile number.
+
+✅ If you've registered before (via WhatsApp or the website), check your email for your Username & Password, then sign in at admission.mul.edu.pk to continue your registration process.
+
+❓ If you're sure you've never applied before, please type 7️⃣ to speak with an Admissions Advisor.`
             );
           } else if (registrationErrorLower.includes("email") && registrationErrorLower.includes("already")) {
             await sendTextMessage(
               from,
-              `It looks like a registration already exists for this email address. If this was you, our admissions team can look up your existing application - please type 7️⃣ to speak with an Admissions Advisor. If you meant to use a different email, please try registering again with that one.`
+              `It looks like a registration already exists for this email address.
+
+✅ If you've registered before (via WhatsApp or the website), check your email for your Username & Password, then sign in at admission.mul.edu.pk to continue your registration process.
+
+❓ If you're sure you've never applied before, please type 7️⃣ to speak with an Admissions Advisor. If you meant to use a different email, please try registering again with that one.`
+            );
+          } else if (registrationErrorLower.includes("already")) {
+            // MUL also returns a generic "This registration has already
+            // been submitted." that names neither field - same duplicate
+            // situation as the two branches above, just without saying
+            // which one triggered it, so the guidance stays field-neutral.
+            await sendTextMessage(
+              from,
+              `It looks like a registration already exists for you.
+
+✅ If you've registered before (via WhatsApp or the website), check your email for your Username & Password, then sign in at admission.mul.edu.pk to continue your registration process.
+
+❓ If you're sure you've never applied before, please type 7️⃣ to speak with an Admissions Advisor.`
             );
           } else {
             await sendTextMessage(
