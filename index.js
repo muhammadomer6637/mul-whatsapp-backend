@@ -525,11 +525,39 @@ function formatPhoneForMul(waPhone) {
   return digits;
 }
 
+// Resolves a program's MUL numeric id, checking the admin-editable
+// fee_programs.mul_program_id column FIRST (so a newly-added program can be
+// mapped by whoever manages Fee Structure, straight from the admin panel,
+// without needing a code change) and only falling back to the built-in
+// scraped map (lib/mulProgramIds.js) if nothing's been entered there.
+// Scoped to categoryId (not just the category label) so it can never
+// cross-match a same-named program sitting in a different category.
+async function resolveMulProgramId(program, categoryId, mulCategory) {
+  if (categoryId) {
+    try {
+      const dbResult = await pool.query(
+        `
+        SELECT mul_program_id FROM fee_programs
+        WHERE category_id = $1 AND LOWER(program_name) = LOWER($2)
+        LIMIT 1
+        `,
+        [categoryId, program]
+      );
+      const dbId = dbResult.rows[0]?.mul_program_id;
+      if (dbId && dbId.trim()) return dbId.trim();
+    } catch (err) {
+      console.error("resolveMulProgramId DB lookup error:", err.message);
+    }
+  }
+
+  return getMulProgramId(program, mulCategory);
+}
+
 // Submits a completed registration to MUL's own admissions system
 // (cms.mul.edu.pk, provided by MUL IT). Always saves a local copy in
 // mul_registrations regardless of the outcome - if MUL's side has any
 // issue, the data isn't lost, and an admin can see/resubmit it.
-async function submitMulRegistration({ phone, fullName, email, category, program }) {
+async function submitMulRegistration({ phone, fullName, email, category, categoryId, program }) {
   const idempotencyKey = `WA-${phone}-${Date.now()}`;
   let result;
 
@@ -539,7 +567,7 @@ async function submitMulRegistration({ phone, fullName, email, category, program
   // If we can't confidently resolve one, don't guess and don't call the
   // API at all - a wrong-but-"successful"-looking submission would be
   // worse than an honest local failure here.
-  const mulProgramId = getMulProgramId(program, category);
+  const mulProgramId = await resolveMulProgramId(program, categoryId, category);
 
   if (!MUL_REGISTRATION_API_KEY) {
     result = { success: false, reference: null, error: "MUL_REGISTRATION_API_KEY not configured" };
@@ -3215,7 +3243,7 @@ app.post("/api/fee-programs", authenticateAgent, requireAdmin, async (req, res) 
     const {
       categoryId, programName, patternType, admissionFee, totalFee,
       perInstalmentAmount, totalInstalments, earlySemesterAmount, laterSemesterAmount,
-      eligibilityCriteria, keywords
+      eligibilityCriteria, keywords, mulProgramId
     } = req.body;
 
     const isQuarterly = patternType === "quarterly";
@@ -3226,9 +3254,9 @@ app.post("/api/fee-programs", authenticateAgent, requireAdmin, async (req, res) 
         category_id, program_name, pattern_type,
         admission_fee, per_instalment_amount, total_instalments,
         early_semester_amount, later_semester_amount, total_fee,
-        eligibility_criteria, keywords
+        eligibility_criteria, keywords, mul_program_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
       `,
       [
@@ -3242,7 +3270,8 @@ app.post("/api/fee-programs", authenticateAgent, requireAdmin, async (req, res) 
         isQuarterly ? null : (laterSemesterAmount || null),
         totalFee || null,
         eligibilityCriteria || null,
-        (keywords || "").trim() || null
+        (keywords || "").trim() || null,
+        (mulProgramId || "").trim() || null
       ]
     );
 
@@ -3268,7 +3297,7 @@ app.put("/api/fee-programs/:id", authenticateAgent, requireAdmin, async (req, re
     const {
       categoryId, programName, patternType, admissionFee, totalFee,
       perInstalmentAmount, totalInstalments, earlySemesterAmount, laterSemesterAmount,
-      eligibilityCriteria, keywords
+      eligibilityCriteria, keywords, mulProgramId
     } = req.body;
 
     const isQuarterly = patternType === "quarterly";
@@ -3286,8 +3315,9 @@ app.put("/api/fee-programs/:id", authenticateAgent, requireAdmin, async (req, re
         later_semester_amount = $8,
         total_fee = $9,
         eligibility_criteria = $10,
-        keywords = $11
-      WHERE id = $12
+        keywords = $11,
+        mul_program_id = $12
+      WHERE id = $13
       RETURNING *
       `,
       [
@@ -3302,6 +3332,7 @@ app.put("/api/fee-programs/:id", authenticateAgent, requireAdmin, async (req, re
         totalFee || null,
         eligibilityCriteria || null,
         (keywords || "").trim() || null,
+        (mulProgramId || "").trim() || null,
         id
       ]
     );
@@ -3764,6 +3795,7 @@ app.post("/webhook", async (req, res) => {
             fullName: leadName,
             email: leadEmail,
             category: mulCategory,
+            categoryId: flowResponse.category,
             program: finalProgram
           });
 
@@ -6890,23 +6922,26 @@ app.get("/api/admin/export-fee-programs", authenticateAgent, requireAdmin, async
   try {
     const result = await pool.query(
       `
-      SELECT fp.program_name, fp.keywords, fp.active, fc.label AS category_label
+      SELECT fp.program_name, fp.keywords, fp.active, fp.mul_program_id, fc.label AS category_label
       FROM fee_programs fp
       JOIN fee_categories fc ON fc.id = fp.category_id
       ORDER BY fc.label ASC, fp.program_name ASC
       `
     );
 
-    const headers = ["Category", "Program Name", "Keywords", "Active", "MUL ID Mapped?"];
+    const headers = ["Category", "Program Name", "Keywords", "Active", "MUL Program ID (Admin-entered)", "MUL ID Mapped?"];
 
     const rows = result.rows.map(row => {
+      // Same precedence as resolveMulProgramId(): admin-entered value first,
+      // fall back to the built-in scraped map.
       const mulCategory = mapCategoryLabelToMulCode(row.category_label);
-      const mulId = getMulProgramId(row.program_name, mulCategory);
+      const mulId = (row.mul_program_id || "").trim() || getMulProgramId(row.program_name, mulCategory);
       return [
         row.category_label || "",
         row.program_name || "",
         row.keywords || "",
         row.active === false ? "No" : "Yes",
+        row.mul_program_id || "",
         mulId ? `Yes (${mulId})` : "MISSING"
       ];
     });
@@ -7066,6 +7101,50 @@ app.listen(3000, async () => {
     );
   } catch (err) {
     console.error("❌ fee_programs.keywords column error:", err.message);
+  }
+
+  // 🔥 FEE PROGRAM MUL PROGRAM ID COLUMN AUTO ADD + ONE-TIME BEST-EFFORT SEED
+  // Admin-editable override (Settings > Fee Structure) for the MUL numeric
+  // program id needed by WhatsApp Registration submissions - lets whoever
+  // adds a new program to Fee Structure map its id themselves straight from
+  // the admin panel (see resolveMulProgramId()), instead of needing a code
+  // change every time. Purely additive column; the one-time seed only fills
+  // rows where mul_program_id is still NULL, using the existing scraped map
+  // (lib/mulProgramIds.js) as a head start - it never overwrites anything
+  // an admin has already typed in.
+  try {
+    await pool.query(`
+      ALTER TABLE fee_programs
+      ADD COLUMN IF NOT EXISTS mul_program_id TEXT NULL;
+    `);
+
+    const unseededMulIds = await pool.query(
+      `
+      SELECT fp.id, fp.program_name, fc.label AS category_label
+      FROM fee_programs fp
+      JOIN fee_categories fc ON fc.id = fp.category_id
+      WHERE fp.mul_program_id IS NULL
+      `
+    );
+
+    let mulIdSeededCount = 0;
+    for (const row of unseededMulIds.rows) {
+      const mulCategory = mapCategoryLabelToMulCode(row.category_label);
+      const knownId = getMulProgramId(row.program_name, mulCategory);
+      if (!knownId) continue;
+
+      await pool.query(
+        "UPDATE fee_programs SET mul_program_id = $1 WHERE id = $2",
+        [knownId, row.id]
+      );
+      mulIdSeededCount++;
+    }
+
+    console.log(
+      `✅ fee_programs.mul_program_id column ensured in DB (seeded ${mulIdSeededCount} of ${unseededMulIds.rows.length} unseeded programs from the existing scraped map)`
+    );
+  } catch (err) {
+    console.error("❌ fee_programs.mul_program_id column error:", err.message);
   }
 
   // 🔥 MUL REGISTRATION SUBMISSIONS TABLE AUTO CREATE

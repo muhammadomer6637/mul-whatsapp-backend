@@ -2620,6 +2620,10 @@ function openFeeProgramModal(id = null, categoryId = null) {
       <textarea id="feeProgramKeywords" class="prompt-input" rows="2" placeholder="e.g. bscs, bs cs, computer science, cs">${existing?.keywords ? escapeHtml(existing.keywords) : ""}</textarea>
       <p style="font-size:11px; color:var(--muted); margin:-14px 0 20px;">Comma-separated. The WhatsApp bot uses these to recognize this program from a student's message (typos, abbreviations, short forms) and answer with its fee/eligibility directly.</p>
 
+      <label class="field-label">MUL Program ID</label>
+      <input id="feeProgramMulId" class="prompt-input" type="text" placeholder="e.g. 292,0" value="${existing?.mul_program_id ? escapeHtml(existing.mul_program_id) : ""}" />
+      <p style="font-size:11px; color:var(--muted); margin:8px 0 20px;">MUL's own numeric id for this program on admission.mul.edu.pk/registration.php - needed for the WhatsApp Registration flow to submit this program successfully. Leave blank if unknown; the program just won't be selectable in that flow until it's filled in.</p>
+
       <div class="confirm-modal-actions">
         <button class="ghost-btn" data-action="cancel">Cancel</button>
         <button class="primary-btn" data-action="save">Save</button>
@@ -2653,6 +2657,7 @@ async function saveFeeProgram(id, overlay) {
   const totalFee = overlay.querySelector("#feeProgramTotalFee").value;
   const eligibilityCriteria = overlay.querySelector("#feeProgramEligibility").value.trim();
   const keywords = overlay.querySelector("#feeProgramKeywords").value.trim();
+  const mulProgramId = overlay.querySelector("#feeProgramMulId").value.trim();
 
   if (!programName) {
     notify("Program name is required", "warning");
@@ -2666,7 +2671,8 @@ async function saveFeeProgram(id, overlay) {
     admissionFee: admissionFee ? Number(admissionFee) : null,
     totalFee: totalFee ? Number(totalFee) : null,
     eligibilityCriteria: eligibilityCriteria || null,
-    keywords: keywords || null
+    keywords: keywords || null,
+    mulProgramId: mulProgramId || null
   };
 
   if (patternType === "quarterly") {
