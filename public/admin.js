@@ -4545,9 +4545,9 @@ function downloadLeadsCsv() {
 }
 
 const REGISTRATION_MODAL_CONFIG = {
-  total: { title: "All Registration Attempts", sub: "Every attempt submitted to MUL in the selected period", getRows: () => registrationAttemptsFull, filename: "all-registration-attempts" },
-  successful: { title: "Successful Registrations", sub: "Accepted by MUL's system in the selected period", getRows: () => registrationSuccessfulFull, filename: "successful-registrations" },
-  failed: { title: "Failed Registrations", sub: "Attempts that MUL's system rejected in the selected period", getRows: () => registrationFailedFull, filename: "failed-registrations" }
+  total: { title: "All Registration Attempts", sub: "Unique students who attempted registration in the selected period - one row each, even if they retried", getRows: () => registrationAttemptsFull, filename: "all-registration-attempts" },
+  successful: { title: "Successful Registrations", sub: "Unique students accepted by MUL's system in the selected period", getRows: () => registrationSuccessfulFull, filename: "successful-registrations" },
+  failed: { title: "Failed Registrations", sub: "Unique students whose every attempt was rejected in the selected period", getRows: () => registrationFailedFull, filename: "failed-registrations" }
 };
 
 function openRegistrationModal(type) {

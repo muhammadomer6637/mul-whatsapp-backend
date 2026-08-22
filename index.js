@@ -6593,14 +6593,29 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // registration API), not user_interactions, since it's the only
       // place that records success/failure and the actual MUL-side error
       // text per attempt.
+      //
+      // Counted by UNIQUE PHONE, not raw attempt rows - a student who
+      // retries several times (different program/email after a rejection,
+      // or just re-tapping the flow) was inflating Total/Failed by one row
+      // per retry instead of counting as the one person they are. Each
+      // unique phone in the period is classified once: "successful" if ANY
+      // of their attempts in the period went through, "failed" only if
+      // every attempt they made failed - so Total always equals
+      // Successful + Failed, and a student who failed twice then succeeded
+      // is counted as one success, not one success plus two failures.
       pool.query(
         `
+        WITH per_phone AS (
+          SELECT phone, BOOL_OR(mul_success) AS succeeded
+          FROM mul_registrations
+          WHERE ${whereCreated}
+          GROUP BY phone
+        )
         SELECT
           COUNT(*)::int AS total,
-          COUNT(*) FILTER (WHERE mul_success)::int AS successful,
-          COUNT(*) FILTER (WHERE NOT mul_success)::int AS failed
-        FROM mul_registrations
-        WHERE ${whereCreated}
+          COUNT(*) FILTER (WHERE succeeded)::int AS successful,
+          COUNT(*) FILTER (WHERE NOT succeeded)::int AS failed
+        FROM per_phone
         `,
         queryParams
       ),
@@ -6608,9 +6623,12 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // Top programs among SUCCESSFUL registrations only - a failed
       // attempt (e.g. a program that couldn't be mapped to MUL's id) isn't
       // a genuine signal of program demand the same way a completed one is.
+      // DISTINCT phone here too, though in practice a phone can only
+      // succeed once (MUL rejects any later attempt as a duplicate), so
+      // this mainly guards against that assumption ever changing.
       pool.query(
         `
-        SELECT program, COUNT(*)::int AS count
+        SELECT program, COUNT(DISTINCT phone)::int AS count
         FROM mul_registrations
         WHERE mul_success = true
           AND ${whereCreated}
@@ -6621,15 +6639,31 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      // Full period-scoped attempt list (both successful and failed) for
-      // the three stat cards' modals - same pattern as recentLeads below
-      // (send the full list once, split/filter client-side into
-      // Total/Successful/Failed) rather than three separate round-trips.
+      // One row per unique phone (not one row per raw attempt) for the
+      // three stat cards' modals, so a student who retried several times
+      // shows up once - matching the unique-phone counts above instead of
+      // re-inflating the list with every retry. Picks each phone's most
+      // recent attempt for the displayed program/date, but "success" and
+      // "error" reflect the OVERALL outcome (succeeded if any attempt in
+      // the period succeeded; error is blank once they're in, even if a
+      // later stray retry after that happened to fail).
       pool.query(
         `
-        SELECT full_name AS name, phone, program, mul_success AS success, mul_error AS error, created_at
-        FROM mul_registrations
-        WHERE ${whereCreated}
+        SELECT * FROM (
+          SELECT DISTINCT ON (phone)
+            full_name AS name,
+            phone,
+            program,
+            BOOL_OR(mul_success) OVER (PARTITION BY phone) AS success,
+            CASE
+              WHEN BOOL_OR(mul_success) OVER (PARTITION BY phone) THEN NULL
+              ELSE mul_error
+            END AS error,
+            created_at
+          FROM mul_registrations
+          WHERE ${whereCreated}
+          ORDER BY phone, created_at DESC
+        ) latest_per_phone
         ORDER BY created_at DESC
         LIMIT 2000
         `,
