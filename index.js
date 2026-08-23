@@ -3804,6 +3804,21 @@ app.post("/webhook", async (req, res) => {
           const registrationErrorLower = (registrationResult.error || "").toLowerCase();
 
           if (registrationResult.success) {
+            // Auto-advance the Admission Funnel's "Registered" stage the
+            // same way an agent manually marking it would (see
+            // /api/funnel-status) - a real MUL-confirmed registration
+            // shouldn't need an agent to remember to also flag it by hand.
+            // COALESCE keeps this a no-op if somehow already set (e.g. an
+            // agent had marked them registered some other way first).
+            try {
+              await pool.query(
+                `UPDATE users SET registered_at = COALESCE(registered_at, NOW()) WHERE phone = $1`,
+                [from]
+              );
+            } catch (funnelErr) {
+              console.error("Auto-mark registered_at error:", funnelErr.message);
+            }
+
             // No reference number shown here - it's a CMS-generated
             // tracking id with nothing the student can actually do with
             // it (they don't log in with it, nowhere asks for it later).
