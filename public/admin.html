@@ -247,7 +247,7 @@
 
   <div class="funnel-grid">
 
-    <div class="funnel-step funnel-step-1">
+    <div class="funnel-step funnel-step-1" style="cursor:pointer;" onclick="openFunnelModal('registrations')" title="Click to see students">
       <div class="funnel-step-num">1</div>
       <div class="funnel-top">
         <span>Registrations</span>
@@ -260,7 +260,7 @@
       <div class="funnel-drop" id="funnelDrop1">Starting point</div>
     </div>
 
-    <div class="funnel-step funnel-step-2">
+    <div class="funnel-step funnel-step-2" style="cursor:pointer;" onclick="openFunnelModal('processing_fee')" title="Click to see students">
       <div class="funnel-step-num">2</div>
       <div class="funnel-top">
         <span>Processing Fee</span>
@@ -273,7 +273,7 @@
       <div class="funnel-drop" id="funnelDrop2">—</div>
     </div>
 
-    <div class="funnel-step funnel-step-3">
+    <div class="funnel-step funnel-step-3" style="cursor:pointer;" onclick="openFunnelModal('documents_submitted')" title="Click to see students">
       <div class="funnel-step-num">3</div>
       <div class="funnel-top">
         <span>Documents Submitted</span>
@@ -286,7 +286,7 @@
       <div class="funnel-drop" id="funnelDrop3">—</div>
     </div>
 
-    <div class="funnel-step funnel-step-4">
+    <div class="funnel-step funnel-step-4" style="cursor:pointer;" onclick="openFunnelModal('fee_paid')" title="Click to see students">
       <div class="funnel-step-num">4</div>
       <div class="funnel-top">
         <span>Fee Paid</span>
@@ -981,6 +981,42 @@
             <th>Phone</th>
             <th>Ad</th>
             <th>Date</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    </div>
+  </div>
+</div>
+
+<div id="funnelModal" class="profile-modal hidden">
+  <div class="profile-modal-card">
+    <div class="profile-modal-header">
+      <div>
+        <h2 id="funnelModalTitle">Registrations</h2>
+        <p id="funnelModalSub">Students who reached this stage</p>
+      </div>
+      <button class="profile-close-btn" onclick="closeFunnelModal()">×</button>
+    </div>
+
+    <div class="profile-modal-body">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="export-btn export-pill-btn" onclick="downloadFunnelCsv()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M6 10l6 6 6-6M5 21h14"/></svg>
+        Download List
+      </button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="styled-table" id="funnelModalTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Program</th>
+            <th>Current Stage</th>
+            <th>Last Updated</th>
           </tr>
         </thead>
         <tbody></tbody>

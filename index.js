@@ -6213,6 +6213,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       allTimeTopPrograms,
       recentLeads,
       funnelStats,
+      funnelStudents,
       callbackTotals,
       callbackRepeat,
       callbackStatuses,
@@ -6481,6 +6482,28 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
           )::int AS fee_paid
 
         FROM users
+      `),
+
+      // Per-student detail behind each of the 4 Admission Funnel cards -
+      // same population/predicates as funnelStats above (also deliberately
+      // NOT date-scoped, for the same reason), split into buckets
+      // client-side so each card's modal list count matches its stat
+      // number exactly.
+      pool.query(`
+        SELECT
+          phone, name, program,
+          registered_at, processing_fee_paid_at,
+          documents_submitted_at, admission_fee_paid_at
+        FROM users
+        WHERE registered_at IS NOT NULL
+           OR processing_fee_paid_at IS NOT NULL
+           OR documents_submitted_at IS NOT NULL
+           OR admission_fee_paid_at IS NOT NULL
+        ORDER BY COALESCE(
+          admission_fee_paid_at, documents_submitted_at,
+          processing_fee_paid_at, registered_at
+        ) DESC
+        LIMIT 3000
       `),
 
       pool.query(
@@ -6785,6 +6808,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         documentsSubmitted: funnelStats.rows[0].documents_submitted || 0,
         feePaid: funnelStats.rows[0].fee_paid || 0
       },
+      funnelStudents: funnelStudents.rows,
       
       callbackStats: {
         totalRequests: callbackTotals.rows[0].total_requests,

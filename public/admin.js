@@ -18,6 +18,8 @@ let registrationSuccessfulFull = [];
 let registrationFailedFull = [];
 let currentRegistrationModalType = "total";
 let metaAdLeadsFull = [];
+let funnelStudentsFull = [];
+let currentFunnelModalType = "registrations";
 
 function authHeaders(extraHeaders = {}) {
   return {
@@ -432,6 +434,7 @@ async function loadDashboard(range = "24h") {
     const stats = data.stats;
     const callback = data.callbackStats || {};
     const funnel = data.funnelStats || {};
+    funnelStudentsFull = data.funnelStudents || [];
     const responseStats = data.responseStats || {};
     const csat = data.csatStats || {};
     const botInterestStats = data.botInterestStats || [];
@@ -4492,6 +4495,12 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  const funnelModal = document.getElementById("funnelModal");
+  if (funnelModal && !funnelModal.classList.contains("hidden")) {
+    closeFunnelModal();
+    return;
+  }
+
   const profileModal = document.getElementById("profileModal");
   if (profileModal && !profileModal.classList.contains("hidden")) {
     closeProfileModal();
@@ -4524,6 +4533,10 @@ document.addEventListener("click", (event) => {
   }
   if (event.target.id === "metaAdLeadsModal") {
     closeMetaAdLeadsModal();
+    return;
+  }
+  if (event.target.id === "funnelModal") {
+    closeFunnelModal();
     return;
   }
   if (event.target.classList && event.target.classList.contains("confirm-modal-overlay")) {
@@ -4663,6 +4676,105 @@ function downloadMetaAdLeadsCsv() {
   const a = document.createElement("a");
   a.href = url;
   a.download = `meta-ad-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Highest stage each student has reached - same cascade the
+// export-leads CSV's "Funnel Stage" column uses, kept in sync so the
+// two never disagree on what a given timestamp combination means.
+function funnelStageLabel(row) {
+  if (row.admission_fee_paid_at) return "Fee Paid";
+  if (row.documents_submitted_at) return "Documents Submitted";
+  if (row.processing_fee_paid_at) return "Processing Fee Paid";
+  if (row.registered_at) return "Registered";
+  return "Not Started";
+}
+
+function funnelLastUpdated(row) {
+  return row.admission_fee_paid_at || row.documents_submitted_at
+    || row.processing_fee_paid_at || row.registered_at || null;
+}
+
+const FUNNEL_MODAL_CONFIG = {
+  registrations: {
+    title: "Registrations",
+    sub: "Every student who has registered (or progressed further)",
+    getRows: () => funnelStudentsFull.filter(r => r.registered_at || r.processing_fee_paid_at || r.documents_submitted_at || r.admission_fee_paid_at),
+    filename: "funnel-registrations"
+  },
+  processing_fee: {
+    title: "Processing Fee",
+    sub: "Students who have paid the processing fee (or progressed further)",
+    getRows: () => funnelStudentsFull.filter(r => r.processing_fee_paid_at || r.documents_submitted_at || r.admission_fee_paid_at),
+    filename: "funnel-processing-fee"
+  },
+  documents_submitted: {
+    title: "Documents Submitted",
+    sub: "Students who have submitted documents (or progressed further)",
+    getRows: () => funnelStudentsFull.filter(r => r.documents_submitted_at || r.admission_fee_paid_at),
+    filename: "funnel-documents-submitted"
+  },
+  fee_paid: {
+    title: "Fee Paid",
+    sub: "Students who have paid the admission fee",
+    getRows: () => funnelStudentsFull.filter(r => r.admission_fee_paid_at),
+    filename: "funnel-fee-paid"
+  }
+};
+
+function openFunnelModal(type) {
+  const config = FUNNEL_MODAL_CONFIG[type] || FUNNEL_MODAL_CONFIG.registrations;
+  currentFunnelModalType = type;
+
+  document.getElementById("funnelModalTitle").textContent = config.title;
+  const rows = config.getRows();
+  document.getElementById("funnelModalSub").textContent =
+    `${config.sub} · ${rows.length} student${rows.length === 1 ? "" : "s"}`;
+
+  const tbody = document.querySelector("#funnelModalTable tbody");
+  tbody.innerHTML = rows.length
+    ? rows.map(r => `
+      <tr>
+        <td>${escapeHtml(r.name || "-")}</td>
+        <td>${escapeHtml(r.phone || "-")}</td>
+        <td>${escapeHtml(prettyProgramName(r.program || "-"))}</td>
+        <td>${escapeHtml(funnelStageLabel(r))}</td>
+        <td>${formatDateTime(funnelLastUpdated(r))}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="5" style="color:var(--muted);">No students in this category yet.</td></tr>`;
+
+  document.getElementById("funnelModal").classList.remove("hidden");
+}
+
+function closeFunnelModal() {
+  const modal = document.getElementById("funnelModal");
+  if (modal) modal.classList.add("hidden");
+}
+
+function downloadFunnelCsv() {
+  const config = FUNNEL_MODAL_CONFIG[currentFunnelModalType] || FUNNEL_MODAL_CONFIG.registrations;
+  const rows = config.getRows();
+
+  const csvEscape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+  const header = ["Name", "Phone", "Program", "Current Stage", "Last Updated"].join(",");
+  const body = rows.map(r => [
+    csvEscape(r.name || "-"),
+    csvEscape(r.phone || "-"),
+    csvEscape(prettyProgramName(r.program || "-")),
+    csvEscape(funnelStageLabel(r)),
+    csvEscape(formatDateTime(funnelLastUpdated(r)))
+  ].join(",")).join("\n");
+
+  const csv = `${header}\n${body}`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${config.filename}-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
