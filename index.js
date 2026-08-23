@@ -3746,6 +3746,52 @@ app.post("/webhook", async (req, res) => {
     const from = msg.from;
     const contactName = contact?.profile?.name || null;
 
+    // Click-to-WhatsApp Meta ad attribution. WhatsApp's Cloud API includes
+    // a "referral" object, at no extra API/permission cost, on the very
+    // first message of a conversation that started from clicking a
+    // Facebook/Instagram "Click to WhatsApp" ad. Recorded once per phone
+    // in its own audit table (meta_ad_leads) - the chat itself proceeds
+    // completely normally below, nothing here changes how it's handled.
+    // Also auto-queues a callback request so a Call Agent gets the lead
+    // too, on top of the normal bot/Chat Agent conversation - two
+    // engagement layers on the same lead, per explicit request.
+    if (msg.referral) {
+      try {
+        const alreadyLogged = await pool.query(
+          "SELECT id FROM meta_ad_leads WHERE phone = $1 LIMIT 1",
+          [from]
+        );
+
+        if (!alreadyLogged.rows.length) {
+          await pool.query(
+            `
+            INSERT INTO meta_ad_leads (phone, name, ad_headline, ad_body, source_url, ctwa_clid)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            `,
+            [
+              from,
+              contactName,
+              msg.referral.headline || null,
+              msg.referral.body || null,
+              msg.referral.source_url || null,
+              msg.referral.ctwa_clid || null
+            ]
+          );
+
+          // createCallbackRequest() updates existing users/chats rows -
+          // this runs before createUserIfNotExists() further down (this is
+          // almost always this phone's very first-ever message), so make
+          // sure both rows exist first or its UPDATEs would silently match
+          // nothing and the callback would never actually get queued.
+          await createUserIfNotExists(from, contactName);
+          await upsertChat(from, "New Meta ad lead", "active");
+          await createCallbackRequest(from);
+        }
+      } catch (adLeadErr) {
+        console.error("meta_ad_leads capture error:", adLeadErr.message);
+      }
+    }
+
     // CSAT button tap ("csat_good"/"csat_bad" sent from switch-mode's
     // reply-buttons prompt). Handled in complete isolation, before the
     // bot state machine below ever sees this message - it is not a menu
@@ -6180,7 +6226,9 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       leadCaptureCompleted,
       registrationTotals,
       registrationTopPrograms,
-      registrationAttempts
+      registrationAttempts,
+      metaAdLeadsTotal,
+      metaAdLeadsList
     ] = await Promise.all([
       pool.query(
         `
@@ -6683,6 +6731,30 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         LIMIT 2000
         `,
         queryParams
+      ),
+
+      // Meta Ad Leads panel - students whose conversation started from
+      // clicking a Click-to-WhatsApp ad (see the "referral" capture in the
+      // webhook handler). One row per phone by construction (meta_ad_leads
+      // only ever gets one insert per phone), so no dedup needed here.
+      pool.query(
+        `
+        SELECT COUNT(*)::int AS count
+        FROM meta_ad_leads
+        WHERE ${whereCreated}
+        `,
+        queryParams
+      ),
+
+      pool.query(
+        `
+        SELECT phone, name, ad_headline, ad_body, created_at
+        FROM meta_ad_leads
+        WHERE ${whereCreated}
+        ORDER BY created_at DESC
+        LIMIT 2000
+        `,
+        queryParams
       )
     ]);
 
@@ -6764,6 +6836,11 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         failed: registrationTotals.rows[0].failed || 0,
         topPrograms: registrationTopPrograms.rows,
         attempts: registrationAttempts.rows
+      },
+
+      metaAdLeads: {
+        total: metaAdLeadsTotal.rows[0].count || 0,
+        leads: metaAdLeadsList.rows
       }
     });
 
@@ -7246,6 +7323,35 @@ app.listen(3000, async () => {
     console.log("✅ mul_registrations table ensured in DB");
   } catch (err) {
     console.error("❌ mul_registrations table error:", err.message);
+  }
+
+  // 🔥 META AD LEADS TABLE AUTO CREATE
+  // Own record of every conversation that started from a "Click to
+  // WhatsApp" Meta ad (Facebook/Instagram), captured from the "referral"
+  // object WhatsApp's Cloud API includes on that first message - see the
+  // detection block in the webhook handler. Independent of the normal
+  // chats/users tables so these leads keep showing up as completely
+  // normal chats, with this as a separate audit trail on the side.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS meta_ad_leads (
+        id SERIAL PRIMARY KEY,
+        phone VARCHAR(30) NOT NULL,
+        name TEXT,
+        ad_headline TEXT,
+        ad_body TEXT,
+        source_url TEXT,
+        ctwa_clid TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_meta_ad_leads_phone ON meta_ad_leads (phone);
+    `);
+
+    console.log("✅ meta_ad_leads table ensured in DB");
+  } catch (err) {
+    console.error("❌ meta_ad_leads table error:", err.message);
   }
 
   // 🔥 START 24H FOLLOW-UP CHECKER

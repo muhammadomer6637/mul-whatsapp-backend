@@ -17,6 +17,7 @@ let registrationAttemptsFull = [];
 let registrationSuccessfulFull = [];
 let registrationFailedFull = [];
 let currentRegistrationModalType = "total";
+let metaAdLeadsFull = [];
 
 function authHeaders(extraHeaders = {}) {
   return {
@@ -723,6 +724,10 @@ document.getElementById("agentCategoryStats").innerHTML =
       const normalizedRegistrationPrograms = normalizeProgramsForDisplay(registrationPrograms);
       registrationProgramsWrap.innerHTML = renderRankedProgramRows(normalizedRegistrationPrograms, { limit: 5 });
     }
+
+    const metaAdPerf = data.metaAdLeads || { total: 0, leads: [] };
+    metaAdLeadsFull = metaAdPerf.leads || [];
+    document.getElementById("metaAdLeadsValue").textContent = metaAdPerf.total;
 
     const funnelRegistrations = Number(funnel.registrations || 0);
 const funnelProcessingFee = Number(funnel.processingFee || 0);
@@ -4481,6 +4486,12 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  const metaAdLeadsModal = document.getElementById("metaAdLeadsModal");
+  if (metaAdLeadsModal && !metaAdLeadsModal.classList.contains("hidden")) {
+    closeMetaAdLeadsModal();
+    return;
+  }
+
   const profileModal = document.getElementById("profileModal");
   if (profileModal && !profileModal.classList.contains("hidden")) {
     closeProfileModal();
@@ -4509,6 +4520,10 @@ document.addEventListener("click", (event) => {
   }
   if (event.target.id === "registrationModal") {
     closeRegistrationModal();
+    return;
+  }
+  if (event.target.id === "metaAdLeadsModal") {
+    closeMetaAdLeadsModal();
     return;
   }
   if (event.target.classList && event.target.classList.contains("confirm-modal-overlay")) {
@@ -4602,6 +4617,52 @@ function downloadRegistrationCsv() {
   const a = document.createElement("a");
   a.href = url;
   a.download = `${config.filename}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function openMetaAdLeadsModal() {
+  document.getElementById("metaAdLeadsModalSub").textContent =
+    `${metaAdLeadsFull.length} lead${metaAdLeadsFull.length === 1 ? "" : "s"} from Click-to-WhatsApp ads in the selected period`;
+
+  const tbody = document.querySelector("#metaAdLeadsModalTable tbody");
+  tbody.innerHTML = metaAdLeadsFull.length
+    ? metaAdLeadsFull.map(r => `
+      <tr>
+        <td>${escapeHtml(r.name || "-")}</td>
+        <td>${escapeHtml(r.phone || "-")}</td>
+        <td>${escapeHtml(r.ad_headline || r.ad_body || "-")}</td>
+        <td>${formatDateTime(r.created_at)}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="4" style="color:var(--muted);">No Meta ad leads in this period.</td></tr>`;
+
+  document.getElementById("metaAdLeadsModal").classList.remove("hidden");
+}
+
+function closeMetaAdLeadsModal() {
+  const modal = document.getElementById("metaAdLeadsModal");
+  if (modal) modal.classList.add("hidden");
+}
+
+function downloadMetaAdLeadsCsv() {
+  const csvEscape = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+  const header = ["Name", "Phone", "Ad", "Date"].join(",");
+  const body = metaAdLeadsFull.map(r => [
+    csvEscape(r.name || "-"),
+    csvEscape(r.phone || "-"),
+    csvEscape(r.ad_headline || r.ad_body || "-"),
+    csvEscape(formatDateTime(r.created_at))
+  ].join(",")).join("\n");
+
+  const csv = `${header}\n${body}`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `meta-ad-leads-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

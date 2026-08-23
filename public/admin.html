@@ -435,6 +435,26 @@
   <div id="registrationTopProgramsList" class="program-bars"></div>
 </div>
 
+<div class="panel" id="metaAdLeadsPanel" style="margin-top: 22px; margin-bottom: 28px;">
+  <div class="panel-header">
+    <div>
+      <h3>Meta Ad Leads</h3>
+      <p>Conversations that started from a Click-to-WhatsApp ad (Facebook/Instagram) - also auto-queued as a callback request</p>
+    </div>
+  </div>
+
+  <div class="stat-cluster-grid" style="grid-template-columns:repeat(1,1fr);max-width:280px;">
+    <div class="stat-card cb-tone-info leads-clickable-card" onclick="openMetaAdLeadsModal()">
+      <div class="stat-card-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>
+      </div>
+      <div class="label">Meta Ad Leads</div>
+      <div class="value" id="metaAdLeadsValue">0</div>
+      <div class="meta">Captured in selected period · click to view</div>
+    </div>
+  </div>
+</div>
+
         <div class="content-grid">
           <div class="panel panel-large">
             <div class="panel-header">
@@ -925,6 +945,41 @@
             <th>Program</th>
             <th>Status</th>
             <th>Error</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    </div>
+  </div>
+</div>
+
+<div id="metaAdLeadsModal" class="profile-modal hidden">
+  <div class="profile-modal-card">
+    <div class="profile-modal-header">
+      <div>
+        <h2>Meta Ad Leads</h2>
+        <p id="metaAdLeadsModalSub">Conversations that started from a Click-to-WhatsApp ad in the selected period</p>
+      </div>
+      <button class="profile-close-btn" onclick="closeMetaAdLeadsModal()">×</button>
+    </div>
+
+    <div class="profile-modal-body">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="export-btn export-pill-btn" onclick="downloadMetaAdLeadsCsv()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M6 10l6 6 6-6M5 21h14"/></svg>
+        Download List
+      </button>
+    </div>
+
+    <div class="table-wrap">
+      <table class="styled-table" id="metaAdLeadsModalTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Ad</th>
             <th>Date</th>
           </tr>
         </thead>
