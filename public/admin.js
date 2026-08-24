@@ -2070,6 +2070,12 @@ const filteredCallbacks =
           ${escapeHtml(item.phone || "-")} · ${escapeHtml(prettyProgramName(item.program || "-"))}
         </div>
 
+        ${
+          item.source === "meta_ad"
+            ? `<div class="repeat-badge" style="background:rgba(24,119,242,0.16); color:#8fc0ff; border-color:rgba(24,119,242,0.3);" title="From a Click-to-WhatsApp ad - they did not explicitly request a callback">🎯 From Meta Ad - didn't request a callback</div>`
+            : ""
+        }
+
         <div class="field-label">Status</div>
         <select
           class="callback-select"

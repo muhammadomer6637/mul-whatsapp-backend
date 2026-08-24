@@ -1005,7 +1005,13 @@ async function getUserByPhone(phone) {
   }
 }
 
-async function createCallbackRequest(phone) {
+// source: "student_request" (default - student explicitly asked for a
+// call, typed "call me back", etc) or "meta_ad" (proactively queued
+// because their conversation started from a Click-to-WhatsApp ad - they
+// never actually asked for a callback). Surfaced to Call Agents in
+// /api/callbacks so they don't open a call with "you requested a
+// callback" when the student never said that.
+async function createCallbackRequest(phone, source = "student_request") {
   try {
     const userResult = await pool.query(
       `
@@ -1050,13 +1056,15 @@ async function createCallbackRequest(phone) {
           first_response_at = NULL,
           first_response_seconds = NULL,
           first_response_status = NULL,
-          first_response_agent_id = NULL
+          first_response_agent_id = NULL,
+          source = $4
         WHERE id = $1
         `,
         [
           existing.id,
           user.name || null,
-          user.program || null
+          user.program || null,
+          source
         ]
       );
 
@@ -1072,15 +1080,17 @@ async function createCallbackRequest(phone) {
           request_count,
           is_repeat,
           created_at,
-          updated_at
+          updated_at,
+          source
         )
-        VALUES ($1, $2, $3, 'pending', 1, false, NOW(), NOW())
+        VALUES ($1, $2, $3, 'pending', 1, false, NOW(), NOW(), $4)
         RETURNING id
         `,
         [
           phone,
           user.name || null,
-          user.program || null
+          user.program || null,
+          source
         ]
       );
 
@@ -2811,6 +2821,7 @@ app.get(
           cb.first_response_seconds,
           cb.first_response_status,
           cb.first_response_agent_id,
+          cb.source,
           a.name AS assigned_call_agent
         FROM callback_requests cb
         LEFT JOIN agents a
@@ -3785,7 +3796,7 @@ app.post("/webhook", async (req, res) => {
           // nothing and the callback would never actually get queued.
           await createUserIfNotExists(from, contactName);
           await upsertChat(from, "New Meta ad lead", "active");
-          await createCallbackRequest(from);
+          await createCallbackRequest(from, "meta_ad");
         }
       } catch (adLeadErr) {
         console.error("meta_ad_leads capture error:", adLeadErr.message);
@@ -7376,6 +7387,22 @@ app.listen(3000, async () => {
     console.log("✅ meta_ad_leads table ensured in DB");
   } catch (err) {
     console.error("❌ meta_ad_leads table error:", err.message);
+  }
+
+  // 🔥 CALLBACK REQUESTS SOURCE COLUMN AUTO ADD
+  // Distinguishes a genuine student-requested callback from one we
+  // proactively queued ourselves (currently just Meta ad leads) - lets
+  // Call Agents see, right on the card, that the student never actually
+  // asked for a call, so they don't open with "you requested a callback".
+  try {
+    await pool.query(`
+      ALTER TABLE callback_requests
+      ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'student_request';
+    `);
+
+    console.log("✅ callback_requests.source column ensured in DB");
+  } catch (err) {
+    console.error("❌ callback_requests.source column error:", err.message);
   }
 
   // 🔥 START 24H FOLLOW-UP CHECKER
