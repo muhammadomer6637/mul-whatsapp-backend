@@ -5361,6 +5361,20 @@ app.post("/api/toggle-agent", authenticateAgent, async (req, res) => {
       });
     }
 
+    // Skip the write (and the log entry below) if this isn't an actual
+    // change - guards against a double-fired request writing/logging the
+    // same value twice, which was flooding Agent Availability Today with
+    // near-duplicate 0m entries.
+    const current = await pool.query(
+      "SELECT value FROM system_settings WHERE key = 'agent_available'"
+    );
+    const currentStatus = current.rows[0]?.value === "true";
+    const newStatus = !!status;
+
+    if (currentStatus === newStatus) {
+      return res.json({ success: true, unchanged: true });
+    }
+
     await pool.query(
       "UPDATE system_settings SET value = $1 WHERE key = 'agent_available'",
       [status ? "true" : "false"]

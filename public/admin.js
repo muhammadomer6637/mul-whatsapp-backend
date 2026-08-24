@@ -329,16 +329,23 @@ if (toggle) {
 }
 
 async function toggleAgent() {
-  const res = await fetch(`${BASE}/api/agent-status`, {
-  headers: authHeaders()
-});
-  const data = await res.json();
+  // Was: GET the current server-side status, then POST its opposite -
+  // a classic stale-read race. The checkbox's own .checked is already
+  // the new value the instant this onchange fires (the browser flips it
+  // on click before this handler ever runs), so use that directly
+  // instead of a separate read-then-invert round-trip. Fixes both
+  // "toggled but didn't seem to take" (a second quick click could read
+  // the same stale status the first call did and re-send the same
+  // value) and the flood of near-duplicate entries in Agent Availability
+  // Today that came from those redundant writes.
+  const toggle = document.getElementById("agentToggleSwitch");
+  if (!toggle) return;
 
-  const newStatus = !data.status;
+  const newStatus = toggle.checked;
 
   await fetch(`${BASE}/api/toggle-agent`, {
     method: "POST",
-   headers: authHeaders({ "Content-Type": "application/json" }),
+    headers: authHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ status: newStatus })
   });
 
