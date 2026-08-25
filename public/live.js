@@ -320,6 +320,7 @@ function openChat(phone) {
 function startLive() {
   loadChats();
   loadAgentAvailability();
+  refreshPushBarState();
   if (!pollIntervalId) {
     pollIntervalId = setInterval(loadChats, 15000);
   }
@@ -360,6 +361,96 @@ async function toggleAgentAvailability() {
     loadAgentAvailability();
   } catch (error) {
     console.error("toggleAgentAvailability error:", error);
+  }
+}
+
+// ---- Push Notifications ----
+// Same logic as admin.js's push functions (see there for the fuller
+// comments) - kept as a separate copy since live.js runs unbundled and
+// standalone from admin.js, same trade-off already accepted for
+// lib/programMatcher.js's duplicate in admin.js.
+function urlBase64ToUint8ArrayLive(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+async function getPushSubscriptionStateLive() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  const registration = await navigator.serviceWorker.ready;
+  return registration.pushManager.getSubscription();
+}
+
+async function refreshPushBarState() {
+  const sub = document.getElementById("pushNotifSub");
+  if (!sub) return;
+
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    sub.textContent = "Not supported on this browser";
+    return;
+  }
+
+  const existing = await getPushSubscriptionStateLive();
+  sub.textContent = existing
+    ? "Enabled - tap to turn off"
+    : "Get alerted for new chats even when this app is closed";
+}
+
+async function togglePushNotifications() {
+  const sub = document.getElementById("pushNotifSub");
+  try {
+    const existingSub = await getPushSubscriptionStateLive();
+
+    if (existingSub) {
+      await fetch("/api/push/unsubscribe", {
+        method: "POST",
+        headers: authHeadersLive({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ endpoint: existingSub.endpoint })
+      });
+      await existingSub.unsubscribe();
+      refreshPushBarState();
+      return;
+    }
+
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      if (sub) sub.textContent = "Not supported on this browser";
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      if (sub) sub.textContent = "Permission denied - enable it in browser settings";
+      return;
+    }
+
+    const keyRes = await fetch("/api/push/vapid-public-key", { headers: authHeadersLive() });
+    const keyData = await keyRes.json();
+    if (!keyData.success) {
+      if (sub) sub.textContent = "Not configured on the server yet";
+      return;
+    }
+
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8ArrayLive(keyData.publicKey)
+    });
+
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: authHeadersLive({ "Content-Type": "application/json" }),
+      body: JSON.stringify(subscription.toJSON())
+    });
+
+    refreshPushBarState();
+  } catch (error) {
+    console.error("togglePushNotifications error:", error);
+    if (sub) sub.textContent = "Something went wrong - try again";
   }
 }
 

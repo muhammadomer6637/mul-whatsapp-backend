@@ -17,6 +17,7 @@ const {
   escapeRegExpLiteral: pmEscapeRegExp
 } = require("./lib/programMatcher");
 const { getMulProgramId } = require("./lib/mulProgramIds");
+const webpush = require("web-push");
 
 const app = express();
 app.use(express.json());
@@ -54,6 +55,23 @@ const MUL_REGISTRATION_API_KEY = process.env.MUL_REGISTRATION_API_KEY;
 // admission.mul.edu.pk). An env var, not hardcoded, in case MUL ever
 // renumbers their dropdown options - no redeploy needed to fix it then.
 const MUL_SOURCE_OF_INFORMATION_WHATSAPP = process.env.MUL_SOURCE_OF_INFORMATION_WHATSAPP || "16";
+
+// Push Notifications (Web Push, no native app) - lets agents get a
+// real-time alert on their phone/laptop for new agent-relevant messages
+// even when admin.html/live.html isn't open. VAPID_PUBLIC_KEY is also
+// handed to the browser via /api/push/vapid-public-key. Both must be set
+// (a matched pair, generated together) or push is treated as disabled -
+// same "both-or-neither" env var pattern as the registration flow.
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:admin@mulnexus.online";
+const pushEnabled = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+
+if (pushEnabled) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+} else {
+  console.warn("⚠️ Push notifications disabled - VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY not set");
+}
 
 // WhatsApp Flows data-exchange encryption (Meta's spec: RSA-OAEP-SHA256 for
 // the AES key, AES-128-GCM for the payload, response IV is the bitwise
@@ -804,6 +822,55 @@ function notifyChatUpdated(phone) {
     phone,
     time: new Date().toISOString()
   });
+}
+
+// Sends one push notification, cleaning up the subscription if the
+// browser reports it's gone (404/410 - user uninstalled, cleared site
+// data, or revoked permission) so it doesn't get retried forever.
+async function sendPushToSubscription(sub, payload) {
+  try {
+    await webpush.sendNotification(
+      { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+      JSON.stringify(payload)
+    );
+  } catch (err) {
+    if (err.statusCode === 404 || err.statusCode === 410) {
+      await pool.query("DELETE FROM push_subscriptions WHERE id = $1", [sub.id]).catch(() => {});
+    } else {
+      console.error("web-push send error:", err.message);
+    }
+  }
+}
+
+async function sendPushToAgents(agentIds, payload) {
+  if (!pushEnabled || !agentIds || !agentIds.length) return;
+  try {
+    const result = await pool.query(
+      "SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE agent_id = ANY($1::int[])",
+      [agentIds]
+    );
+    await Promise.all(result.rows.map(sub => sendPushToSubscription(sub, payload)));
+  } catch (err) {
+    console.error("sendPushToAgents error:", err.message);
+  }
+}
+
+// Broadcasts to every subscribed admin/chat_agent - used for "a student
+// needs an agent" type events where any available agent can pick it up,
+// as opposed to a message in a chat already assigned to one specific agent.
+async function sendPushToAllAvailableAgents(payload) {
+  if (!pushEnabled) return;
+  try {
+    const result = await pool.query(`
+      SELECT ps.id, ps.endpoint, ps.p256dh, ps.auth
+      FROM push_subscriptions ps
+      JOIN agents a ON a.id = ps.agent_id
+      WHERE a.role IN ('admin', 'chat_agent')
+    `);
+    await Promise.all(result.rows.map(sub => sendPushToSubscription(sub, payload)));
+  } catch (err) {
+    console.error("sendPushToAllAvailableAgents error:", err.message);
+  }
 }
 
 // =========================
@@ -4582,11 +4649,12 @@ If comma is missing, your request may not be forwarded correctly.`
     });
 
 const existingChatResult = await pool.query(
-  "SELECT status FROM chats WHERE phone = $1 LIMIT 1",
+  "SELECT status, assigned_agent_id FROM chats WHERE phone = $1 LIMIT 1",
   [from]
 );
 
 const existingChatStatus = existingChatResult.rows[0]?.status;
+const existingAssignedAgentId = existingChatResult.rows[0]?.assigned_agent_id;
 
 const incomingChatStatus =
   currentMode === "agent"
@@ -4596,6 +4664,28 @@ const incomingChatStatus =
     : "active";
 
 await incrementUnreadAndSetIncoming(from, incomingText, incomingChatStatus);
+
+// Push Notifications - fire-and-forget (don't hold up the webhook
+// response on an external push-service call). Two cases only, to avoid
+// spamming agents on every bot-mode message: a new message in a chat
+// already assigned to a specific agent (notify just them), or a chat
+// newly entering agent_waiting that wasn't already waiting (notify
+// every available agent, since anyone can pick it up).
+if (currentMode === "agent") {
+  if (incomingChatStatus === "agent_active" && existingAssignedAgentId) {
+    sendPushToAgents([existingAssignedAgentId], {
+      title: contactName || from,
+      body: incomingText,
+      url: "/admin.html"
+    }).catch(err => console.error("push (agent_active) error:", err.message));
+  } else if (incomingChatStatus === "agent_waiting" && existingChatStatus !== "agent_waiting") {
+    sendPushToAllAvailableAgents({
+      title: "New chat request",
+      body: `${contactName || from} needs an agent`,
+      url: "/admin.html"
+    }).catch(err => console.error("push (agent_waiting) error:", err.message));
+  }
+}
 
     if (
       currentMode === "agent" &&
@@ -5331,6 +5421,63 @@ Please choose one of the following options:
       error.response?.data || error.message || error
     );
     return res.sendStatus(500);
+  }
+});
+
+// =========================
+// PUSH NOTIFICATIONS
+// =========================
+
+// Public key the browser needs to create a subscription - not a secret,
+// safe to hand to any authenticated agent.
+app.get("/api/push/vapid-public-key", authenticateAgent, async (req, res) => {
+  if (!pushEnabled) {
+    return res.status(503).json({ success: false, error: "Push notifications not configured" });
+  }
+  return res.json({ success: true, publicKey: VAPID_PUBLIC_KEY });
+});
+
+app.post("/api/push/subscribe", authenticateAgent, async (req, res) => {
+  try {
+    const { endpoint, keys } = req.body;
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      return res.status(400).json({ success: false, error: "Invalid subscription" });
+    }
+
+    // One row per browser/device (endpoint is unique per subscription) -
+    // re-subscribing (e.g. after clearing site data) just replaces which
+    // agent it's tied to and refreshes the keys, rather than erroring.
+    await pool.query(
+      `
+      INSERT INTO push_subscriptions (agent_id, endpoint, p256dh, auth)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (endpoint) DO UPDATE SET
+        agent_id = EXCLUDED.agent_id,
+        p256dh = EXCLUDED.p256dh,
+        auth = EXCLUDED.auth
+      `,
+      [req.agent.id, endpoint, keys.p256dh, keys.auth]
+    );
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("POST /api/push/subscribe error:", error.message);
+    return res.status(500).json({ success: false, error: "Failed to save subscription" });
+  }
+});
+
+app.post("/api/push/unsubscribe", authenticateAgent, async (req, res) => {
+  try {
+    const { endpoint } = req.body;
+    if (!endpoint) {
+      return res.status(400).json({ success: false, error: "endpoint is required" });
+    }
+
+    await pool.query("DELETE FROM push_subscriptions WHERE endpoint = $1", [endpoint]);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("POST /api/push/unsubscribe error:", error.message);
+    return res.status(500).json({ success: false, error: "Failed to remove subscription" });
   }
 });
 
@@ -7417,6 +7564,32 @@ app.listen(3000, async () => {
     console.log("✅ callback_requests.source column ensured in DB");
   } catch (err) {
     console.error("❌ callback_requests.source column error:", err.message);
+  }
+
+  // 🔥 PUSH SUBSCRIPTIONS TABLE AUTO CREATE
+  // One row per browser/device an agent has enabled Push Notifications on
+  // (an agent using both their phone and laptop gets two rows). endpoint
+  // is unique per subscription - a device re-subscribing (new browser
+  // profile, cleared site data) just replaces the row via ON CONFLICT in
+  // /api/push/subscribe rather than duplicating it.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id SERIAL PRIMARY KEY,
+        agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_push_subscriptions_agent_id ON push_subscriptions (agent_id);
+    `);
+
+    console.log("✅ push_subscriptions table ensured in DB");
+  } catch (err) {
+    console.error("❌ push_subscriptions table error:", err.message);
   }
 
   // 🔥 START 24H FOLLOW-UP CHECKER

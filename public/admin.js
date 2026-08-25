@@ -316,6 +316,94 @@ function setRange(button, range) {
   loadDashboard(range);
 }
 
+// ---- Push Notifications ----
+// VAPID public key comes from the server as a base64url string - the
+// Push API needs it as a raw Uint8Array, hence this standard conversion.
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+async function getPushSubscriptionState() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  const registration = await navigator.serviceWorker.ready;
+  return registration.pushManager.getSubscription();
+}
+
+async function refreshPushButtonState() {
+  const btn = document.getElementById("pushNotifBtn");
+  if (!btn) return;
+
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    btn.textContent = "🔔 Push Not Supported On This Browser";
+    btn.disabled = true;
+    return;
+  }
+
+  const sub = await getPushSubscriptionState();
+  btn.textContent = sub ? "🔔 Push Notifications: On (tap to turn off)" : "🔔 Enable Push Notifications";
+}
+
+async function togglePushNotifications() {
+  try {
+    const existingSub = await getPushSubscriptionState();
+
+    if (existingSub) {
+      await fetch(`${BASE}/api/push/unsubscribe`, {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ endpoint: existingSub.endpoint })
+      });
+      await existingSub.unsubscribe();
+      notify("Push notifications turned off", "success");
+      refreshPushButtonState();
+      return;
+    }
+
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      notify("This browser doesn't support push notifications", "warning");
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      notify("Notification permission was not granted", "warning");
+      return;
+    }
+
+    const keyRes = await fetch(`${BASE}/api/push/vapid-public-key`, { headers: authHeaders() });
+    const keyData = await keyRes.json();
+    if (!keyData.success) {
+      notify("Push notifications aren't configured on the server yet", "warning");
+      return;
+    }
+
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(keyData.publicKey)
+    });
+
+    await fetch(`${BASE}/api/push/subscribe`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(subscription.toJSON())
+    });
+
+    notify("Push notifications enabled", "success");
+    refreshPushButtonState();
+  } catch (error) {
+    console.error("togglePushNotifications error:", error);
+    notify("Failed to update push notification settings", "error");
+  }
+}
+
 async function loadAgentStatus() {
   const res = await fetch(`${BASE}/api/agent-status`, {
   headers: authHeaders()
@@ -4183,6 +4271,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   checkAuth();
+  refreshPushButtonState();
 
   // =========================
   // REAL-TIME SSE LISTENER
