@@ -342,9 +342,14 @@ async function loadAgentAvailability() {
 
 async function toggleAgentAvailability() {
   try {
-    const statusRes = await fetch("/api/agent-status", { headers: authHeadersLive() });
-    const statusData = await statusRes.json();
-    const newStatus = !statusData.status;
+    // Was: GET the current server-side status, then POST its opposite -
+    // the same stale-read race fixed in admin.js's toggleAgent(). Use the
+    // checkbox's own .checked (already the correct new value the instant
+    // onchange fires) instead of a separate GET-then-invert round-trip.
+    const toggle = document.getElementById("agentAvailabilityToggle");
+    if (!toggle) return;
+
+    const newStatus = toggle.checked;
 
     await fetch("/api/toggle-agent", {
       method: "POST",
