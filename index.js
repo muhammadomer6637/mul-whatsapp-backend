@@ -86,7 +86,15 @@ const emailEnabled = !!(EMAIL_USER && EMAIL_APP_PASSWORD);
 const emailTransporter = emailEnabled
   ? nodemailer.createTransport({
       service: "gmail",
-      auth: { user: EMAIL_USER, pass: EMAIL_APP_PASSWORD }
+      auth: { user: EMAIL_USER, pass: EMAIL_APP_PASSWORD },
+      // Some hosts (Railway included) block/drop outbound SMTP silently -
+      // the TCP connection just never completes instead of failing
+      // cleanly, which without these left sendMail() hanging forever (no
+      // response, no error - confirmed live). Fail fast instead so
+      // sendEmail() always resolves one way or another within ~10s.
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000
     })
   : null;
 
