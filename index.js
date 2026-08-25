@@ -18,6 +18,7 @@ const {
 } = require("./lib/programMatcher");
 const { getMulProgramId } = require("./lib/mulProgramIds");
 const webpush = require("web-push");
+const nodemailer = require("nodemailer");
 
 const app = express();
 app.use(express.json());
@@ -71,6 +72,45 @@ if (pushEnabled) {
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 } else {
   console.warn("⚠️ Push notifications disabled - VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY not set");
+}
+
+// Outgoing email (Gmail SMTP via a dedicated @mul.edu.pk mailbox + App
+// Password - not the personal inbox of anyone on the team). Used for
+// agent password resets now; the student-survey email feature planned
+// next will reuse this same transporter.
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_APP_PASSWORD = process.env.EMAIL_APP_PASSWORD;
+const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || "MUL Nexus";
+const emailEnabled = !!(EMAIL_USER && EMAIL_APP_PASSWORD);
+
+const emailTransporter = emailEnabled
+  ? nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: EMAIL_USER, pass: EMAIL_APP_PASSWORD }
+    })
+  : null;
+
+if (!emailEnabled) {
+  console.warn("⚠️ Email sending disabled - EMAIL_USER/EMAIL_APP_PASSWORD not set");
+}
+
+async function sendEmail({ to, subject, html }) {
+  if (!emailEnabled) {
+    console.error("sendEmail called but email is not configured");
+    return { success: false, error: "Email not configured" };
+  }
+  try {
+    await emailTransporter.sendMail({
+      from: `"${EMAIL_FROM_NAME}" <${EMAIL_USER}>`,
+      to,
+      subject,
+      html
+    });
+    return { success: true };
+  } catch (err) {
+    console.error("sendEmail error:", err.message);
+    return { success: false, error: err.message };
+  }
 }
 
 // WhatsApp Flows data-exchange encryption (Meta's spec: RSA-OAEP-SHA256 for
@@ -2355,6 +2395,119 @@ app.post("/api/login", async (req, res) => {
       success: false,
       error: "Login failed"
     });
+  }
+});
+
+// FORGOT PASSWORD - sends a reset link to the agent's email on file.
+// Deliberately specific error messages (no email on file / account not
+// found) rather than a generic "if this account exists" response - this
+// is a small internal team, not a public sign-up, so the usual
+// enumeration-prevention trade-off isn't worth the extra support burden
+// of agents not knowing why nothing arrived.
+app.post("/api/forgot-password", async (req, res) => {
+  try {
+    const { username } = req.body;
+    if (!username || !String(username).trim()) {
+      return res.status(400).json({ success: false, error: "Username is required" });
+    }
+
+    const result = await pool.query(
+      "SELECT id, name, email FROM agents WHERE username = $1 AND active = true LIMIT 1",
+      [String(username).trim()]
+    );
+    const agent = result.rows[0];
+
+    if (!agent) {
+      return res.status(404).json({ success: false, error: "No account found with that username" });
+    }
+
+    if (!agent.email) {
+      return res.status(400).json({
+        success: false,
+        error: "No email is on file for this account - ask an admin to reset your password, or add an email to your profile first"
+      });
+    }
+
+    if (!emailEnabled) {
+      return res.status(503).json({ success: false, error: "Email sending isn't configured yet - ask an admin to reset your password directly" });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+    await pool.query(
+      "INSERT INTO password_reset_tokens (agent_id, token_hash, expires_at) VALUES ($1, $2, $3)",
+      [agent.id, tokenHash, expiresAt]
+    );
+
+    const resetUrl = `${BASE_URL}/reset-password.html?token=${rawToken}`;
+
+    const emailResult = await sendEmail({
+      to: agent.email,
+      subject: "Reset your MUL Nexus password",
+      html: `
+        <p>Hi ${agent.name || ""},</p>
+        <p>Someone requested a password reset for your MUL Nexus account. Click the button below to set a new password - this link expires in 30 minutes.</p>
+        <p><a href="${resetUrl}" style="display:inline-block;background:#2f7df6;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">Reset Password</a></p>
+        <p>If you didn't request this, you can safely ignore this email - your password won't change unless you click the link above and set a new one.</p>
+        <p style="color:#888;font-size:12px;">MUL Nexus Admissions System</p>
+      `
+    });
+
+    if (!emailResult.success) {
+      return res.status(500).json({ success: false, error: "Failed to send reset email - please try again" });
+    }
+
+    return res.json({ success: true, message: `Reset link sent to ${agent.email}` });
+  } catch (error) {
+    console.error("POST /api/forgot-password error:", error.message);
+    return res.status(500).json({ success: false, error: "Failed to process request" });
+  }
+});
+
+app.post("/api/reset-password", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ success: false, error: "Token and new password are required" });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, error: "Password must be at least 6 characters" });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(String(token)).digest("hex");
+
+    const tokenResult = await pool.query(
+      `
+      SELECT id, agent_id, expires_at, used
+      FROM password_reset_tokens
+      WHERE token_hash = $1
+      LIMIT 1
+      `,
+      [tokenHash]
+    );
+    const tokenRow = tokenResult.rows[0];
+
+    if (!tokenRow) {
+      return res.status(400).json({ success: false, error: "This reset link is invalid" });
+    }
+    if (tokenRow.used) {
+      return res.status(400).json({ success: false, error: "This reset link has already been used" });
+    }
+    if (new Date(tokenRow.expires_at) < new Date()) {
+      return res.status(400).json({ success: false, error: "This reset link has expired - request a new one" });
+    }
+
+    const password_hash = await bcrypt.hash(newPassword, 10);
+
+    await pool.query("UPDATE agents SET password_hash = $1 WHERE id = $2", [password_hash, tokenRow.agent_id]);
+    await pool.query("UPDATE password_reset_tokens SET used = true WHERE id = $1", [tokenRow.id]);
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("POST /api/reset-password error:", error.message);
+    return res.status(500).json({ success: false, error: "Failed to reset password" });
   }
 });
 
@@ -7590,6 +7743,32 @@ app.listen(3000, async () => {
     console.log("✅ push_subscriptions table ensured in DB");
   } catch (err) {
     console.error("❌ push_subscriptions table error:", err.message);
+  }
+
+  // 🔥 PASSWORD RESET TOKENS TABLE AUTO CREATE
+  // Only the SHA-256 hash of the token is ever stored, same principle as
+  // password_hash - a raw token only exists in the emailed link itself
+  // and briefly in memory while /api/reset-password verifies it, never
+  // written to the database. A stolen DB backup alone can't be used to
+  // reset anyone's password.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id SERIAL PRIMARY KEY,
+        agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+        token_hash TEXT NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        used BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_agent_id ON password_reset_tokens (agent_id);
+    `);
+
+    console.log("✅ password_reset_tokens table ensured in DB");
+  } catch (err) {
+    console.error("❌ password_reset_tokens table error:", err.message);
   }
 
   // 🔥 START 24H FOLLOW-UP CHECKER

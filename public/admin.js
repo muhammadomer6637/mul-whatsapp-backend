@@ -72,6 +72,49 @@ localStorage.removeItem("mul_nexus_token");
   }
 }
 
+function showForgotPassword() {
+  document.getElementById("loginFormWrap").style.display = "none";
+  document.getElementById("forgotPasswordFormWrap").style.display = "flex";
+  document.getElementById("forgotPasswordError").innerText = "";
+}
+
+function showLoginForm() {
+  document.getElementById("forgotPasswordFormWrap").style.display = "none";
+  document.getElementById("loginFormWrap").style.display = "flex";
+}
+
+async function sendPasswordResetEmail() {
+  const username = document.getElementById("forgotUsername").value.trim();
+  const errorBox = document.getElementById("forgotPasswordError");
+  errorBox.innerText = "";
+  errorBox.style.color = "";
+
+  if (!username) {
+    errorBox.innerText = "Please enter your username";
+    return;
+  }
+
+  try {
+    const res = await fetch(`${BASE}/api/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username })
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      errorBox.innerText = data.error || "Failed to send reset email";
+      return;
+    }
+
+    errorBox.style.color = "#82efbf";
+    errorBox.innerText = data.message || "Reset link sent - check your email";
+  } catch (error) {
+    console.error("sendPasswordResetEmail error:", error);
+    errorBox.innerText = "Server connection failed";
+  }
+}
+
 async function checkAuth() {
   if (!authToken) {
     document.getElementById("loginOverlay").style.display = "flex";

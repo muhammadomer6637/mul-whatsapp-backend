@@ -26,7 +26,7 @@
       Powering Smart Conversations, Driving Admissions
     </p>
 
-    <div class="login-form">
+    <div class="login-form" id="loginFormWrap">
 
       <input
         type="text"
@@ -48,6 +48,31 @@
 
       <div id="loginError" class="login-error"></div>
 
+      <p style="margin-top:4px;">
+        <a href="#" onclick="showForgotPassword(); return false;" style="color:#8fc0ff;font-size:13px;text-decoration:none;">Forgot password?</a>
+      </p>
+
+    </div>
+
+    <div class="login-form" id="forgotPasswordFormWrap" style="display:none;">
+      <p class="login-subtitle" style="margin-bottom:8px;">Enter your username and we'll email you a reset link.</p>
+
+      <input
+        type="text"
+        id="forgotUsername"
+        placeholder="Username"
+        class="login-input"
+      />
+
+      <button class="login-btn" onclick="sendPasswordResetEmail()">
+        Send Reset Link
+      </button>
+
+      <div id="forgotPasswordError" class="login-error"></div>
+
+      <p style="margin-top:4px;">
+        <a href="#" onclick="showLoginForm(); return false;" style="color:#8fc0ff;font-size:13px;text-decoration:none;">Back to login</a>
+      </p>
     </div>
   </div>
 </div>
