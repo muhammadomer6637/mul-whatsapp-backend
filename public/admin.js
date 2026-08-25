@@ -352,6 +352,31 @@ async function refreshPushButtonState() {
 
 async function togglePushNotifications() {
   try {
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      notify("This browser doesn't support push notifications", "warning");
+      return;
+    }
+
+    // Permission check/request comes FIRST, before any other await -
+    // calling Notification.requestPermission() after an intervening
+    // await can get silently treated as not tied to the user's click
+    // gesture in some browsers, which denies it without ever showing a
+    // prompt. A prior explicit "denied" also never re-prompts - the
+    // browser just returns "denied" again instantly - so tell the user
+    // to fix it in site settings instead of looking like it silently failed.
+    if (Notification.permission === "denied") {
+      notify("Notifications are blocked for this site - click the padlock/info icon next to the address bar, allow Notifications, then try again", "warning");
+      return;
+    }
+
+    if (Notification.permission !== "granted") {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        notify("Notification permission was not granted", "warning");
+        return;
+      }
+    }
+
     const existingSub = await getPushSubscriptionState();
 
     if (existingSub) {
@@ -363,17 +388,6 @@ async function togglePushNotifications() {
       await existingSub.unsubscribe();
       notify("Push notifications turned off", "success");
       refreshPushButtonState();
-      return;
-    }
-
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      notify("This browser doesn't support push notifications", "warning");
-      return;
-    }
-
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") {
-      notify("Notification permission was not granted", "warning");
       return;
     }
 

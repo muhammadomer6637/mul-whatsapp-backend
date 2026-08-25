@@ -404,6 +404,27 @@ async function refreshPushBarState() {
 async function togglePushNotifications() {
   const sub = document.getElementById("pushNotifSub");
   try {
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      if (sub) sub.textContent = "Not supported on this browser";
+      return;
+    }
+
+    // Permission check/request comes FIRST, before any other await - see
+    // admin.js's togglePushNotifications() for why. A prior explicit
+    // "denied" never re-prompts either, so tell the user where to fix it.
+    if (Notification.permission === "denied") {
+      if (sub) sub.textContent = "Blocked - enable Notifications for this site in browser settings";
+      return;
+    }
+
+    if (Notification.permission !== "granted") {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        if (sub) sub.textContent = "Permission denied - enable it in browser settings";
+        return;
+      }
+    }
+
     const existingSub = await getPushSubscriptionStateLive();
 
     if (existingSub) {
@@ -414,17 +435,6 @@ async function togglePushNotifications() {
       });
       await existingSub.unsubscribe();
       refreshPushBarState();
-      return;
-    }
-
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      if (sub) sub.textContent = "Not supported on this browser";
-      return;
-    }
-
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") {
-      if (sub) sub.textContent = "Permission denied - enable it in browser settings";
       return;
     }
 
