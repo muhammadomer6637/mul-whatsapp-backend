@@ -48,7 +48,12 @@
 
       <div id="loginError" class="login-error"></div>
 
-      <p style="margin-top:4px;">
+      <!-- Hidden until email sending is reliable (Railway blocks outbound
+           SMTP - Gmail App Password approach doesn't work there; needs
+           an HTTP-based email service instead). Backend endpoints and
+           reset-password.html are untouched - just unhide this link once
+           a working email provider is wired up. -->
+      <p style="margin-top:4px; display:none;">
         <a href="#" onclick="showForgotPassword(); return false;" style="color:#8fc0ff;font-size:13px;text-decoration:none;">Forgot password?</a>
       </p>
 
