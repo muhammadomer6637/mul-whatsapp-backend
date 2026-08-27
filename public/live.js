@@ -352,13 +352,31 @@ async function toggleAgentAvailability() {
 
     const newStatus = toggle.checked;
 
-    await fetch("/api/toggle-agent", {
-      method: "POST",
-      headers: authHeadersLive({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ status: newStatus })
-    });
+    // The real bug behind "have to tap it multiple times": a checkbox
+    // tap gave no feedback that anything happened, so an agent seeing no
+    // immediate change assumed it failed and tapped again - but a SECOND
+    // tap doesn't retry, it flips the toggle back (checkbox semantics,
+    // not a "set to on" button). That produced the alternating on/off
+    // flood in Agent Availability Today, not a race. Disable the toggle
+    // for the round-trip so a second tap can't land mid-request, and
+    // revert on failure so the agent isn't left guessing.
+    toggle.disabled = true;
 
-    loadAgentAvailability();
+    try {
+      const res = await fetch("/api/toggle-agent", {
+        method: "POST",
+        headers: authHeadersLive({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!res.ok) {
+        toggle.checked = !newStatus;
+        alert("Failed to update Agent Status - please try again");
+      }
+    } finally {
+      toggle.disabled = false;
+      loadAgentAvailability();
+    }
   } catch (error) {
     console.error("toggleAgentAvailability error:", error);
   }

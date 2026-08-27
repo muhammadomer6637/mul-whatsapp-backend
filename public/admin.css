@@ -2021,6 +2021,14 @@ CALLBACK CENTER
   transform:translateX(27px) !important;
 }
 
+/* Visual feedback while a toggle's request is in flight (e.g. Agent
+   Status) - without this a click looked like it did nothing, which was
+   why agents kept re-clicking and accidentally flipping it back off. */
+.switch input:disabled + .slider{
+  opacity:0.5 !important;
+  cursor:wait !important;
+}
+
 @media (max-width: 1100px) {
   .content-grid,
   .whatsapp-shell {

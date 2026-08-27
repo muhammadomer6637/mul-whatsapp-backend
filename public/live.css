@@ -184,6 +184,14 @@ body{
   transform:translateX(20px);
 }
 
+/* Visual feedback while a toggle's request is in flight (Agent Status) -
+   without this a tap looked like it did nothing, which was why agents
+   kept re-tapping and accidentally flipping it back off. */
+.switch input:disabled + .slider{
+  opacity:0.5;
+  cursor:wait;
+}
+
 .tabs{
   display:flex;
   gap:8px;

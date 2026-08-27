@@ -488,13 +488,36 @@ async function toggleAgent() {
 
   const newStatus = toggle.checked;
 
-  await fetch(`${BASE}/api/toggle-agent`, {
-    method: "POST",
-    headers: authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ status: newStatus })
-  });
+  // The real bug behind the "have to click it multiple times" complaint:
+  // a checkbox click gives no feedback that anything happened, so an
+  // agent seeing no immediate change assumes it failed and clicks again
+  // - but a SECOND click doesn't retry the same action, it flips the
+  // toggle back (checkbox semantics, not a "set to on" button). That's
+  // what was producing the alternating on/off flood, not a race. Disable
+  // the toggle for the round-trip so a second click can't land while the
+  // first is still in flight, and revert + explain on failure so the
+  // agent isn't left guessing whether it worked.
+  toggle.disabled = true;
 
-  loadAgentStatus();
+  try {
+    const res = await fetch(`${BASE}/api/toggle-agent`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ status: newStatus })
+    });
+
+    if (!res.ok) {
+      toggle.checked = !newStatus;
+      notify("Failed to update Agent Status - please try again", "error");
+    }
+  } catch (error) {
+    console.error("toggleAgent error:", error);
+    toggle.checked = !newStatus;
+    notify("Failed to update Agent Status - check your connection and try again", "error");
+  } finally {
+    toggle.disabled = false;
+    loadAgentStatus();
+  }
 }
 
 function prettyInteractionCategory(category) {
