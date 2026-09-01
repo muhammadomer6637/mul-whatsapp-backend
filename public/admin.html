@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-  <link rel="stylesheet" href="admin.css?v=11" />
+  <link rel="stylesheet" href="admin.css?v=12" />
 </head>
 <body>
   <div id="loginOverlay" class="login-overlay">
@@ -738,13 +738,6 @@
 </section>
 
       <section id="settings" class="section hidden">
-        <div class="page-header">
-          <div>
-            <h1>Settings</h1>
-            <p>Quick replies and system configuration</p>
-          </div>
-        </div>
-
         <div class="settings-tab-bar">
           <button class="ghost-btn settings-tab-btn active-filter" data-settings-tab="quickReplies" onclick="showSettingsTab('quickReplies', this)">
             Quick Replies
@@ -792,15 +785,22 @@
                 <p>Live status of the database, WhatsApp connection, and background jobs</p>
               </div>
               <div style="display:flex; gap:10px;">
-                <button class="ghost-btn" onclick="exportRawMessages()" title="Download the most recent incoming student messages as CSV, for reviewing real conversation content">
-                  Export Raw Messages
-                </button>
-                <button class="ghost-btn" onclick="exportRegistrationAttempts()" title="Download every MUL admissions registration submission attempt, including error details for failed ones">
-                  Export Registration Attempts
-                </button>
-                <button class="ghost-btn" onclick="exportFeePrograms()" title="Download every Fee Structure program and whether it currently has a working MUL registration ID mapping">
-                  Export Fee Programs Mapping
-                </button>
+                <div class="export-dropdown-wrap">
+                  <button class="ghost-btn" onclick="toggleExportDropdown()">
+                    Export ▾
+                  </button>
+                  <div id="exportDropdownMenu" class="export-dropdown-menu hidden">
+                    <button onclick="exportRawMessages(); closeExportDropdown();" title="Download the most recent incoming student messages as CSV, for reviewing real conversation content">
+                      Export Raw Messages
+                    </button>
+                    <button onclick="exportRegistrationAttempts(); closeExportDropdown();" title="Download every MUL admissions registration submission attempt, including error details for failed ones">
+                      Export Registration Attempts
+                    </button>
+                    <button onclick="exportFeePrograms(); closeExportDropdown();" title="Download every Fee Structure program and whether it currently has a working MUL registration ID mapping">
+                      Export Fee Programs Mapping
+                    </button>
+                  </div>
+                </div>
                 <button class="ghost-btn" id="pushNotifBtn" onclick="togglePushNotifications()" title="Get a notification for new agent-relevant messages even when this page isn't open (works best after installing this page to your home screen)">
                   🔔 Enable Push Notifications
                 </button>

@@ -419,6 +419,49 @@ body {
   border-color: rgba(86,165,255,0.38);
 }
 
+/* System Health's 3 export buttons collapsed into one dropdown - was
+   crowding the panel header as more export/action buttons got added. */
+.export-dropdown-wrap {
+  position: relative;
+}
+
+.export-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #111c31;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 8px;
+  min-width: 230px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+}
+
+.export-dropdown-menu.hidden {
+  display: none;
+}
+
+.export-dropdown-menu button {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+}
+
+.export-dropdown-menu button:hover {
+  background: rgba(255,255,255,0.06);
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));

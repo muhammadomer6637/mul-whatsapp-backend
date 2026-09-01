@@ -4450,6 +4450,23 @@ function exportDashboardData() {
     });
 }
 
+function toggleExportDropdown() {
+  const menu = document.getElementById("exportDropdownMenu");
+  if (menu) menu.classList.toggle("hidden");
+}
+
+function closeExportDropdown() {
+  const menu = document.getElementById("exportDropdownMenu");
+  if (menu) menu.classList.add("hidden");
+}
+
+document.addEventListener("click", (event) => {
+  const wrap = document.querySelector(".export-dropdown-wrap");
+  if (wrap && !wrap.contains(event.target)) {
+    closeExportDropdown();
+  }
+});
+
 // One-off diagnostic export (System Health tab, admin-only): most recent
 // incoming student text messages as CSV, for reviewing real conversation
 // content directly instead of relying on database access.
@@ -4658,6 +4675,12 @@ function closeLeadsModal() {
 // edit agent, customConfirm, customPrompt).
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
+
+  const exportMenu = document.getElementById("exportDropdownMenu");
+  if (exportMenu && !exportMenu.classList.contains("hidden")) {
+    closeExportDropdown();
+    return;
+  }
 
   const leadsModal = document.getElementById("leadsModal");
   if (leadsModal && !leadsModal.classList.contains("hidden")) {
