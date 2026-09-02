@@ -7753,6 +7753,25 @@ app.listen(3000, async () => {
     console.error("❌ push_subscriptions table error:", err.message);
   }
 
+  // 🔥 ADMISSION FUNNEL COLUMN INDEXES
+  // funnelStats and funnelStudents (both in /api/dashboard) filter/sort
+  // users by these 4 timestamp columns, none of which were ever indexed -
+  // every dashboard load was a full sequential scan of the users table
+  // for both queries. Partial indexes (only non-null rows) since most
+  // users have never reached any of these stages, keeping the index
+  // small and letting Postgres bitmap-OR across them for the "reached at
+  // least this stage" queries.
+  try {
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_registered_at ON users (registered_at) WHERE registered_at IS NOT NULL;`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_processing_fee_paid_at ON users (processing_fee_paid_at) WHERE processing_fee_paid_at IS NOT NULL;`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_documents_submitted_at ON users (documents_submitted_at) WHERE documents_submitted_at IS NOT NULL;`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_admission_fee_paid_at ON users (admission_fee_paid_at) WHERE admission_fee_paid_at IS NOT NULL;`);
+
+    console.log("✅ Admission Funnel column indexes ensured in DB");
+  } catch (err) {
+    console.error("❌ Admission Funnel column indexes error:", err.message);
+  }
+
   // 🔥 PASSWORD RESET TOKENS TABLE AUTO CREATE
   // Only the SHA-256 hash of the token is ever stored, same principle as
   // password_hash - a raw token only exists in the emailed link itself

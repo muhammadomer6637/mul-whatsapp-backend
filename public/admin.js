@@ -604,7 +604,10 @@ async function loadDashboard(range = "24h") {
   headers: authHeaders()
 });
     const data = await res.json();
-    if (!data.success) return;
+    if (!data.success) {
+      showDashboardLoadError(data.error || "Failed to load dashboard data");
+      return;
+    }
 
     const stats = data.stats;
     const callback = data.callbackStats || {};
@@ -984,7 +987,25 @@ document.getElementById("funnelDrop4").textContent = funnelDropText(funnelDocume
     `).join("");
   } catch (error) {
     console.error("Dashboard load error:", error);
+    // Was: silently logged and left the loading spinner stuck forever
+    // with zero feedback (confirmed live - a slow/hanging /api/dashboard
+    // request, e.g. from DB connection pool exhaustion, looked exactly
+    // like the page was just broken). Now shows a clear message with a
+    // one-click retry instead of an indefinite spinner.
+    showDashboardLoadError("Couldn't reach the server - check your connection and try again");
   }
+}
+
+function showDashboardLoadError(message) {
+  const el = document.getElementById("stats");
+  if (!el) return;
+  el.innerHTML = `
+    <div class="empty-chat-state" style="min-height:160px;">
+      <div class="empty-chat-icon">⚠️</div>
+      <h3>${escapeHtml(message)}</h3>
+      <button class="ghost-btn" style="margin-top:12px;" onclick="loadDashboard(currentRange)">Retry</button>
+    </div>
+  `;
 }
 
 let weeklyConversationsChartInstance = null;
