@@ -443,11 +443,21 @@ function renderReplyPreview() {
   `;
 }
 
+let isSendingMessage = false;
+
 async function sendMessage() {
+  // Same fix as admin.js's sendMessage() - see there for the fuller
+  // comment. No feedback + no re-entry guard meant a second tap while
+  // the first send was still in flight fired a genuine duplicate.
+  if (isSendingMessage) return;
+
   const input = document.getElementById("messageInput");
   const message = input.value.trim();
 
   if (!message) return;
+
+  isSendingMessage = true;
+  input.value = "";
 
   try {
     const res = await fetch("/api/send", {
@@ -468,10 +478,10 @@ async function sendMessage() {
 
     if (!data.success) {
       alert(data.error || "Message send failed");
+      input.value = message;
       return;
     }
 
-    input.value = "";
     activeReply = null;
     renderReplyPreview();
     await loadMessages();
@@ -479,6 +489,9 @@ async function sendMessage() {
   } catch (error) {
     console.error("sendMessage error:", error);
     alert("Message send failed");
+    input.value = message;
+  } finally {
+    isSendingMessage = false;
   }
 }
 

@@ -2025,7 +2025,20 @@ function renderReplyPreview() {
   `;
 }
 
+let isSendingMessage = false;
+
 async function sendMessage() {
+  // Was: input.value only cleared on success, no guard against a second
+  // trigger while the first request was still in flight. With no visible
+  // feedback in between, an agent who pressed Enter/clicked Send again
+  // (thinking it hadn't gone through) would fire a genuine second send
+  // of the same text - confirmed live, the same message going out 4-5
+  // times a few seconds apart. isSendingMessage blocks any re-entry
+  // (covers both the Send button and the Enter-key handler), and the
+  // input clears immediately instead of waiting for the response so a
+  // repeat trigger has no stale text left to resend.
+  if (isSendingMessage) return;
+
   const input = document.getElementById("messageInput");
   const msg = input.value.trim();
 
@@ -2035,6 +2048,9 @@ async function sendMessage() {
   }
 
   if (!msg) return;
+
+  isSendingMessage = true;
+  input.value = "";
 
   try {
     const res = await fetch(`${BASE}/api/send`, {
@@ -2051,10 +2067,10 @@ async function sendMessage() {
 
     if (!res.ok || !data.success) {
       notify(data.error || "Message send failed", "error");
+      input.value = msg;
       return;
     }
 
-    input.value = "";
     activeReply = null;
     renderReplyPreview();
     await loadChats();
@@ -2062,6 +2078,9 @@ async function sendMessage() {
   } catch (error) {
     console.error("Frontend send error:", error);
     notify("Message send failed. Check browser console and Railway logs.", "error");
+    input.value = msg;
+  } finally {
+    isSendingMessage = false;
   }
 }
 
