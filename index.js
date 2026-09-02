@@ -872,6 +872,44 @@ function notifyChatUpdated(phone) {
   });
 }
 
+// Bounded-concurrency drop-in for pool.query(), used only by
+// /api/dashboard's query fan-out. That endpoint fires ~34 queries at
+// once via Promise.all - fine for the app's own connection pool (see
+// db/db.js), but Railway's Postgres plan has its own server-side
+// connection ceiling we have no way to see or confirm (their Console
+// doesn't support running a query to check it), and asking for more
+// connections than the DB will admit just means the excess queue
+// invisibly at the server - confirmed live as p99 response-time spikes
+// of 20-25s with 0% error rate and near-idle CPU/Memory on both
+// services, not the connection-pool-exhaustion-with-visible-hang this
+// was first (wrongly) diagnosed as. Capping how many of THIS endpoint's
+// queries are ever in flight at once keeps its peak connection demand
+// well under any plausible real ceiling, whatever it turns out to be.
+const DASHBOARD_QUERY_CONCURRENCY = 8;
+let dashboardQueryActive = 0;
+const dashboardQueryQueue = [];
+
+function runDashboardQuery(sql, params) {
+  return new Promise((resolve, reject) => {
+    const run = () => {
+      dashboardQueryActive++;
+      pool.query(sql, params)
+        .then(resolve, reject)
+        .finally(() => {
+          dashboardQueryActive--;
+          const next = dashboardQueryQueue.shift();
+          if (next) next();
+        });
+    };
+
+    if (dashboardQueryActive < DASHBOARD_QUERY_CONCURRENCY) {
+      run();
+    } else {
+      dashboardQueryQueue.push(run);
+    }
+  });
+}
+
 // Sends one push notification, cleaning up the subscription if the
 // browser reports it's gone (404/410 - user uninstalled, cleared site
 // data, or revoked permission) so it doesn't get retried forever.
@@ -6564,7 +6602,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       metaAdLeadsTotal,
       metaAdLeadsList
     ] = await Promise.all([
-      pool.query(
+      runDashboardQuery(
         `
         SELECT COUNT(*)::int AS count
         FROM users
@@ -6573,7 +6611,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(`
+      runDashboardQuery(`
         SELECT
           TO_CHAR(day, 'Dy') AS label,
           COUNT(u.id)::int AS count
@@ -6591,7 +6629,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // day-of-month labels instead of day-name labels - feeds the
       // Weekly/Monthly toggle on the Weekly Overview chart (independent of
       // the main dashboard date-range filter, always daily granularity).
-      pool.query(`
+      runDashboardQuery(`
         SELECT
           TO_CHAR(day, 'DD') AS label,
           COUNT(u.id)::int AS count
@@ -6605,13 +6643,13 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         ORDER BY day
       `),
 
-      pool.query(`
+      runDashboardQuery(`
         SELECT COUNT(*)::int AS count
         FROM chats
         WHERE unread_count > 0
       `),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT COUNT(*)::int AS count
         FROM messages
@@ -6631,7 +6669,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // interaction-log source so this total and the Agent Request
       // Insights breakdown can never disagree - they're now literally the
       // same query, one grouped and one not.
-      pool.query(
+      runDashboardQuery(
         `
         SELECT COUNT(DISTINCT phone)::int AS count
         FROM user_interactions
@@ -6641,7 +6679,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT COUNT(*)::int AS count
         FROM messages
@@ -6651,7 +6689,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT category, COUNT(DISTINCT phone)::int AS count
         FROM user_interactions
@@ -6671,7 +6709,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // total above. Picks each phone's most recent category choice in
       // the range first (DISTINCT ON), so categories are mutually
       // exclusive per phone and this always sums to exactly that total.
-      pool.query(
+      runDashboardQuery(
         `
         SELECT category, COUNT(*)::int AS count
         FROM (
@@ -6687,19 +6725,19 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(`
+      runDashboardQuery(`
         SELECT COUNT(*)::int AS count
         FROM chats
         WHERE status = 'agent_waiting'
       `),
 
-      pool.query(`
+      runDashboardQuery(`
         SELECT COUNT(*)::int AS count
         FROM chats
         WHERE status = 'agent_active'
       `),
 
-      pool.query(`
+      runDashboardQuery(`
         SELECT COUNT(*)::int AS count
         FROM users u
         JOIN chats c ON c.phone = u.phone
@@ -6707,7 +6745,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         AND c.last_incoming_at >= NOW() - INTERVAL '10 minutes'
       `),
 
-      pool.query(`
+      runDashboardQuery(`
         SELECT COUNT(*)::int AS count
         FROM users u
         JOIN chats c ON c.phone = u.phone
@@ -6715,7 +6753,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         AND c.last_incoming_at >= NOW() - INTERVAL '10 minutes'
       `),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT
           program,
@@ -6735,7 +6773,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // "Top Programs" panel that merges free-text spelling variants client-side.
       // No LIMIT here beyond a safety cap: normalization merges rows together in
       // admin.js, so we need the raw grouped counts, not a pre-merge top 10.
-      pool.query(`
+      runDashboardQuery(`
         SELECT
           program,
           COUNT(*)::int AS inquiries
@@ -6759,7 +6797,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // written before this column existed, so historical leads fall back
       // to the old created_at behaviour unchanged - only newly-captured/
       // updated leads going forward use the more accurate date.
-      pool.query(
+      runDashboardQuery(
         `
         SELECT
           u.name,
@@ -6784,7 +6822,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // Deliberately NOT scoped to the date range - this must always show
       // the true overall funnel, not just students who first messaged in
       // the selected window (per explicit user instruction).
-      pool.query(`
+      runDashboardQuery(`
         SELECT
           COUNT(*) FILTER (
             WHERE (
@@ -6822,7 +6860,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // NOT date-scoped, for the same reason), split into buckets
       // client-side so each card's modal list count matches its stat
       // number exactly.
-      pool.query(`
+      runDashboardQuery(`
         SELECT
           phone, name, program,
           registered_at, processing_fee_paid_at,
@@ -6839,7 +6877,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         LIMIT 3000
       `),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT
           COUNT(*)::int AS total_requests,
@@ -6850,7 +6888,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT COUNT(*)::int AS repeat_numbers
         FROM (
@@ -6864,7 +6902,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(
+      runDashboardQuery(
         `
         WITH scoped_callbacks AS (
           SELECT DISTINCT callback_request_id
@@ -6885,7 +6923,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT
           COALESCE(ROUND(AVG(agent_response_seconds))::int, 0) AS average_chat_response_seconds
@@ -6896,7 +6934,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT
           COALESCE(ROUND(AVG(first_response_seconds))::int, 0) AS average_callback_response_seconds
@@ -6907,7 +6945,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT
           COUNT(*) FILTER (WHERE rating = 'positive')::int AS positive,
@@ -6934,7 +6972,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // ratio became comparable, not a hardcoded date. COALESCE'd to NOW()
       // so a flow with zero sends yet reports 0 completions instead of
       // matching everything before a NULL cutoff.
-      pool.query(
+      runDashboardQuery(
         `
         SELECT COUNT(DISTINCT phone)::int AS count
         FROM user_interactions
@@ -6945,7 +6983,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT COUNT(DISTINCT phone)::int AS count
         FROM user_interactions
@@ -6966,7 +7004,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // repeat interest signal for that ranking, unlike the raw Sent count
       // above which was inflated by the same person triggering it without
       // ever engaging).
-      pool.query(
+      runDashboardQuery(
         `
         SELECT category, COUNT(*)::int AS count
         FROM user_interactions
@@ -6982,7 +7020,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT COUNT(DISTINCT phone)::int AS count
         FROM user_interactions
@@ -6993,7 +7031,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT COUNT(DISTINCT phone)::int AS count
         FROM user_interactions
@@ -7022,7 +7060,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // every attempt they made failed - so Total always equals
       // Successful + Failed, and a student who failed twice then succeeded
       // is counted as one success, not one success plus two failures.
-      pool.query(
+      runDashboardQuery(
         `
         WITH per_phone AS (
           SELECT phone, BOOL_OR(mul_success) AS succeeded
@@ -7045,7 +7083,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // DISTINCT phone here too, though in practice a phone can only
       // succeed once (MUL rejects any later attempt as a duplicate), so
       // this mainly guards against that assumption ever changing.
-      pool.query(
+      runDashboardQuery(
         `
         SELECT program, COUNT(DISTINCT phone)::int AS count
         FROM mul_registrations
@@ -7066,7 +7104,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // "error" reflect the OVERALL outcome (succeeded if any attempt in
       // the period succeeded; error is blank once they're in, even if a
       // later stray retry after that happened to fail).
-      pool.query(
+      runDashboardQuery(
         `
         SELECT * FROM (
           SELECT DISTINCT ON (phone)
@@ -7093,7 +7131,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
       // clicking a Click-to-WhatsApp ad (see the "referral" capture in the
       // webhook handler). One row per phone by construction (meta_ad_leads
       // only ever gets one insert per phone), so no dedup needed here.
-      pool.query(
+      runDashboardQuery(
         `
         SELECT COUNT(*)::int AS count
         FROM meta_ad_leads
@@ -7102,7 +7140,7 @@ app.get("/api/dashboard", authenticateAgent, async (req, res) => {
         queryParams
       ),
 
-      pool.query(
+      runDashboardQuery(
         `
         SELECT phone, name, ad_headline, ad_body, created_at
         FROM meta_ad_leads
