@@ -7354,7 +7354,25 @@ app.get("/api/export-leads", authenticateAgent, async (req, res) => {
 // needing separate database access.
 app.get("/api/admin/export-messages", authenticateAgent, requireAdmin, async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 5000, 20000);
+    // Was always "most recent N" with no date filter - at current
+    // message volume, 5000 rows only reaches back about a week, which
+    // silently truncated any audit trying to cover a longer period (the
+    // gap only surfaced when the user asked why a month-long audit only
+    // showed 7 days). start/end (YYYY-MM-DD) are optional - omitted,
+    // this keeps its original "most recent N" behavior.
+    const limit = Math.min(parseInt(req.query.limit, 10) || 5000, 50000);
+    const { start, end } = req.query;
+
+    let whereDate = "";
+    const params = [];
+
+    if (start && end) {
+      whereDate = `AND m.created_at >= $1::timestamp AND m.created_at < ($2::date + INTERVAL '1 day')`;
+      params.push(start, end);
+    }
+
+    params.push(limit);
+    const limitParamIndex = params.length;
 
     const result = await pool.query(
       `
@@ -7365,10 +7383,11 @@ app.get("/api/admin/export-messages", authenticateAgent, requireAdmin, async (re
         AND m.type = 'text'
         AND m.text IS NOT NULL
         AND m.text <> ''
+        ${whereDate}
       ORDER BY m.created_at DESC
-      LIMIT $1
+      LIMIT $${limitParamIndex}
       `,
-      [limit]
+      params
     );
 
     const headers = ["Date", "Phone", "Name", "Program", "Message"];

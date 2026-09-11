@@ -4510,8 +4510,60 @@ document.addEventListener("click", (event) => {
 // One-off diagnostic export (System Health tab, admin-only): most recent
 // incoming student text messages as CSV, for reviewing real conversation
 // content directly instead of relying on database access.
-function exportRawMessages() {
-  fetch(`${BASE}/api/admin/export-messages`, {
+function promptDateRange(message) {
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.className = "confirm-modal-overlay";
+    overlay.innerHTML = `
+      <div class="confirm-modal-card">
+        <p>${escapeHtml(message)}</p>
+        <label class="field-label">From</label>
+        <input id="dateRangeStart" class="prompt-input" type="date" />
+        <label class="field-label">To</label>
+        <input id="dateRangeEnd" class="prompt-input" type="date" />
+        <p style="font-size:11px; color:var(--muted); margin:8px 0 0;">Leave both blank to export the most recent messages instead (no date filter).</p>
+        <div class="confirm-modal-actions">
+          <button class="ghost-btn" data-action="cancel">Cancel</button>
+          <button class="primary-btn" data-action="ok">Export</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    overlay.querySelector("#dateRangeStart").focus();
+
+    function finish(result) {
+      overlay.remove();
+      resolve(result);
+    }
+
+    overlay.addEventListener("click", (event) => {
+      const action = event.target.dataset.action;
+      if (!action) return;
+
+      if (action === "cancel") {
+        finish(null);
+        return;
+      }
+
+      const start = overlay.querySelector("#dateRangeStart").value;
+      const end = overlay.querySelector("#dateRangeEnd").value;
+      finish({ start: start || null, end: end || null });
+    });
+  });
+}
+
+async function exportRawMessages() {
+  const range = await promptDateRange("Export Raw Messages - pick a date range, or leave blank for the most recent messages");
+  if (range === null) return;
+
+  const params = new URLSearchParams({ limit: "50000" });
+  if (range.start && range.end) {
+    params.set("start", range.start);
+    params.set("end", range.end);
+  }
+
+  fetch(`${BASE}/api/admin/export-messages?${params.toString()}`, {
     headers: authHeaders()
   })
     .then(response => {
