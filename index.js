@@ -4514,6 +4514,57 @@ if (currentModeForKeyword !== "agent" && !isAwaitingLeadDetails) {
   ) {
     text = "__deadline_query__";
   }
+
+  // Bank/transaction-SMS forwards - students paste their payment
+  // confirmation text thinking that's how to confirm payment (found via
+  // the 21 Aug-11 Sept message audit). The bot can't verify any real
+  // transaction, but can explain what actually updates their fee status
+  // instead of leaving them with silence/the generic fallback.
+  if (
+    lowerText &&
+    /\b(pkr|rs\.?)\s?[\d,]{3,}(\.\d+)?\b/.test(lowerText) &&
+    (
+      lowerText.includes("received") ||
+      lowerText.includes("txn") ||
+      lowerText.includes("transaction") ||
+      lowerText.includes("a/c") ||
+      lowerText.includes("account") ||
+      lowerText.includes("raast") ||
+      lowerText.includes("reference no") ||
+      lowerText.includes("ref no")
+    )
+  ) {
+    text = "__payment_confirmation__";
+  }
+
+  // A message that reads like a program question (degree-level prefix,
+  // or "department"/"offer"/"course" language) but is longer/messier
+  // than isBareProgramMention() above will accept (that one requires an
+  // exact/near-exact match against MUL_CANONICAL_PROGRAMS in <=8 words -
+  // too strict for something like "Bs radiology department hai" or "Bs
+  // computer science department hai", both found via the message
+  // audit). Route these into the SAME __program_mention__ handler
+  // instead of inventing a new one - it already does the right thing
+  // either way: matchFeeProgramFromCatalog() there is a much more
+  // lenient word-boundary/fuzzy matcher (handles trailing filler words
+  // fine, confirmed radiology correctly finds nothing while "computer
+  // science department hai" still correctly finds BS Computer Science),
+  // so a real program still gets its normal fee/eligibility answer, and
+  // only a genuinely unoffered one gets "we don't have a program by
+  // that name". The `text === originalIncomingText` guard skips this if
+  // an earlier, more specific bucket (fee/deadline/percentage/etc.)
+  // already claimed the message.
+  if (
+    text === originalIncomingText &&
+    lowerText &&
+    lowerText.split(/\s+/).length <= 12 &&
+    (
+      /\b(bs|b\.s\.?|bsc|b\.sc\.?|adp|associate degree|m\.?phil|\bms\b|mphil|phd|ph\.d\.?|pharm[\s.-]?d|doctor of|diploma|certificate course|short course)\b/i.test(lowerText) ||
+      /\b(department|offering|program|course)\b/i.test(lowerText)
+    )
+  ) {
+    text = "__program_mention__";
+  }
 }
 
 lowerText = text?.toLowerCase();
@@ -4940,7 +4991,8 @@ To get help, please type MENU and choose option 7️⃣ (Chat with Admissions Ad
           "6a", "6b", "6c", "6d", "6e", "6f", "6g", "6h", "6i", "6j", "6k", "6l",
           "apply",
           "__filler__", "__program_mention__", "__job_inquiry__",
-          "__percentage_query__", "__deadline_query__", "__fee_query__", "__apply_now__"
+          "__percentage_query__", "__deadline_query__", "__fee_query__", "__apply_now__",
+          "__payment_confirmation__"
         ].includes(lowerText)
       ) {
         await sendTextMessage(from, welcomeMessage());
@@ -5584,6 +5636,23 @@ if (lowerText === "__deadline_query__") {
 
 4️⃣ Type 4 to see the Admission Process, or
 7️⃣ Type 7 to talk directly to our Admissions Advisor for exact dates.`
+  );
+  return res.sendStatus(200);
+}
+
+if (lowerText === "__payment_confirmation__") {
+  userStates[from].hasInteracted = true;
+
+  await sendTextMessage(
+    from,
+    `We've received your payment details. When your fee status updates depends on how the payment was made:
+
+✅ If you paid against a Challan number (or paid in person at the bank) - your status will update automatically within 24 hours (working days), no further action needed.
+
+⚠️ If you transferred the payment directly into the university's account (without a Challan) - your status will NOT update automatically. Please contact your Admission Advisor and share the Fee Challan + Payment Transfer Slip.
+
+📞 For admission fee questions: Admissions Office - 03111222685 (phone call only, not WhatsApp call)
+📞 For semester fee questions: Accounts Office - 04235145621, Extension: 388`
   );
   return res.sendStatus(200);
 }
