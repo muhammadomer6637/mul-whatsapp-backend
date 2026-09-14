@@ -199,6 +199,7 @@ function applyRolePermissions() {
   const callbackBtn = document.querySelector('.nav-btn[data-section="callbacks"]');
   const agentStatusWrap = document.querySelector(".agent-status-wrap");
   const feeStructureTabBtn = document.getElementById("feeStructureTabBtn");
+  const faqTabBtn = document.getElementById("faqTabBtn");
 
   if (dashboardBtn) dashboardBtn.style.display = "none";
   if (agentPanelBtn) agentPanelBtn.style.display = "none";
@@ -206,6 +207,7 @@ function applyRolePermissions() {
   if (callbackBtn) callbackBtn.style.display = "none";
   if (agentStatusWrap) agentStatusWrap.style.display = "none";
   if (feeStructureTabBtn) feeStructureTabBtn.style.display = "none";
+  if (faqTabBtn) faqTabBtn.style.display = "none";
 
   if (currentAgent.role === "admin") {
     if (dashboardBtn) dashboardBtn.style.display = "flex";
@@ -214,6 +216,7 @@ function applyRolePermissions() {
     if (callbackBtn) callbackBtn.style.display = "flex";
     if (agentStatusWrap) agentStatusWrap.style.display = "flex";
     if (feeStructureTabBtn) feeStructureTabBtn.style.display = "inline-flex";
+    if (faqTabBtn) faqTabBtn.style.display = "flex";
     return;
   }
 
@@ -2419,6 +2422,9 @@ function showSettingsTab(tab) {
   } else if (tab === "feeStructure") {
     document.getElementById("feeStructureTab").classList.remove("hidden");
     loadFeeStructure();
+  } else if (tab === "faq") {
+    document.getElementById("faqTab").classList.remove("hidden");
+    loadFaq();
   }
 }
 
@@ -3033,6 +3039,174 @@ async function toggleFeeProgramActive(id, currentlyActive) {
   } catch (error) {
     console.error("toggleFeeProgramActive error:", error);
     notify("Failed to update program status", "error");
+  }
+}
+
+// =========================
+// FAQ
+// =========================
+let faqEntries = [];
+
+async function loadFaq() {
+  showLoadingState("faqTableBody", 4);
+  try {
+    const res = await fetch(`${BASE}/api/faq`, { headers: authHeaders() });
+    const data = await res.json();
+    if (!data.success) return;
+
+    faqEntries = data.faqs || [];
+
+    const tbody = document.getElementById("faqTableBody");
+    tbody.innerHTML = faqEntries.length
+      ? faqEntries.map(f => buildFaqRow(f)).join("")
+      : `<tr><td colspan="4" style="text-align:center; color:var(--muted); padding:16px;">No FAQs yet.</td></tr>`;
+    markLoaded("faqTableBody");
+  } catch (error) {
+    console.error("loadFaq error:", error);
+  }
+}
+
+function buildFaqRow(faq) {
+  const isActive = faq.active !== false;
+  return `
+    <tr style="${isActive ? "" : "opacity:0.55;"}">
+      <td>${escapeHtml(faq.question_label)} <span class="status-chip status-${isActive ? "active" : "agent_waiting"}" style="margin-left:6px; font-size:10px;">${isActive ? "Active" : "Inactive"}</span></td>
+      <td style="max-width:220px; white-space:normal;">${escapeHtml(faq.keywords)}</td>
+      <td style="max-width:320px; white-space:normal;">${escapeHtml(faq.answer)}</td>
+      <td class="agent-action-icons">
+        <span class="icon-action" onclick="toggleFaqActive(${faq.id}, ${isActive})" title="${isActive ? "Deactivate" : "Activate"}">${isActive ? "⏸" : "▶"}</span>
+        <span class="icon-action" onclick="openFaqModal(${faq.id})" title="Edit">✎</span>
+        <span class="icon-action" onclick="deleteFaq(${faq.id})" title="Delete">🗑</span>
+      </td>
+    </tr>
+  `;
+}
+
+function openFaqModal(id = null) {
+  const existing = id ? faqEntries.find(f => f.id === id) : null;
+
+  const overlay = document.createElement("div");
+  overlay.className = "confirm-modal-overlay";
+  overlay.innerHTML = `
+    <div class="confirm-modal-card">
+      <p style="font-weight:700; font-size:16px;">${existing ? "Edit FAQ" : "Add FAQ"}</p>
+
+      <label class="field-label">Question (for your own reference)</label>
+      <input id="faqQuestionLabel" class="prompt-input" type="text" placeholder="e.g. Exam Date" value="${existing ? escapeHtml(existing.question_label) : ""}" />
+
+      <label class="field-label">Keywords / Phrases</label>
+      <textarea id="faqKeywords" class="prompt-input" rows="2" placeholder="e.g. exam date, test date, paper kab hoga">${existing ? escapeHtml(existing.keywords) : ""}</textarea>
+      <p style="font-size:11px; color:var(--muted); margin:-14px 0 20px;">Comma-separated. Use specific multi-word phrases, not single common words (e.g. "exam date", not just "date") - otherwise similar questions can get mixed up with each other.</p>
+
+      <label class="field-label">Answer</label>
+      <textarea id="faqAnswer" class="prompt-input" rows="4" placeholder="The exact reply the bot will send">${existing ? escapeHtml(existing.answer) : ""}</textarea>
+
+      <div class="confirm-modal-actions">
+        <button class="ghost-btn" data-action="cancel">Cancel</button>
+        <button class="primary-btn" data-action="save">Save</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  overlay.querySelector("#faqQuestionLabel").focus();
+
+  overlay.addEventListener("click", async (event) => {
+    const action = event.target.dataset.action;
+    if (!action) return;
+
+    if (action === "cancel") {
+      overlay.remove();
+      return;
+    }
+
+    if (action === "save") {
+      await saveFaq(existing?.id || null, overlay);
+    }
+  });
+}
+
+async function saveFaq(id, overlay) {
+  const questionLabel = overlay.querySelector("#faqQuestionLabel").value.trim();
+  const keywords = overlay.querySelector("#faqKeywords").value.trim();
+  const answer = overlay.querySelector("#faqAnswer").value.trim();
+
+  if (!questionLabel || !keywords || !answer) {
+    notify("Question, keywords, and answer are all required", "warning");
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      id ? `${BASE}/api/faq/${id}` : `${BASE}/api/faq`,
+      {
+        method: id ? "PUT" : "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ questionLabel, keywords, answer })
+      }
+    );
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to save FAQ", "error");
+      return;
+    }
+
+    notify("FAQ saved", "success");
+    overlay.remove();
+    await loadFaq();
+  } catch (error) {
+    console.error("saveFaq error:", error);
+    notify("Failed to save FAQ", "error");
+  }
+}
+
+async function toggleFaqActive(id, currentlyActive) {
+  try {
+    const res = await fetch(`${BASE}/api/faq/${id}/active`, {
+      method: "PUT",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ active: !currentlyActive })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to update FAQ status", "error");
+      return;
+    }
+
+    notify(`FAQ ${currentlyActive ? "deactivated" : "activated"}`, "success");
+    await loadFaq();
+  } catch (error) {
+    console.error("toggleFaqActive error:", error);
+    notify("Failed to update FAQ status", "error");
+  }
+}
+
+async function deleteFaq(id) {
+  const confirmed = await customConfirm("Delete this FAQ?");
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`${BASE}/api/faq/${id}`, {
+      method: "DELETE",
+      headers: authHeaders()
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to delete FAQ", "error");
+      return;
+    }
+
+    notify("FAQ deleted", "success");
+    await loadFaq();
+  } catch (error) {
+    console.error("deleteFaq error:", error);
+    notify("Failed to delete FAQ", "error");
   }
 }
 

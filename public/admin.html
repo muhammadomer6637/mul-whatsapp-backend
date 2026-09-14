@@ -125,6 +125,7 @@
               <button class="nav-subbtn active" data-settings-tab="quickReplies" onclick="goToSettingsTab('quickReplies', this)">Quick Replies</button>
               <button class="nav-subbtn" data-settings-tab="systemHealth" onclick="goToSettingsTab('systemHealth', this)">System Health</button>
               <button id="feeStructureTabBtn" class="nav-subbtn" data-settings-tab="feeStructure" onclick="goToSettingsTab('feeStructure', this)">Fee Structure</button>
+              <button id="faqTabBtn" class="nav-subbtn" data-settings-tab="faq" onclick="goToSettingsTab('faq', this)">FAQ</button>
             </div>
           </div>
         </nav>
@@ -825,6 +826,34 @@
             </div>
 
             <div id="feeStructureBody" style="margin-top:20px;"></div>
+          </div>
+        </div>
+
+        <div id="faqTab" class="settings-tab-panel hidden">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>FAQ</h3>
+                <p>Keyword-matched answers for general questions (dates, deadlines, etc.) not tied to a specific program</p>
+              </div>
+              <button class="primary-btn" onclick="openFaqModal()">
+                Add FAQ
+              </button>
+            </div>
+
+            <div class="table-wrap" style="margin-top:20px;">
+              <table class="styled-table">
+                <thead>
+                  <tr>
+                    <th>Question</th>
+                    <th>Keywords</th>
+                    <th>Answer</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="faqTableBody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>

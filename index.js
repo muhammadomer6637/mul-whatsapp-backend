@@ -283,6 +283,62 @@ function matchFeeProgramFromCatalog(rawText, catalog) {
   return null;
 }
 
+// Admin-managed FAQ catalog (dates, deadlines, general questions) - see
+// the "FAQ" section further down for the CRUD endpoints. Word-boundary
+// phrase matching only (no fuzzy tier like fee programs get) - FAQ
+// keywords are meant to be specific multi-word phrases an admin chose
+// deliberately, not typo-prone program names, so fuzzy matching would
+// only add false-positive risk here without solving a real problem.
+async function getActiveFaqCatalog() {
+  const result = await pool.query(
+    "SELECT id, question_label, keywords, answer FROM faq_entries WHERE active = true"
+  );
+  return result.rows;
+}
+
+function faqPhrases(row) {
+  return (row.keywords || "")
+    .split(",")
+    .map(k => k.trim())
+    .filter(k => pmTightClean(k).length >= 2);
+}
+
+// All significant words of a phrase must appear (as whole words)
+// SOMEWHERE in the message, in any order, not necessarily adjacent -
+// tested and confirmed necessary: Roman Urdu sentences routinely
+// insert connector words between the English keyword terms ("Exam ki
+// date", "Admission ki last date"), so requiring the phrase to appear
+// verbatim/adjacent (the first version of this, matching
+// matchFeeProgramConfident's exact-phrase approach) missed most real
+// messages. The anti-collision property this was built for is still
+// preserved: a phrase's word-SET stays specific ("date" alone can
+// never match anything, since no real FAQ should register a lone
+// common word as its only keyword; "classes date" still won't satisfy
+// "exam date"'s requirement, since "exam" wouldn't be present).
+function faqPhraseWords(phrase) {
+  return phrase.split(/\s+/).map(w => w.trim()).filter(w => w.length >= 2);
+}
+
+function matchFaqFromCatalog(rawText, catalog) {
+  const candidates = [];
+  for (const row of catalog) {
+    for (const phrase of faqPhrases(row)) {
+      const words = faqPhraseWords(phrase);
+      if (words.length) candidates.push({ row, words });
+    }
+  }
+  // Most specific (most words) wins if multiple phrases are satisfied.
+  candidates.sort((a, b) => b.words.length - a.words.length);
+
+  for (const { row, words } of candidates) {
+    const allPresent = words.every(word =>
+      new RegExp(`\\b${pmEscapeRegExp(word)}\\b`, "i").test(rawText)
+    );
+    if (allPresent) return row;
+  }
+  return null;
+}
+
 function buildFeeProgramAnswer(row) {
   const feeLines = [];
   if (row.admission_fee != null) {
@@ -3676,6 +3732,139 @@ app.delete("/api/fee-programs/:id", authenticateAgent, requireAdmin, async (req,
 });
 
 // =========================
+// FAQ (admin-managed keyword-matched knowledge base - dates, deadlines,
+// and other general questions that don't belong to a specific program).
+// Same keyword-matching technique as Fee Structure's program keywords:
+// word-boundary phrase match against comma-separated admin-entered
+// phrases, longest phrase wins. Deliberately phrase-based, not
+// single-word - a bare word like "date" would collide across multiple
+// FAQ entries (Exam Date / Classes Start Date / Admission Last Date all
+// contain it), whereas "exam date" vs "classes start" vs "admission
+// last date" don't. See matchFaqFromCatalog() and its call site below.
+// =========================
+
+app.get("/api/faq", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM faq_entries ORDER BY question_label ASC"
+    );
+    return res.json({ success: true, faqs: result.rows });
+  } catch (error) {
+    console.error("GET /api/faq error:", error.message);
+    return res.status(500).json({ success: false, error: "Failed to fetch FAQs" });
+  }
+});
+
+function validateFaqInput(body) {
+  const { questionLabel, keywords, answer } = body;
+  if (!questionLabel || !questionLabel.trim()) return "Question label is required";
+  if (!keywords || !keywords.trim()) return "At least one keyword/phrase is required";
+  if (!answer || !answer.trim()) return "Answer is required";
+  return null;
+}
+
+app.post("/api/faq", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const validationError = validateFaqInput(req.body);
+    if (validationError) {
+      return res.status(400).json({ success: false, error: validationError });
+    }
+
+    const { questionLabel, keywords, answer } = req.body;
+
+    const result = await pool.query(
+      `
+      INSERT INTO faq_entries (question_label, keywords, answer)
+      VALUES ($1, $2, $3)
+      RETURNING *
+      `,
+      [questionLabel.trim(), keywords.trim(), answer.trim()]
+    );
+
+    return res.json({ success: true, faq: result.rows[0] });
+  } catch (error) {
+    console.error("POST /api/faq error:", error.message);
+    return res.status(500).json({ success: false, error: "Failed to create FAQ" });
+  }
+});
+
+app.put("/api/faq/:id", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const validationError = validateFaqInput(req.body);
+    if (validationError) {
+      return res.status(400).json({ success: false, error: validationError });
+    }
+
+    const { questionLabel, keywords, answer } = req.body;
+
+    const result = await pool.query(
+      `
+      UPDATE faq_entries SET
+        question_label = $1,
+        keywords = $2,
+        answer = $3,
+        updated_at = NOW()
+      WHERE id = $4
+      RETURNING *
+      `,
+      [questionLabel.trim(), keywords.trim(), answer.trim(), id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: "FAQ not found" });
+    }
+
+    return res.json({ success: true, faq: result.rows[0] });
+  } catch (error) {
+    console.error("PUT /api/faq/:id error:", error.message);
+    return res.status(500).json({ success: false, error: "Failed to update FAQ" });
+  }
+});
+
+app.put("/api/faq/:id/active", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { active } = req.body;
+
+    const result = await pool.query(
+      "UPDATE faq_entries SET active = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
+      [!!active, id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: "FAQ not found" });
+    }
+
+    return res.json({ success: true, faq: result.rows[0] });
+  } catch (error) {
+    console.error("PUT /api/faq/:id/active error:", error.message);
+    return res.status(500).json({ success: false, error: "Failed to update FAQ status" });
+  }
+});
+
+app.delete("/api/faq/:id", authenticateAgent, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      "DELETE FROM faq_entries WHERE id = $1 RETURNING id",
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: "FAQ not found" });
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("DELETE /api/faq/:id error:", error.message);
+    return res.status(500).json({ success: false, error: "Failed to delete FAQ" });
+  }
+});
+
+// =========================
 // SYSTEM HEALTH API
 // =========================
 
@@ -5654,6 +5843,19 @@ if (lowerText === "__payment_confirmation__") {
 📞 For admission fee questions: Admissions Office - 03111222685 (phone call only, not WhatsApp call)
 📞 For semester fee questions: Accounts Office - 04235145621, Extension: 388`
   );
+  return res.sendStatus(200);
+}
+
+// Admin-managed FAQ catch-all - checked here, as the true last resort
+// right before the generic menu fallback, so it can never steal a
+// message from any of the more specific buckets above (fee/program/
+// deadline/payment/etc). Only messages nothing else recognized reach
+// this point.
+const faqCatalogForFallback = await getActiveFaqCatalog();
+const faqMatch = matchFaqFromCatalog(originalIncomingText, faqCatalogForFallback);
+if (faqMatch) {
+  userStates[from].hasInteracted = true;
+  await sendTextMessage(from, faqMatch.answer);
   return res.sendStatus(200);
 }
 
@@ -7922,6 +8124,31 @@ app.listen(3000, async () => {
     console.log("✅ password_reset_tokens table ensured in DB");
   } catch (err) {
     console.error("❌ password_reset_tokens table error:", err.message);
+  }
+
+  // 🔥 FAQ ENTRIES TABLE AUTO CREATE
+  // Admin-managed keyword-matched Q&A (Settings > FAQ) - dates,
+  // deadlines, and other general questions not tied to a specific
+  // program. See matchFaqFromCatalog() for the phrase-matching logic.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS faq_entries (
+        id SERIAL PRIMARY KEY,
+        question_label TEXT NOT NULL,
+        keywords TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_faq_entries_active ON faq_entries (active);
+    `);
+
+    console.log("✅ faq_entries table ensured in DB");
+  } catch (err) {
+    console.error("❌ faq_entries table error:", err.message);
   }
 
   // 🔥 START 24H FOLLOW-UP CHECKER
