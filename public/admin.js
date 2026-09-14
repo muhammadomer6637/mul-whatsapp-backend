@@ -2401,11 +2401,15 @@ async function updateCallback(id) {
 }
 
 // =========================
-// SETTINGS TABS
+// SETTINGS NAVIGATION (sidebar sub-menu under "Settings", replacing the
+// old in-page tab bar - that was one more row of tabs on an already
+// crowded page; this collapses to a single Settings entry in the
+// sidebar with Quick Replies/System Health/Fee Structure as sub-items).
 // =========================
-function showSettingsTab(tab, btn) {
+let currentSettingsTab = "quickReplies";
+
+function showSettingsTab(tab) {
   document.querySelectorAll(".settings-tab-panel").forEach(panel => panel.classList.add("hidden"));
-  document.querySelectorAll(".settings-tab-btn").forEach(b => b.classList.remove("active-filter"));
 
   if (tab === "quickReplies") {
     document.getElementById("quickRepliesTab").classList.remove("hidden");
@@ -2416,8 +2420,50 @@ function showSettingsTab(tab, btn) {
     document.getElementById("feeStructureTab").classList.remove("hidden");
     loadFeeStructure();
   }
+}
 
-  if (btn) btn.classList.add("active-filter");
+// Expands the sidebar's sub-menu (auto-expanding the whole sidebar
+// first if it's currently collapsed to icon-only, since there'd
+// otherwise be no room to show the sub-items) and shows whichever
+// settings tab was last active - so clicking the "Settings" parent
+// itself always lands somewhere sensible, not just toggling the menu.
+function handleSettingsNavClick(btn) {
+  expandSidebarForSettings();
+
+  const submenu = document.getElementById("settingsSubmenu");
+  const chevron = btn.querySelector(".nav-chevron");
+  const isOpen = submenu.classList.toggle("open");
+  if (chevron) chevron.classList.toggle("rotated", isOpen);
+
+  showSection("settings", btn);
+  activateSettingsTab(currentSettingsTab);
+}
+
+function goToSettingsTab(tab, subBtn) {
+  expandSidebarForSettings();
+
+  const submenu = document.getElementById("settingsSubmenu");
+  submenu.classList.add("open");
+  const chevron = document.getElementById("settingsNavBtn")?.querySelector(".nav-chevron");
+  if (chevron) chevron.classList.add("rotated");
+
+  showSection("settings", document.getElementById("settingsNavBtn"));
+  activateSettingsTab(tab);
+}
+
+function activateSettingsTab(tab) {
+  currentSettingsTab = tab;
+  document.querySelectorAll(".nav-subbtn").forEach(b => b.classList.remove("active"));
+  document.querySelector(`.nav-subbtn[data-settings-tab="${tab}"]`)?.classList.add("active");
+  showSettingsTab(tab);
+}
+
+function expandSidebarForSettings() {
+  const sidebar = document.getElementById("sidebar");
+  if (sidebar && !sidebar.classList.contains("expanded")) {
+    sidebar.classList.add("expanded");
+    localStorage.setItem("mul_nexus_sidebar_expanded", "1");
+  }
 }
 
 // =========================
