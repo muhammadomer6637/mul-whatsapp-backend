@@ -2291,7 +2291,9 @@ const filteredCallbacks =
         ${
           item.source === "meta_ad"
             ? `<div class="repeat-badge" style="background:rgba(24,119,242,0.16); color:#8fc0ff; border-color:rgba(24,119,242,0.3);" title="From a Click-to-WhatsApp ad - they did not explicitly request a callback">🎯 From Meta Ad - didn't request a callback</div>`
-            : ""
+            : item.source === "advisor_offline"
+              ? `<div class="repeat-badge" style="background:rgba(168,85,247,0.16); color:#d9b8ff; border-color:rgba(168,85,247,0.3);" title="Tried to chat while the Advisor was offline - they did not explicitly request a callback">🌙 Wants to Chat - Outside Office Hours</div>`
+              : ""
         }
 
         <div class="field-label">Status</div>

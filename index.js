@@ -900,6 +900,62 @@ For immediate information, you may continue exploring the available menu options
 Thank you for your patience.`;
 }
 
+// Sends the unavailable-hours message AND auto-queues a callback request
+// tagged "advisor_offline" - previously these students just got a
+// message and were never tracked anywhere, so nobody actually followed
+// up with them (the exact complaint that led to this). source keeps
+// this distinguishable in the Callback Requests panel from a genuine
+// student-typed "call me back" (see callback_requests.source, same
+// pattern as Meta Ad Leads) - a Call Agent shouldn't open with "you
+// requested a callback" when the student was just trying to chat.
+async function sendAgentUnavailableAndQueue(phone) {
+  await sendTextMessage(phone, agentUnavailableMessage());
+  try {
+    await createCallbackRequest(phone, "advisor_offline");
+  } catch (err) {
+    console.error("sendAgentUnavailableAndQueue callback error:", err.message);
+  }
+}
+
+// When an admin turns Agent Status back on, proactively tell any
+// student who hit the "advisor offline" message within the last 24
+// hours (WhatsApp's free-messaging window - sending outside it would
+// need a paid template and likely just fail) that they can now chat.
+// Anyone outside that window still has their callback_requests row
+// (source='advisor_offline') for a Call Agent to follow up manually -
+// this is a same-day bonus on top of that reliable fallback, not a
+// replacement for it. advisor_online_notified_at stops a same-day
+// off/on/off/on toggle from re-sending this to the same pending request.
+async function notifyAdvisorOnline() {
+  try {
+    const result = await pool.query(`
+      SELECT id, phone
+      FROM callback_requests
+      WHERE source = 'advisor_offline'
+        AND status = 'pending'
+        AND advisor_online_notified_at IS NULL
+        AND created_at >= NOW() - INTERVAL '24 hours'
+    `);
+
+    for (const row of result.rows) {
+      try {
+        await sendTextMessage(
+          row.phone,
+          `Our Admissions Advisor is now available. Type 7️⃣ to chat with them directly.`
+        );
+        await pool.query(
+          "UPDATE callback_requests SET advisor_online_notified_at = NOW() WHERE id = $1",
+          [row.id]
+        );
+      } catch (sendErr) {
+        console.error("notifyAdvisorOnline send error for", row.phone, ":", sendErr.message);
+      }
+    }
+  } catch (err) {
+    console.error("notifyAdvisorOnline error:", err.message);
+  }
+}
+
 // Track agent category selection
 // admissions | other
 // per user
@@ -3201,6 +3257,18 @@ app.put(
         });
       }
 
+      // Read the status BEFORE updating, so we only message the student
+      // on a genuine transition INTO called/not_responded (not every
+      // time an agent re-saves notes on an already-called entry, and
+      // correctly fires again on e.g. not_responded -> called if it
+      // changes back and forth).
+      const beforeResult = await pool.query(
+        "SELECT status, phone FROM callback_requests WHERE id = $1",
+        [id]
+      );
+      const previousStatus = beforeResult.rows[0]?.status;
+      const callbackPhone = beforeResult.rows[0]?.phone;
+
       const result = await pool.query(
         `
         UPDATE callback_requests
@@ -3260,6 +3328,25 @@ app.put(
           success: false,
           error: "Callback request not found"
         });
+      }
+
+      // Tell the student directly, on a genuine status transition -
+      // fire-and-forget so a slow/failed WhatsApp send never blocks the
+      // agent's own save. Re-fires on every real transition (e.g. a
+      // not_responded that later becomes called still sends the
+      // "called" message), per explicit request.
+      if (callbackPhone && status && status !== previousStatus) {
+        if (status === "called") {
+          sendTextMessage(
+            callbackPhone,
+            `Our Admissions Tele Officer contacted you through a phone call and informed you about your query. 📞 If you need any further assistance, feel free to message us anytime.`
+          ).catch(err => console.error("callback 'called' notify error:", err.message));
+        } else if (status === "not_responded") {
+          sendTextMessage(
+            callbackPhone,
+            `We tried calling you, but couldn't reach you. 📞 You can request another callback anytime, or call us directly at 03111222685.`
+          ).catch(err => console.error("callback 'not_responded' notify error:", err.message));
+        }
       }
 
       return res.json({
@@ -4434,7 +4521,7 @@ Our admissions team will review your application and issue your Admission Fee ch
                 userStates[from].currentMenu = "main";
                 userStates[from].hasInteracted = true;
               }
-              await sendTextMessage(from, agentUnavailableMessage());
+              await sendAgentUnavailableAndQueue(from);
               return res.sendStatus(200);
             }
 
@@ -4824,7 +4911,7 @@ userStates[from].lastSeenAt = Date.now();
 if (lowerText === "yes" && chatForCallback?.status !== "agent_active") {
   const agentAvailableForReengage = await isAgentAvailable();
   if (!agentAvailableForReengage) {
-    await sendTextMessage(from, agentUnavailableMessage());
+    await sendAgentUnavailableAndQueue(from);
     return res.sendStatus(200);
   }
 
@@ -4946,7 +5033,7 @@ if (userStates[from]?.currentMenu === "agent_category") {
     ) {
       const agentAvailableForAdmissions = await isAgentAvailable();
       if (!agentAvailableForAdmissions) {
-        await sendTextMessage(from, agentUnavailableMessage());
+        await sendAgentUnavailableAndQueue(from);
         return res.sendStatus(200);
       }
 
@@ -5023,7 +5110,7 @@ If comma is missing, your request may not be forwarded correctly.`
 
     const agentAvailableForOther = await isAgentAvailable();
     if (!agentAvailableForOther) {
-      await sendTextMessage(from, agentUnavailableMessage());
+      await sendAgentUnavailableAndQueue(from);
       return res.sendStatus(200);
     }
 
@@ -5305,7 +5392,7 @@ await pool.query(
 
       if (!agentAvailableForLead) {
         userStates[from].currentMenu = "main";
-        await sendTextMessage(from, agentUnavailableMessage());
+        await sendAgentUnavailableAndQueue(from);
         return res.sendStatus(200);
       }
 
@@ -5635,7 +5722,7 @@ if (lowerText === "7") {
   const available = await isAgentAvailable();
 
   if (!available) {
-    await sendTextMessage(from, agentUnavailableMessage());
+    await sendAgentUnavailableAndQueue(from);
     return res.sendStatus(200);
   }
 
@@ -6008,6 +6095,14 @@ app.post("/api/toggle-agent", authenticateAgent, async (req, res) => {
     } catch (logError) {
       // Don't let a logging failure block the actual toggle from succeeding.
       console.error("agent_status_logs insert error:", logError.message);
+    }
+
+    // Fire-and-forget - never delay the toggle's own response on however
+    // many WhatsApp sends this involves. Only relevant when turning ON.
+    if (newStatus === true) {
+      notifyAdvisorOnline().catch(err =>
+        console.error("notifyAdvisorOnline (post-toggle) error:", err.message)
+      );
     }
 
     res.json({ success: true });
@@ -8053,6 +8148,23 @@ app.listen(3000, async () => {
     console.log("✅ callback_requests.source column ensured in DB");
   } catch (err) {
     console.error("❌ callback_requests.source column error:", err.message);
+  }
+
+  // 🔥 CALLBACK REQUESTS ADVISOR-ONLINE NOTIFICATION COLUMN
+  // Tracks whether an "advisor_offline" callback request has already
+  // received the "Advisor is now available" WhatsApp message (sent when
+  // an admin toggles Agent Status back on - see /api/toggle-agent),
+  // so re-toggling on/off during the same day never re-sends it to the
+  // same pending request.
+  try {
+    await pool.query(`
+      ALTER TABLE callback_requests
+      ADD COLUMN IF NOT EXISTS advisor_online_notified_at TIMESTAMPTZ NULL;
+    `);
+
+    console.log("✅ callback_requests.advisor_online_notified_at column ensured in DB");
+  } catch (err) {
+    console.error("❌ callback_requests.advisor_online_notified_at column error:", err.message);
   }
 
   // 🔥 PUSH SUBSCRIPTIONS TABLE AUTO CREATE
