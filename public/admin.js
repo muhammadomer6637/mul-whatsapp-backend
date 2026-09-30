@@ -197,6 +197,7 @@ function applyRolePermissions() {
   const agentPanelBtn = document.querySelector('.nav-btn[data-section="agent"]');
   const agentManagementBtn = document.querySelector('.nav-btn[data-section="agents"]');
   const callbackBtn = document.querySelector('.nav-btn[data-section="callbacks"]');
+  const onHoldCasesBtn = document.querySelector('.nav-btn[data-section="onHoldCases"]');
   const agentStatusWrap = document.querySelector(".agent-status-wrap");
   const feeStructureTabBtn = document.getElementById("feeStructureTabBtn");
   const faqTabBtn = document.getElementById("faqTabBtn");
@@ -205,6 +206,7 @@ function applyRolePermissions() {
   if (agentPanelBtn) agentPanelBtn.style.display = "none";
   if (agentManagementBtn) agentManagementBtn.style.display = "none";
   if (callbackBtn) callbackBtn.style.display = "none";
+  if (onHoldCasesBtn) onHoldCasesBtn.style.display = "none";
   if (agentStatusWrap) agentStatusWrap.style.display = "none";
   if (feeStructureTabBtn) feeStructureTabBtn.style.display = "none";
   if (faqTabBtn) faqTabBtn.style.display = "none";
@@ -214,6 +216,7 @@ function applyRolePermissions() {
     if (agentPanelBtn) agentPanelBtn.style.display = "flex";
     if (agentManagementBtn) agentManagementBtn.style.display = "flex";
     if (callbackBtn) callbackBtn.style.display = "flex";
+    if (onHoldCasesBtn) onHoldCasesBtn.style.display = "flex";
     if (agentStatusWrap) agentStatusWrap.style.display = "flex";
     if (feeStructureTabBtn) feeStructureTabBtn.style.display = "inline-flex";
     if (faqTabBtn) faqTabBtn.style.display = "flex";
@@ -222,6 +225,7 @@ function applyRolePermissions() {
 
   if (currentAgent.role === "chat_agent") {
     if (agentPanelBtn) agentPanelBtn.style.display = "flex";
+    if (onHoldCasesBtn) onHoldCasesBtn.style.display = "flex";
     return;
   }
 
@@ -326,6 +330,13 @@ else if (id === "callbacks") {
     "Manage callback requests and follow-up activity";
 
   loadCallbacks();
+} else if (id === "onHoldCases") {
+  topbar.classList.remove("agent-mode");
+
+  title.textContent = "Pending Cases";
+  subtitle.textContent = "Chats on hold while an agent investigates something";
+
+  loadOnHoldCases();
 } else if (id === "settings") {
   topbar.classList.remove("agent-mode");
 
@@ -1745,6 +1756,10 @@ const admissionFeeIcon = funnel.admission_fee_paid_at ? "✓" : "○";
       <button class="funnel-menu-item" onclick="assignToCallAgent()">
         Assign To Call Agent
       </button>
+
+      <button class="funnel-menu-item" onclick="markChatOnHold()">
+        ⏸ Mark as On Hold
+      </button>
     </div>
   `;
 
@@ -1879,6 +1894,44 @@ async function assignToCallAgent() {
   } catch (error) {
     console.error("assignToCallAgent error:", error);
     notify("Failed to assign to call agent", "error");
+  }
+}
+
+async function markChatOnHold() {
+  if (!selectedPhone) {
+    notify("Please select a chat first.", "warning");
+    return;
+  }
+
+  const note = await customPrompt(
+    "What are you checking on? (shown to other agents in Pending Cases)",
+    { defaultValue: "" }
+  );
+  if (note === null) return;
+
+  try {
+    const res = await fetch(`${BASE}/api/chats/${selectedPhone}/hold`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ note })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      notify(data.error || "Failed to mark chat on hold", "error");
+      return;
+    }
+
+    const menu = document.getElementById("funnelMenu");
+    if (menu) menu.remove();
+
+    notify("Chat marked on hold - student has been notified", "success");
+    await loadChats();
+    await openChat(selectedPhone, false);
+  } catch (error) {
+    console.error("markChatOnHold error:", error);
+    notify("Failed to mark chat on hold", "error");
   }
 }
 
@@ -2403,6 +2456,81 @@ async function updateCallback(id) {
     console.error("updateCallback error:", error);
     notify("Callback update failed", "error");
   }
+}
+
+// =========================
+// PENDING CASES (chats put "on hold" while an agent investigates
+// something - see markChatOnHold() and the "⏸ Mark as On Hold" chat
+// menu item)
+// =========================
+async function loadOnHoldCases() {
+  showLoadingState("onHoldCasesBody");
+  try {
+    const res = await fetch(`${BASE}/api/on-hold-cases`, {
+      headers: authHeaders()
+    });
+    const data = await res.json();
+    if (!data.success) return;
+
+    const cases = data.cases || [];
+    const container = document.getElementById("onHoldCasesBody");
+
+    if (!cases.length) {
+      container.innerHTML = `
+        <div class="empty-chat-state" style="min-height:160px;">
+          <div class="empty-chat-icon">⏸</div>
+          <h3>No cases on hold right now</h3>
+        </div>
+      `;
+      markLoaded("onHoldCasesBody");
+      return;
+    }
+
+    container.innerHTML = cases.map(c => {
+      const startedMs = c.on_hold_started_at ? new Date(c.on_hold_started_at).getTime() : Date.now();
+      const hoursOnHold = (Date.now() - startedMs) / (1000 * 60 * 60);
+      // 20h matches checkOnHoldReminders()'s own threshold for sending
+      // the free pre-expiry reminder - this just surfaces the same
+      // urgency visually so agents don't need to guess.
+      const isApproachingWindow = hoursOnHold >= 20;
+
+      return `
+        <div class="callback-card" style="${isApproachingWindow ? "border-color:rgba(255,91,91,0.5);" : ""}">
+          <div class="callback-card-header">
+            <div>
+              <div class="callback-card-name">${escapeHtml(c.student_name || "-")}</div>
+              ${
+                isApproachingWindow
+                  ? `<div class="repeat-badge" style="background:rgba(255,91,91,0.16); color:#ff9a9a; border-color:rgba(255,91,91,0.3);">⏰ Approaching 24h window</div>`
+                  : ""
+              }
+            </div>
+            <div class="callback-card-date">${formatDateTime(c.on_hold_started_at)}</div>
+          </div>
+
+          <div class="callback-card-meta">
+            ${escapeHtml(c.phone || "-")} · ${escapeHtml(prettyProgramName(c.program || "-"))} · Assigned: ${escapeHtml(c.assigned_agent_name || "Unassigned")}
+          </div>
+
+          <div class="field-label">Note</div>
+          <div style="color:var(--text); font-size:13px; margin-bottom:12px;">${escapeHtml(c.on_hold_note || "No note added")}</div>
+
+          <button class="primary-btn" onclick="openChatFromOnHold('${c.phone}')">
+            Open Chat &amp; Reply
+          </button>
+        </div>
+      `;
+    }).join("");
+
+    markLoaded("onHoldCasesBody");
+  } catch (error) {
+    console.error("loadOnHoldCases error:", error);
+  }
+}
+
+function openChatFromOnHold(phone) {
+  showSection("agent");
+  openChat(phone, true);
 }
 
 // =========================

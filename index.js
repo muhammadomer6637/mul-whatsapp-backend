@@ -2425,6 +2425,44 @@ Please choose an option:
   }
 }
 
+// Sends the free (no template needed) pre-expiry reminder for on-hold
+// cases approaching WhatsApp's 24h free-messaging window - see the
+// "on_hold_keep_updated" button handler in the webhook for what happens
+// if the student taps it. 20h since their last message (not since the
+// case was marked on hold) leaves a real margin before the window
+// actually closes at 24h.
+async function checkOnHoldReminders() {
+  try {
+    const result = await pool.query(`
+      SELECT phone
+      FROM chats
+      WHERE status = 'on_hold'
+        AND on_hold_reminder_sent_at IS NULL
+        AND last_incoming_at IS NOT NULL
+        AND last_incoming_at <= NOW() - INTERVAL '20 hours'
+      LIMIT 20
+    `);
+
+    for (const row of result.rows) {
+      await sendReplyButtons(
+        row.phone,
+        `We're still working on your query and need a little more time. 🙏
+
+Please tap below so we can keep you updated.`,
+        [{ id: "on_hold_keep_updated", title: "Keep Me Updated" }],
+        "on_hold"
+      );
+
+      await pool.query(
+        "UPDATE chats SET on_hold_reminder_sent_at = NOW() WHERE phone = $1",
+        [row.phone]
+      );
+    }
+  } catch (error) {
+    console.error("checkOnHoldReminders error:", error.message);
+  }
+}
+
 const MEDIA_MAX_AGE_MS = 5 * 24 * 60 * 60 * 1000; // 5 days
 
 async function cleanupOldMedia() {
@@ -4360,6 +4398,22 @@ app.post("/webhook", async (req, res) => {
         [from, rating]
       );
       await sendTextMessage(from, "Thank you for your feedback!", "active");
+      return res.sendStatus(200);
+    }
+
+    // On-hold pre-expiry reminder button tap ("on_hold_keep_updated" -
+    // see notifyOnHoldExpiring()). The tap itself is the point: any
+    // genuine incoming message refreshes WhatsApp's 24h free-messaging
+    // window, so the agent can send their eventual full answer as a
+    // normal message instead of needing a paid template. Handled in
+    // isolation like CSAT above - not a menu navigation choice.
+    if (
+      msg.type === "interactive" &&
+      msg.interactive?.type === "button_reply" &&
+      msg.interactive.button_reply.id === "on_hold_keep_updated"
+    ) {
+      await incrementUnreadAndSetIncoming(from, "Tapped: Keep Me Updated", "on_hold");
+      await sendTextMessage(from, "Thanks! We'll keep you updated. 🙏", "on_hold");
       return res.sendStatus(200);
     }
 
@@ -6439,6 +6493,84 @@ ${welcomeMessage()}`,
   }
 });
 
+// =========================
+// ON HOLD CASES
+// Real complaint this solves: some queries (e.g. "what's my application
+// status") take an agent real time to actually investigate (checking
+// with another office, etc), well past a quick reply. Keeping the chat
+// "active/waiting" the whole time made those cases invisible/easy to
+// lose track of; marking it "on hold" here gives it a dedicated,
+// persistent record (assigned_agent_id is untouched, so it's still
+// "theirs") instead of just sitting silently in the normal chat list.
+// =========================
+
+app.post("/api/chats/:phone/hold", authenticateAgent, async (req, res) => {
+  try {
+    const { phone } = req.params;
+    const { note } = req.body;
+
+    const result = await pool.query(
+      `
+      UPDATE chats
+      SET
+        status = 'on_hold',
+        on_hold_note = $1,
+        on_hold_started_at = NOW(),
+        on_hold_reminder_sent_at = NULL,
+        updated_at = NOW()
+      WHERE phone = $2
+      RETURNING *
+      `,
+      [(note || "").trim() || null, phone]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: "Chat not found" });
+    }
+
+    await sendTextMessage(
+      phone,
+      `Thank you for your patience. 🙏 Our team is currently looking into your query and will get back to you with an update shortly.
+
+💡 Type MENU anytime to explore other information.`,
+      "on_hold"
+    );
+
+    notifyChatUpdated(phone);
+
+    return res.json({ success: true, chat: result.rows[0] });
+  } catch (error) {
+    console.error("POST /api/chats/:phone/hold error:", error.message);
+    return res.status(500).json({ success: false, error: "Failed to mark chat on hold" });
+  }
+});
+
+app.get("/api/on-hold-cases", authenticateAgent, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        c.phone,
+        c.on_hold_note,
+        c.on_hold_started_at,
+        c.on_hold_reminder_sent_at,
+        c.assigned_agent_id,
+        ag.name AS assigned_agent_name,
+        u.name AS student_name,
+        u.program
+      FROM chats c
+      LEFT JOIN agents ag ON ag.id = c.assigned_agent_id
+      LEFT JOIN users u ON u.phone = c.phone
+      WHERE c.status = 'on_hold'
+      ORDER BY c.on_hold_started_at ASC
+    `);
+
+    return res.json({ success: true, cases: result.rows });
+  } catch (error) {
+    console.error("GET /api/on-hold-cases error:", error.message);
+    return res.status(500).json({ success: false, error: "Failed to fetch on-hold cases" });
+  }
+});
+
 const CHATS_COLUMNS = `
   c.phone,
   c.status,
@@ -6596,6 +6728,19 @@ app.post("/api/send", authenticateAgent, async (req, res) => {
 
     await updateUserDetails(phone, { mode: "agent" });
     await sendAgentTextMessage(phone, message, "agent_active", replyContext);
+
+    // Sending any reply is itself the natural "I'm done investigating"
+    // signal for an on-hold case - sendAgentTextMessage above already
+    // moves chats.status off 'on_hold' (to 'agent_active'), this just
+    // clears the now-stale on-hold bookkeeping so it doesn't linger.
+    await pool.query(
+      `
+      UPDATE chats
+      SET on_hold_note = NULL, on_hold_started_at = NULL, on_hold_reminder_sent_at = NULL
+      WHERE phone = $1
+      `,
+      [phone]
+    );
 
     return res.json({
       success: true,
@@ -8263,12 +8408,30 @@ app.listen(3000, async () => {
     console.error("❌ faq_entries table error:", err.message);
   }
 
+  // 🔥 ON HOLD CASES COLUMNS
+  // status = 'on_hold' is a new value on the existing chats.status
+  // column (plain TEXT, no migration needed for that part) - these are
+  // just the extra bookkeeping fields that go with it.
+  try {
+    await pool.query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS on_hold_note TEXT NULL;`);
+    await pool.query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS on_hold_started_at TIMESTAMPTZ NULL;`);
+    await pool.query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS on_hold_reminder_sent_at TIMESTAMPTZ NULL;`);
+
+    console.log("✅ On Hold Cases columns ensured in DB");
+  } catch (err) {
+    console.error("❌ On Hold Cases columns error:", err.message);
+  }
+
   // 🔥 START 24H FOLLOW-UP CHECKER
   setInterval(checkPendingFollowups, 10 * 60 * 1000); // every 10 minutes
   setInterval(checkCallbackOffers, 10 * 60 * 1000);
   console.log("10m callback offer checker started");
   checkCallbackOffers();
   console.log("✅ 24h follow-up checker started");
+
+  setInterval(checkOnHoldReminders, 10 * 60 * 1000);
+  checkOnHoldReminders();
+  console.log("✅ On-hold pre-expiry reminder checker started");
 
   setInterval(cleanupOldMedia, 24 * 60 * 60 * 1000); // once a day
   cleanupOldMedia();

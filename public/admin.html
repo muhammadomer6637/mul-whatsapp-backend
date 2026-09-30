@@ -115,6 +115,11 @@
   <span class="nav-label">Callback Requests</span>
 </button>
 
+          <button class="nav-btn" data-section="onHoldCases" onclick="showSection('onHoldCases', this)" title="Pending Cases">
+  <span class="nav-icon">⏸</span>
+  <span class="nav-label">Pending Cases</span>
+</button>
+
           <div class="nav-group">
             <button class="nav-btn admin-only" id="settingsNavBtn" data-section="settings" onclick="handleSettingsNavClick(this)" title="Settings">
               <span class="nav-icon">⚙</span>
@@ -744,6 +749,27 @@
   </div>       
 
   <div id="callbackTableBody" class="callback-card-list"></div>
+</section>
+
+      <section id="onHoldCases" class="section hidden">
+
+  <div class="page-header">
+    <div>
+      <h1>Pending Cases</h1>
+      <p>
+        Chats put on hold while an agent investigates something (e.g. an application status check) - oldest first
+      </p>
+    </div>
+
+    <button
+      class="refresh-btn"
+      onclick="loadOnHoldCases()"
+    >
+      Refresh
+    </button>
+  </div>
+
+  <div id="onHoldCasesBody" class="callback-card-list"></div>
 </section>
 
       <section id="settings" class="section hidden">
