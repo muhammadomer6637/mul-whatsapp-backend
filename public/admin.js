@@ -2342,6 +2342,17 @@ const filteredCallbacks =
         </div>
 
         ${
+          item.phone
+            ? `<a
+                href="https://wa.me/${item.phone.replace(/\D/g, "")}"
+                target="_blank"
+                rel="noopener"
+                style="display:inline-block;text-align:center;text-decoration:none;padding:10px 16px;border-radius:10px;background:#25D366;color:#fff;font-weight:700;font-size:14px;margin-top:4px;margin-bottom:4px;"
+              >💬 Chat on WhatsApp</a>`
+            : ""
+        }
+
+        ${
           item.source === "meta_ad"
             ? `<div class="repeat-badge" style="background:rgba(24,119,242,0.16); color:#8fc0ff; border-color:rgba(24,119,242,0.3);" title="From a Click-to-WhatsApp ad - they did not explicitly request a callback">🎯 From Meta Ad - didn't request a callback</div>`
             : item.source === "advisor_offline"
