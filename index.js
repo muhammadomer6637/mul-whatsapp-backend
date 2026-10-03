@@ -4337,6 +4337,43 @@ app.post("/webhook", async (req, res) => {
     const from = msg.from;
     const contactName = contact?.profile?.name || null;
 
+    // 🔥 MAINTENANCE MODE - set MAINTENANCE_MODE=true in Railway env vars
+    // to pause the entire bot (menus, FAQ, program matching, registration,
+    // everything below this point) without deleting/changing any of it.
+    // Every incoming message is instead treated like "advisor offline":
+    // the student gets the existing agent-unavailable message ONCE and is
+    // queued in Callback Requests (source="advisor_offline") for manual
+    // follow-up, exactly like outside support hours already works. Repeat
+    // messages from the same phone stay completely silent (tracked via
+    // chats.maintenance_notice_sent_at) so they don't generate further
+    // paid Service messages. Set MAINTENANCE_MODE back to false (or remove
+    // it) in Railway and redeploy to resume normal operation - nothing
+    // else needs to change.
+    if (process.env.MAINTENANCE_MODE === "true") {
+      try {
+        await createUserIfNotExists(from, contactName);
+
+        const incomingPreview = msg.text?.body || "[Message received]";
+        await incrementUnreadAndSetIncoming(from, incomingPreview, "agent_waiting");
+
+        const chatRow = await pool.query(
+          "SELECT maintenance_notice_sent_at FROM chats WHERE phone = $1",
+          [from]
+        );
+
+        if (!chatRow.rows[0]?.maintenance_notice_sent_at) {
+          await sendAgentUnavailableAndQueue(from);
+          await pool.query(
+            "UPDATE chats SET maintenance_notice_sent_at = NOW() WHERE phone = $1",
+            [from]
+          );
+        }
+      } catch (err) {
+        console.error("maintenance mode handling error:", err.message);
+      }
+      return res.sendStatus(200);
+    }
+
     // Click-to-WhatsApp Meta ad attribution. WhatsApp's Cloud API includes
     // a "referral" object, at no extra API/permission cost, on the very
     // first message of a conversation that started from clicking a
@@ -8420,6 +8457,19 @@ app.listen(3000, async () => {
     console.log("✅ On Hold Cases columns ensured in DB");
   } catch (err) {
     console.error("❌ On Hold Cases columns error:", err.message);
+  }
+
+  // 🔥 MAINTENANCE MODE COLUMN
+  // Tracks whether a phone has already been sent the one-time
+  // agent-unavailable message while MAINTENANCE_MODE=true, so repeat
+  // messages from the same student during the outage stay silent
+  // (no repeat Service-category charge) instead of re-sending every time.
+  try {
+    await pool.query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS maintenance_notice_sent_at TIMESTAMPTZ NULL;`);
+
+    console.log("✅ Maintenance mode column ensured in DB");
+  } catch (err) {
+    console.error("❌ Maintenance mode column error:", err.message);
   }
 
   // 🔥 START 24H FOLLOW-UP CHECKER
