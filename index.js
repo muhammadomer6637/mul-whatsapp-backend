@@ -4340,15 +4340,13 @@ app.post("/webhook", async (req, res) => {
     // 🔥 MAINTENANCE MODE - set MAINTENANCE_MODE=true in Railway env vars
     // to pause the entire bot (menus, FAQ, program matching, registration,
     // everything below this point) without deleting/changing any of it.
-    // Every incoming message is instead treated like "advisor offline":
-    // the student gets the existing agent-unavailable message ONCE and is
-    // queued in Callback Requests (source="advisor_offline") for manual
-    // follow-up, exactly like outside support hours already works. Repeat
-    // messages from the same phone stay completely silent (tracked via
-    // chats.maintenance_notice_sent_at) so they don't generate further
-    // paid Service messages. Set MAINTENANCE_MODE back to false (or remove
-    // it) in Railway and redeploy to resume normal operation - nothing
-    // else needs to change.
+    // Zero WhatsApp messages are sent back to the student (no Service
+    // charge at all) - every incoming message is only silently queued in
+    // Callback Requests (source="advisor_offline") for manual follow-up.
+    // chats.maintenance_notice_sent_at stops repeat messages from the same
+    // phone from re-queuing/bumping the same callback request over and
+    // over. Set MAINTENANCE_MODE back to false (or remove it) in Railway
+    // and redeploy to resume normal operation - nothing else needs to change.
     if (process.env.MAINTENANCE_MODE === "true") {
       try {
         await createUserIfNotExists(from, contactName);
@@ -4362,7 +4360,7 @@ app.post("/webhook", async (req, res) => {
         );
 
         if (!chatRow.rows[0]?.maintenance_notice_sent_at) {
-          await sendAgentUnavailableAndQueue(from);
+          await createCallbackRequest(from, "advisor_offline");
           await pool.query(
             "UPDATE chats SET maintenance_notice_sent_at = NOW() WHERE phone = $1",
             [from]
