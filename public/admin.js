@@ -1537,6 +1537,13 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
     ${formatStatus(selectedChat?.status || "active")}
   </span>
 
+  <a
+    href="https://wa.me/${(selectedChat?.phone || phone).replace(/\D/g, "")}"
+    target="_blank"
+    rel="noopener"
+    style="display:inline-block;text-align:center;text-decoration:none;padding:6px 12px;border-radius:8px;background:#25D366;color:#fff;font-weight:700;font-size:13px;white-space:nowrap;"
+  >💬 WhatsApp</a>
+
   <button
     class="ghost-btn"
     onclick="toggleFunnelMenu()"
@@ -2340,17 +2347,6 @@ const filteredCallbacks =
         <div class="callback-card-meta">
           ${escapeHtml(item.phone || "-")} · ${escapeHtml(prettyProgramName(item.program || "-"))}
         </div>
-
-        ${
-          item.phone
-            ? `<a
-                href="https://wa.me/${item.phone.replace(/\D/g, "")}"
-                target="_blank"
-                rel="noopener"
-                style="display:inline-block;text-align:center;text-decoration:none;padding:10px 16px;border-radius:10px;background:#25D366;color:#fff;font-weight:700;font-size:14px;margin-top:4px;margin-bottom:4px;"
-              >💬 Chat on WhatsApp</a>`
-            : ""
-        }
 
         ${
           item.source === "meta_ad"
