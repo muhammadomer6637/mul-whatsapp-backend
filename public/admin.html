@@ -628,6 +628,7 @@
 
             <div id="chatList" class="chat-list premium-scroll"></div>
             <button id="loadMoreChatsBtn" class="ghost-btn load-more-chats-btn hidden" onclick="loadMoreChats()">Load More Chats</button>
+            <button id="maintenanceQueueBtn" class="ghost-btn" style="width:100%;margin-top:10px;" onclick="openMaintenanceQueueModal()">📋 List View (0)</button>
           </div>
 
           <div class="wa-chat-window">
@@ -962,6 +963,41 @@
     <button class="primary-btn" onclick="changeOwnPassword()">
       Change Password
     </button>
+    </div>
+  </div>
+</div>
+
+<div id="maintenanceQueueModal" class="profile-modal hidden">
+  <div class="profile-modal-card">
+    <div class="profile-modal-header">
+      <div>
+        <h2>Maintenance Queue</h2>
+        <p>Students who messaged today while the system was paused - contact manually, then check them off.</p>
+      </div>
+      <button class="profile-close-btn" onclick="closeMaintenanceQueueModal()">×</button>
+    </div>
+
+    <div class="profile-modal-body">
+      <div class="wa-filters" style="margin-bottom:14px;">
+        <button class="ghost-btn active-filter" id="mqFilter_all" onclick="setMaintenanceQueueFilter('all')">All</button>
+        <button class="ghost-btn" id="mqFilter_pending" onclick="setMaintenanceQueueFilter('pending')">Pending</button>
+        <button class="ghost-btn" id="mqFilter_marked" onclick="setMaintenanceQueueFilter('marked')">Marked</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="styled-table" id="maintenanceQueueTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Program</th>
+              <th>WhatsApp</th>
+              <th>Contacted</th>
+            </tr>
+          </thead>
+          <tbody id="maintenanceQueueTableBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>

@@ -6580,6 +6580,46 @@ app.post("/api/chats/:phone/hold", authenticateAgent, async (req, res) => {
   }
 });
 
+// Toggles whether an agent has manually contacted a student outside the
+// system (via the secondary WhatsApp number) while MAINTENANCE_MODE is
+// pausing automated replies. Deliberately separate from the Callback
+// Requests status dropdown (PUT /api/callbacks/:id), which fires a real
+// WhatsApp notification on status change - this must never send a
+// message, so it only ever touches this one timestamp column. Read from
+// both the chat header (openChat) and the Agent Panel's List View modal,
+// kept in sync because both write the same chats row.
+app.post("/api/chats/:phone/mark-contacted", authenticateAgent, async (req, res) => {
+  try {
+    if (!["admin", "chat_agent"].includes(req.agent.role)) {
+      return res.status(403).json({ success: false, error: "Not authorized" });
+    }
+
+    const { phone } = req.params;
+    const { contacted } = req.body;
+
+    const result = await pool.query(
+      `
+      UPDATE chats
+      SET manually_contacted_at = $1, updated_at = NOW()
+      WHERE phone = $2
+      RETURNING *
+      `,
+      [contacted ? new Date() : null, phone]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: "Chat not found" });
+    }
+
+    notifyChatUpdated(phone);
+
+    return res.json({ success: true, chat: result.rows[0] });
+  } catch (error) {
+    console.error("POST /api/chats/:phone/mark-contacted error:", error.message);
+    return res.status(500).json({ success: false, error: "Failed to update" });
+  }
+});
+
 app.get("/api/on-hold-cases", authenticateAgent, async (req, res) => {
   try {
     const result = await pool.query(`
@@ -6617,6 +6657,8 @@ const CHATS_COLUMNS = `
   c.assigned_agent_id,
   a.name AS assigned_agent,
   c.assigned_at,
+  c.maintenance_notice_sent_at,
+  c.manually_contacted_at,
   u.name,
   u.program,
   u.mode
@@ -8457,17 +8499,21 @@ app.listen(3000, async () => {
     console.error("❌ On Hold Cases columns error:", err.message);
   }
 
-  // 🔥 MAINTENANCE MODE COLUMN
-  // Tracks whether a phone has already been sent the one-time
-  // agent-unavailable message while MAINTENANCE_MODE=true, so repeat
-  // messages from the same student during the outage stay silent
-  // (no repeat Service-category charge) instead of re-sending every time.
+  // 🔥 MAINTENANCE MODE COLUMNS
+  // maintenance_notice_sent_at tracks whether a phone has already been
+  // silently queued while MAINTENANCE_MODE=true, so repeat messages from
+  // the same student during the outage don't re-queue/bump the same
+  // callback request (no repeat Service-category charge either way).
+  // manually_contacted_at tracks whether an agent has manually replied
+  // outside the system (e.g. via the secondary WhatsApp number) - checked
+  // off from the chat header or the Agent Panel's List View.
   try {
     await pool.query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS maintenance_notice_sent_at TIMESTAMPTZ NULL;`);
+    await pool.query(`ALTER TABLE chats ADD COLUMN IF NOT EXISTS manually_contacted_at TIMESTAMPTZ NULL;`);
 
-    console.log("✅ Maintenance mode column ensured in DB");
+    console.log("✅ Maintenance mode columns ensured in DB");
   } catch (err) {
-    console.error("❌ Maintenance mode column error:", err.message);
+    console.error("❌ Maintenance mode columns error:", err.message);
   }
 
   // 🔥 START 24H FOLLOW-UP CHECKER

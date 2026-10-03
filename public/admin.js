@@ -1192,6 +1192,7 @@ async function loadChats() {
     updateAgentMiniStats(allChats);
     renderChatList();
     updateLoadMoreButton();
+    updateMaintenanceQueueBadge();
   } catch (error) {
     console.error("Chats load error:", error);
   }
@@ -1230,6 +1231,7 @@ async function loadMoreChats() {
 
     updateAgentMiniStats(allChats);
     renderChatList();
+    updateMaintenanceQueueBadge();
   } catch (error) {
     console.error("Load more chats error:", error);
   } finally {
@@ -1414,6 +1416,11 @@ function buildChatRowHtml(chat, now) {
       <div class="chat-topline">
         <div class="chat-name">${escapeHtml(chat.name || chat.phone)}</div>
         ${
+          chat.maintenance_notice_sent_at && !chat.manually_contacted_at
+            ? `<span title="Queued while the system was paused - not yet manually contacted">🚨</span>`
+            : ""
+        }
+        ${
           Number(chat.unread_count || 0) > 0 &&
           (chat.status === "agent_waiting" || chat.status === "agent_active")
             ? `<span class="unread-badge">${chat.unread_count}</span>`
@@ -1443,6 +1450,130 @@ ${
         ${escapeHtml(chat.last_message || "No messages yet")}
       </div>
   `;
+}
+
+// =========================
+// MAINTENANCE QUEUE (List View)
+// =========================
+// Reuses the already-loaded allChats array (populated by loadChats(),
+// which always returns the complete agent_waiting/agent_active set, not
+// just page 1) instead of its own fetch - every maintenance-queued chat
+// is status="agent_waiting" with maintenance_notice_sent_at set, so it's
+// always present in allChats already. "Today" is compared in Pakistan
+// time (fixed UTC+5, no DST) by shifting both timestamps before reading
+// their UTC calendar date, since the server stores plain UTC timestamps.
+let currentMaintenanceQueueFilter = "all";
+
+function isTodayPKT(isoString) {
+  if (!isoString) return false;
+  const PKT_OFFSET_MS = 5 * 60 * 60 * 1000;
+  const d = new Date(new Date(isoString).getTime() + PKT_OFFSET_MS);
+  const now = new Date(Date.now() + PKT_OFFSET_MS);
+  return (
+    d.getUTCFullYear() === now.getUTCFullYear() &&
+    d.getUTCMonth() === now.getUTCMonth() &&
+    d.getUTCDate() === now.getUTCDate()
+  );
+}
+
+function getMaintenanceQueueChats() {
+  return allChats.filter(c => c.maintenance_notice_sent_at && isTodayPKT(c.maintenance_notice_sent_at));
+}
+
+function updateMaintenanceQueueBadge() {
+  const btn = document.getElementById("maintenanceQueueBtn");
+  if (!btn) return;
+  const pending = getMaintenanceQueueChats().filter(c => !c.manually_contacted_at).length;
+  btn.textContent = `📋 List View (${pending})`;
+}
+
+async function toggleContacted(phone, contacted) {
+  try {
+    const res = await fetch(`${BASE}/api/chats/${phone}/mark-contacted`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ contacted })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      notify(data.error || "Failed to update", "error");
+      return;
+    }
+
+    const chat = allChats.find(c => c.phone === phone);
+    if (chat) chat.manually_contacted_at = contacted ? data.chat.manually_contacted_at : null;
+
+    renderChatList();
+    updateMaintenanceQueueBadge();
+    if (selectedPhone === phone) openChat(phone, false, true);
+    if (!document.getElementById("maintenanceQueueModal").classList.contains("hidden")) {
+      renderMaintenanceQueueRows();
+    }
+  } catch (error) {
+    console.error("toggleContacted error:", error);
+    notify("Failed to update", "error");
+  }
+}
+
+function openMaintenanceQueueModal() {
+  currentMaintenanceQueueFilter = "all";
+  document.querySelectorAll("#maintenanceQueueModal .wa-filters .ghost-btn").forEach(btn => btn.classList.remove("active-filter"));
+  document.getElementById("mqFilter_all").classList.add("active-filter");
+  renderMaintenanceQueueRows();
+  document.getElementById("maintenanceQueueModal").classList.remove("hidden");
+}
+
+function closeMaintenanceQueueModal() {
+  const modal = document.getElementById("maintenanceQueueModal");
+  if (modal) modal.classList.add("hidden");
+}
+
+function setMaintenanceQueueFilter(filter) {
+  currentMaintenanceQueueFilter = filter;
+  document.querySelectorAll("#maintenanceQueueModal .wa-filters .ghost-btn").forEach(btn => btn.classList.remove("active-filter"));
+  const btn = document.getElementById(`mqFilter_${filter}`);
+  if (btn) btn.classList.add("active-filter");
+  renderMaintenanceQueueRows();
+}
+
+function renderMaintenanceQueueRows() {
+  let rows = getMaintenanceQueueChats();
+
+  if (currentMaintenanceQueueFilter === "pending") {
+    rows = rows.filter(c => !c.manually_contacted_at);
+  } else if (currentMaintenanceQueueFilter === "marked") {
+    rows = rows.filter(c => c.manually_contacted_at);
+  }
+
+  rows.sort((a, b) => new Date(a.maintenance_notice_sent_at) - new Date(b.maintenance_notice_sent_at));
+
+  const tbody = document.getElementById("maintenanceQueueTableBody");
+  if (!tbody) return;
+
+  tbody.innerHTML = rows.length
+    ? rows.map(c => `
+      <tr>
+        <td>${escapeHtml(c.name || "-")}</td>
+        <td>${escapeHtml(c.phone || "-")}</td>
+        <td>${escapeHtml(prettyProgramName(c.program || "-"))}</td>
+        <td>
+          <a
+            href="https://wa.me/${(c.phone || "").replace(/\D/g, "")}"
+            target="_blank"
+            rel="noopener"
+            style="display:inline-block;text-align:center;text-decoration:none;padding:6px 12px;border-radius:8px;background:#25D366;color:#fff;font-weight:700;font-size:13px;white-space:nowrap;"
+          >💬 Chat</a>
+        </td>
+        <td>
+          <input
+            type="checkbox"
+            ${c.manually_contacted_at ? "checked" : ""}
+            onchange="toggleContacted('${c.phone}', this.checked)"
+          />
+        </td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="5" style="color:var(--muted);">No students in this view.</td></tr>`;
 }
 
 function buildTickHtml(status) {
@@ -1543,6 +1674,19 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
     rel="noopener"
     style="display:inline-block;text-align:center;text-decoration:none;padding:6px 12px;border-radius:8px;background:#25D366;color:#fff;font-weight:700;font-size:13px;white-space:nowrap;"
   >💬 WhatsApp</a>
+
+  ${
+    selectedChat?.maintenance_notice_sent_at
+      ? `<label style="display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;cursor:pointer;">
+          <input
+            type="checkbox"
+            ${selectedChat?.manually_contacted_at ? "checked" : ""}
+            onchange="toggleContacted('${selectedChat?.phone || phone}', this.checked)"
+          />
+          Contacted
+        </label>`
+      : ""
+  }
 
   <button
     class="ghost-btn"
@@ -5137,6 +5281,12 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  const maintenanceQueueModal = document.getElementById("maintenanceQueueModal");
+  if (maintenanceQueueModal && !maintenanceQueueModal.classList.contains("hidden")) {
+    closeMaintenanceQueueModal();
+    return;
+  }
+
   const registrationModal = document.getElementById("registrationModal");
   if (registrationModal && !registrationModal.classList.contains("hidden")) {
     closeRegistrationModal();
@@ -5179,6 +5329,10 @@ document.addEventListener("click", (event) => {
   }
   if (event.target.id === "leadsModal") {
     closeLeadsModal();
+    return;
+  }
+  if (event.target.id === "maintenanceQueueModal") {
+    closeMaintenanceQueueModal();
     return;
   }
   if (event.target.id === "registrationModal") {
