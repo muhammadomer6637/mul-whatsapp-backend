@@ -1452,6 +1452,17 @@ ${
   `;
 }
 
+// window.open() with a name is the reliable way to reuse the same tab
+// across repeat clicks - an <a target="..."> with rel="noopener" was
+// tried first, but noopener makes some browsers force a brand new tab
+// every time instead of reusing the named one, which was logging the
+// agent out of their already-open WhatsApp Web session on every click.
+function openWhatsAppChat(phone) {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (!digits) return;
+  window.open(`https://web.whatsapp.com/send?phone=${digits}`, "mul_whatsapp_web");
+}
+
 // =========================
 // MAINTENANCE QUEUE (List View)
 // =========================
@@ -1558,9 +1569,8 @@ function renderMaintenanceQueueRows() {
         <td>${escapeHtml(prettyProgramName(c.program || "-"))}</td>
         <td>
           <a
-            href="https://web.whatsapp.com/send?phone=${(c.phone || "").replace(/\D/g, "")}"
-            target="mul_whatsapp_web"
-            rel="noopener"
+            href="javascript:void(0)"
+            onclick="openWhatsAppChat('${(c.phone || "").replace(/\D/g, "")}')"
             style="display:inline-block;text-align:center;text-decoration:none;padding:6px 12px;border-radius:8px;background:#25D366;color:#fff;font-weight:700;font-size:13px;white-space:nowrap;"
           >💬 Chat</a>
         </td>
@@ -1669,9 +1679,8 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
   </span>
 
   <a
-    href="https://web.whatsapp.com/send?phone=${(selectedChat?.phone || phone).replace(/\D/g, "")}"
-    target="mul_whatsapp_web"
-    rel="noopener"
+    href="javascript:void(0)"
+    onclick="openWhatsAppChat('${(selectedChat?.phone || phone).replace(/\D/g, "")}')"
     style="display:inline-block;text-align:center;text-decoration:none;padding:6px 12px;border-radius:8px;background:#25D366;color:#fff;font-weight:700;font-size:13px;white-space:nowrap;"
   >💬 WhatsApp</a>
 
