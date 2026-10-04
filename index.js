@@ -4372,8 +4372,62 @@ app.post("/webhook", async (req, res) => {
       try {
         await createUserIfNotExists(from, contactName);
 
-        const incomingPreview = msg.text?.body || "[Message received]";
-        await incrementUnreadAndSetIncoming(from, incomingPreview, "agent_waiting");
+        // Mirrors the normal incoming-message parsing further below
+        // (type/text/media extraction) - needed here too because this
+        // branch returns before ever reaching that code, and without a
+        // real saveMessage() call the chat list's last_message preview
+        // (from incrementUnreadAndSetIncoming) showed the new message
+        // while the chat window itself stayed empty, since that reads
+        // from the messages table, not from chats.last_message.
+        const maintenanceMsgType = msg.type || "text";
+        let maintenanceIncomingText = "";
+        let maintenanceMediaId = null;
+        let maintenanceMediaUrl = null;
+        let maintenanceFileName = null;
+        let maintenanceMimeType = null;
+
+        if (maintenanceMsgType === "text") {
+          maintenanceIncomingText = msg.text?.body || "";
+        } else if (maintenanceMsgType === "interactive" && msg.interactive?.type === "button_reply") {
+          maintenanceIncomingText = msg.interactive.button_reply?.title || "[Button Reply]";
+        } else if (maintenanceMsgType === "image") {
+          maintenanceIncomingText = "[Image]";
+          maintenanceMediaId = msg.image?.id || null;
+          maintenanceMimeType = msg.image?.mime_type || null;
+          maintenanceMediaUrl = await downloadWhatsAppMedia(maintenanceMediaId, maintenanceMimeType);
+        } else if (maintenanceMsgType === "document") {
+          maintenanceIncomingText = msg.document?.filename || "[Document]";
+          maintenanceMediaId = msg.document?.id || null;
+          maintenanceFileName = msg.document?.filename || null;
+          maintenanceMimeType = msg.document?.mime_type || null;
+          maintenanceMediaUrl = await downloadWhatsAppMedia(maintenanceMediaId, maintenanceMimeType);
+        } else if (maintenanceMsgType === "video") {
+          maintenanceIncomingText = "[Video]";
+          maintenanceMediaId = msg.video?.id || null;
+          maintenanceMimeType = msg.video?.mime_type || null;
+          maintenanceMediaUrl = await downloadWhatsAppMedia(maintenanceMediaId, maintenanceMimeType);
+        } else if (maintenanceMsgType === "audio") {
+          maintenanceIncomingText = "[Audio]";
+          maintenanceMediaId = msg.audio?.id || null;
+          maintenanceMimeType = msg.audio?.mime_type || null;
+          maintenanceMediaUrl = await downloadWhatsAppMedia(maintenanceMediaId, maintenanceMimeType);
+        } else {
+          maintenanceIncomingText = `[${maintenanceMsgType}]`;
+        }
+
+        await saveMessage({
+          phone: from,
+          sender: "user",
+          type: maintenanceMsgType,
+          text: maintenanceIncomingText,
+          media_id: maintenanceMediaId,
+          media_url: maintenanceMediaUrl,
+          file_name: maintenanceFileName,
+          mime_type: maintenanceMimeType,
+          wamid: msg.id || null
+        });
+
+        await incrementUnreadAndSetIncoming(from, maintenanceIncomingText, "agent_waiting");
 
         const chatRow = await pool.query(
           "SELECT maintenance_notice_sent_at FROM chats WHERE phone = $1",
