@@ -420,6 +420,7 @@ async function getFeeProgramOptions(categoryId) {
 
 async function sendFeeCalculatorFlow(to) {
   if (!WHATSAPP_FLOW_ID) return;
+  if (isMaintenanceModeActive()) return;
   try {
     const categories = await getFeeCategoryOptions();
 
@@ -496,6 +497,7 @@ Please find attached the complete fee structure.`,
 
 async function sendLeadCaptureFlow(to) {
   if (!WHATSAPP_LEAD_FLOW_ID) return false;
+  if (isMaintenanceModeActive()) return false;
   try {
     const categories = await getFeeCategoryOptions();
 
@@ -559,6 +561,7 @@ async function sendRegistrationFlow(to) {
   // failure at submission (real scenario: only MUL_REGISTRATION_API_KEY
   // got removed while pausing this feature, Flow ID was left in place).
   if (!WHATSAPP_REGISTRATION_FLOW_ID || !MUL_REGISTRATION_API_KEY) return false;
+  if (isMaintenanceModeActive()) return false;
   try {
     const categories = await getFeeCategoryOptions();
 
@@ -2106,7 +2109,19 @@ Location: Office # 303, Ground Floor, Jabir Ibn Hayyan Block`
 // =========================
 // WHATSAPP SEND HELPERS
 // =========================
+// Checked at the top of every function below that actually calls the
+// Graph API - this is the single choke point for MAINTENANCE_MODE, so a
+// background setInterval job (checkPendingFollowups, checkCallbackOffers,
+// checkOnHoldReminders, ...) can never slip a paid message out just
+// because it isn't routed through the /webhook handler's own gate. Found
+// the hard way: the /webhook gate alone let sendFollowupMessage's 10-
+// minute interval keep sending while MAINTENANCE_MODE was on.
+function isMaintenanceModeActive() {
+  return process.env.MAINTENANCE_MODE === "true";
+}
+
 async function sendTextMessage(to, message, chatStatus = "active") {
+  if (isMaintenanceModeActive()) return;
   try {
     await axios.post(
       `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
@@ -2148,6 +2163,7 @@ async function sendDocumentMessage(
   mimeType = "application/pdf",
   replyContext = null
 ) {
+  if (isMaintenanceModeActive()) return;
   try {
     const payload = {
       messaging_product: "whatsapp",
@@ -2206,6 +2222,7 @@ async function sendImageMessage(
   sender = "agent",
   replyContext = null
 ) {
+  if (isMaintenanceModeActive()) return;
   try {
     const payload = {
       messaging_product: "whatsapp",
@@ -2253,6 +2270,9 @@ async function sendImageMessage(
 }
 
 async function sendAgentTextMessage(to, message, chatStatus = "agent_active", replyContext = null) {
+  if (isMaintenanceModeActive()) {
+    throw new Error("Sending is paused (MAINTENANCE_MODE) - use the manual WhatsApp workflow instead");
+  }
   try {
     const payload = {
       messaging_product: "whatsapp",
@@ -2310,6 +2330,7 @@ To explore options, type MENU.`;
 }
 
 async function sendReplyButtons(to, bodyText, buttons, chatStatus = "active") {
+  if (isMaintenanceModeActive()) return;
   try {
     await axios.post(
       `https://graph.facebook.com/v23.0/${PHONE_NUMBER_ID}/messages`,
