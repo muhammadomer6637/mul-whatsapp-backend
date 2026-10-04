@@ -1558,7 +1558,7 @@ function renderMaintenanceQueueRows() {
         <td>${escapeHtml(prettyProgramName(c.program || "-"))}</td>
         <td>
           <a
-            href="https://wa.me/${(c.phone || "").replace(/\D/g, "")}"
+            href="https://web.whatsapp.com/send?phone=${(c.phone || "").replace(/\D/g, "")}"
             target="mul_whatsapp_web"
             rel="noopener"
             style="display:inline-block;text-align:center;text-decoration:none;padding:6px 12px;border-radius:8px;background:#25D366;color:#fff;font-weight:700;font-size:13px;white-space:nowrap;"
@@ -1669,7 +1669,7 @@ async function openChat(phone, markRead = true, preserveScroll = false) {
   </span>
 
   <a
-    href="https://wa.me/${(selectedChat?.phone || phone).replace(/\D/g, "")}"
+    href="https://web.whatsapp.com/send?phone=${(selectedChat?.phone || phone).replace(/\D/g, "")}"
     target="mul_whatsapp_web"
     rel="noopener"
     style="display:inline-block;text-align:center;text-decoration:none;padding:6px 12px;border-radius:8px;background:#25D366;color:#fff;font-weight:700;font-size:13px;white-space:nowrap;"
